@@ -133,22 +133,17 @@ describe('NekoJSON: monetization safety', () => {
       // Phase 1.1g
       'view.table',
       'search',
+      // Phase 1.1h — closes the Phase 1 free-tier feature set.
+      'copy.path',
+      'copy.value',
     ]);
     const declared = new Set(jsonManifest.entitlements.free);
     expect(declared).toEqual(expectedFree);
 
-    // Deferred free features must NOT be declared in the manifest
-    // until the implementation lands in the same PR. Phase 1.1a
-    // shipped textual diff; Phase 1.1f shipped tree + text views;
-    // Phase 1.1g shipped the table view + search. Only copy.* remains
-    // deferred — those are Phase 1.1h.
-    const deferredFree = [
-      'copy.path',
-      'copy.value',
-    ];
-    for (const id of deferredFree) {
-      expect(declared.has(id)).toBe(false);
-    }
+    // After Phase 1.1h, no charter-declared free feature remains
+    // unimplemented. Any new diagnostic or entitlement must arrive
+    // via a new PR that updates this expected set in the same
+    // commit — the regression-guard list is now empty by design.
   });
 });
 

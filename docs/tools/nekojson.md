@@ -223,12 +223,15 @@ Free **shipped Phase 1.1g** (in `manifest.entitlements.free`):
 - Table view (`view.table`) — [`apps/web-suite/src/TableView.tsx`](../../apps/web-suite/src/TableView.tsx)
 - Search across keys and values (`search`) — [`apps/web-suite/src/search.ts`](../../apps/web-suite/src/search.ts) (wired into TreeView + TableView through App.tsx)
 
-Free **deferred to follow-up PRs** (will be added to
-`manifest.entitlements.free` when their implementations land — they are
-*not* declared there today, because unimplemented free features are
-misleading advertising):
+Free **shipped Phase 1.1h** (in `manifest.entitlements.free`):
 
-- Copy path / copy value — Phase 1.1h
+- Copy path (`copy.path`) — [`apps/web-suite/src/clipboard.ts`](../../apps/web-suite/src/clipboard.ts) + button in `App.tsx`. Writes the active JSON Pointer through `navigator.clipboard.writeText` with a hidden-textarea + `document.execCommand('copy')` fallback. No network, no telemetry.
+- Copy value (`copy.value`) — same helper, writes the JSON value at the active path. Uses [`apps/web-suite/src/pointer-resolve.ts`](../../apps/web-suite/src/pointer-resolve.ts) for RFC 6901 resolution (reuses `parsePointer` from lens-json).
+
+**Phase 1 free tier is now closed.** Every charter-declared free
+feature is implementation-backed in `manifest.entitlements.free`. Any
+future free entitlement must land in a new PR that updates the
+monetization-safety conformance test in the same commit.
 
 Pro:
 
@@ -375,4 +378,4 @@ explicit follow-up PRs, not silently:
 | UI shell + manifest panel                          | **Shipped — Phase 1.1e** | `apps/web-suite` scaffold + UI charter at [`docs/tools/nekojson-ui.md`](nekojson-ui.md). |
 | Tree view + Text view                              | **Shipped — Phase 1.1f** | [`TreeView.tsx`](../../apps/web-suite/src/TreeView.tsx) + [`TextView.tsx`](../../apps/web-suite/src/TextView.tsx). |
 | Table view + Search across keys/values             | **Shipped — Phase 1.1g** | [`TableView.tsx`](../../apps/web-suite/src/TableView.tsx) + [`search.ts`](../../apps/web-suite/src/search.ts). |
-| Copy path + Copy value                             | Follow-up — Phase 1.1h | Last remaining free UI affordances; manifest entitlements added in the same PR that ships them. |
+| Copy path + Copy value                             | **Shipped — Phase 1.1h** | Local-clipboard affordances. [`clipboard.ts`](../../apps/web-suite/src/clipboard.ts) + buttons in App. `manifest.entitlements.free` now includes `copy.path` + `copy.value`. **Phase 1 free tier closed.** |

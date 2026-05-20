@@ -9,8 +9,8 @@
 | ------- | --------------------------- | ----- |
 | Phase 0   | **Complete** (commit `93efaa5`) | Platform spine + audit patches landed. |
 | Phase 1.0 | **Complete** (PR #2, commit `324115c`) | Engine MVP merged. No UI, no diff, no search — those land in Phase 1.1+ follow-up PRs. |
-| Phase 1.1 | **Active**                  | Follow-up engine + UI capabilities. See **Active Next Queue** below. |
-| Phase 2   | Not started                 | Fast adjacent tools. |
+| Phase 1.1 | **Complete** (closes at this PR) | All charter-declared free engine + UI capabilities shipped: diff (1.1a), large-doc threshold (1.1b), tokenizer (1.1c), duplicate-key + trailing-comma (1.1d), UI shell (1.1e), tree + text (1.1f), table + search (1.1g), copy.path + copy.value (1.1h). |
+| Phase 2   | **Active next**             | Phase 2.0 NekoEnv charter PR is the next-up queue row. |
 | Phase 3   | Not started                 | Premium engines (graph, semantic diff, migration). |
 | Phase 4   | Not started                 | Heavier tools (YAML, API Lens, Headers, Types, RBAC). |
 | Phase 5   | Not started                 | Expansion packs. |
@@ -35,9 +35,9 @@ previous row `Done`.
 | 5     | Phase 1.1d | Implementation | `json.duplicate_key` + `json.trailing_comma` diagnostics using the new tokenizer.              | Done (PR #7 / `6a230f0`) |
 | 6     | Phase 1.1e | UI Planning + Shell | `apps/web-suite` shell scaffold + UI charter; manifest-summary panel. Views/search/copy queued as 1.1f–h. | Done (PR #8 / `50ab36c`) |
 | 7     | Phase 1.1f | Implementation | NekoJSON **tree view** + **text view** + flip `view.tree` / `view.text` into `entitlements.free`. | Done (PR #9 / `87293eb`) |
-| 8     | Phase 1.1g | Implementation | NekoJSON **table view** + **search** across keys/values + flip `view.table` / `search` into `entitlements.free`. | Done (this PR) |
-| 9     | Phase 1.1h | Implementation | **Copy.path** + **copy.value** affordances + flip both into `entitlements.free`.               | **Next** |
-| 10    | Phase 2.0  | Charter        | NekoEnv charter PR (10-question reuse gate).                                                   | Later  |
+| 8     | Phase 1.1g | Implementation | NekoJSON **table view** + **search** across keys/values + flip `view.table` / `search` into `entitlements.free`. | Done (PR #10 / `337a05d`) |
+| 9     | Phase 1.1h | Implementation | **Copy.path** + **copy.value** affordances + flip both into `entitlements.free`. **Phase 1 free tier closes here.** | Done (this PR) |
+| 10    | Phase 2.0  | Charter        | NekoEnv charter PR (10-question reuse gate).                                                   | **Next** |
 
 `Later` rows are intentionally not in the queue order — they are
 candidates for promotion to `Queued` after Phase 1 is fully closed.
@@ -108,11 +108,13 @@ flag in the same PR.
 - trailing-comma detection (`json.trailing_comma`) — Phase 1.1d (PR #7)
 - `apps/web-suite` shell + UI charter ([`docs/tools/nekojson-ui.md`](tools/nekojson-ui.md)) — Phase 1.1e (PR #8)
 - tree view + text view (`view.tree`, `view.text`) — Phase 1.1f (PR #9)
-- table view + search (`view.table`, `search`) — Phase 1.1g (this PR)
+- table view + search (`view.table`, `search`) — Phase 1.1g (PR #10)
+- copy.path + copy.value (`copy.path`, `copy.value`) — Phase 1.1h (this PR)
 
-**Remaining** (each PR adds its entitlement(s) to `manifest.entitlements.free` in the same commit):
-
-- copy path + copy value — Phase 1.1h
+**Phase 1 free tier is closed.** Every charter-declared free feature
+ships and is declared in `manifest.entitlements.free`. The Phase 1 Pro
+manifest declarations remain advertising for the future
+`@nekotools-pro/*` package.
 
 ### Phase 1 Pro (future private package)
 

@@ -7,7 +7,7 @@ describe('TreeView', () => {
     render(
       <TreeView
         value={{ a: 1, b: 'two' }}
-        activePath=""
+        activePath={null}
         onSelectPath={() => {}}
       />,
     );
@@ -21,7 +21,7 @@ describe('TreeView', () => {
     render(
       <TreeView
         value={{ outer: { inner: 1 } }}
-        activePath=""
+        activePath={null}
         onSelectPath={() => {}}
       />,
     );
@@ -40,7 +40,7 @@ describe('TreeView', () => {
     render(
       <TreeView
         value={{ a: 1 }}
-        activePath=""
+        activePath={null}
         onSelectPath={onSelectPath}
       />,
     );
@@ -64,7 +64,7 @@ describe('TreeView', () => {
     render(
       <TreeView
         value={{ outer: { needle: 1, other: 2 } }}
-        activePath=""
+        activePath={null}
         onSelectPath={() => {}}
         searchQuery="needle"
       />,
@@ -79,12 +79,28 @@ describe('TreeView', () => {
     render(
       <TreeView
         value={{ a: 1 }}
-        activePath=""
+        activePath={null}
         onSelectPath={() => {}}
         searchQuery="zzz-no-such-key"
       />,
     );
     expect(screen.getByTestId('tree-no-matches')).toBeInTheDocument();
     expect(screen.queryByRole('tree')).not.toBeInTheDocument();
+  });
+
+  it('PR #11 audit blocker 1: activePath=null does not falsely mark the root row as selected', () => {
+    render(
+      <TreeView value={{ a: 1 }} activePath={null} onSelectPath={() => {}} />,
+    );
+    const rootRow = screen.getByText('(root)').closest('li');
+    expect(rootRow).toHaveAttribute('aria-selected', 'false');
+  });
+
+  it('PR #11 audit blocker 1: activePath="" marks the root row as selected (RFC 6901 root pointer)', () => {
+    render(
+      <TreeView value={{ a: 1 }} activePath="" onSelectPath={() => {}} />,
+    );
+    const rootRow = screen.getByText('(root)').closest('li');
+    expect(rootRow).toHaveAttribute('aria-selected', 'true');
   });
 });
