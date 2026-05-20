@@ -51,9 +51,13 @@ export const JSON_DIAGNOSTIC_CODES = {
 } as const;
 
 /**
- * Default soft size threshold for `json.text` parser input, in bytes
- * (counted as `input.raw.length`, which approximates UTF-16 code units;
- * close enough for an *info* heuristic).
+ * Default soft size threshold for `json.text` parser input, in **UTF-8
+ * bytes**.
+ *
+ * The parser measures input size with `TextEncoder.encode().byteLength`,
+ * not with `input.raw.length` (which would count UTF-16 code units and
+ * under-count non-ASCII payloads). The `*Bytes` naming throughout the
+ * lens is therefore honest at the boundary.
  *
  * Chosen at 10 MB — the conservative end of the 10–50 MB range the
  * charter sketched. The diagnostic is informational only: nothing in
@@ -62,6 +66,7 @@ export const JSON_DIAGNOSTIC_CODES = {
  * when to refuse a render; until then, this just gives the user a
  * heads-up that subsequent operations may be slow.
  *
- * Per-tool override via `LargeDocumentOptions.largeDocumentBytes`.
+ * Per-registration override via
+ * `BuildJsonRegistrationOptions.largeDocumentBytes`.
  */
 export const DEFAULT_LARGE_DOCUMENT_BYTES = 10 * 1024 * 1024;

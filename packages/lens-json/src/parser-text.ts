@@ -134,11 +134,14 @@ function utf8ByteLength(s: string): number {
 }
 
 /**
- * Best-effort extraction of a byte offset from a JSON.parse error message.
- * V8 historically emits "Unexpected token ... in JSON at position 42" or
- * (Node 21+) "Unexpected token ... is not valid JSON". The regex is
- * intentionally permissive: any failure returns `undefined` and the
- * diagnostic carries no span.
+ * Best-effort extraction of an offset from a JSON.parse error message.
+ *
+ * V8 historically emits "Unexpected token ... in JSON at position 42"
+ * or (Node 21+) "Unexpected token ... is not valid JSON". The "position
+ * N" value is treated as an offset into `input.raw` (i.e., a JS string
+ * index, not necessarily a UTF-8 byte offset) and clamped to the input
+ * length. The regex is intentionally permissive: any failure returns
+ * `undefined` and the diagnostic carries no span.
  */
 function extractPositionSpan(
   message: string,
