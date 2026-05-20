@@ -1,11 +1,10 @@
 # NekoJSON UI — Phase 1.1e charter
 
-> Status: **IMPLEMENTED through Phase 1.1f.** The shell (Phase 1.1e)
-> and the tree + text views (Phase 1.1f) ship. Table view + search
-> are Phase 1.1g. Copy.path + copy.value are Phase 1.1h. All four
-> remaining items will update `manifest.entitlements.free` in the
-> same PR that adds their implementation, per the open-core
-> governance rule.
+> Status: **IMPLEMENTED through Phase 1.1g.** Shell (1.1e) + tree +
+> text views (1.1f) + table view + search across keys/values (1.1g)
+> all ship. Only copy.path / copy.value remain — Phase 1.1h. Those
+> will update `manifest.entitlements.free` in the same PR that adds
+> their implementation, per the open-core governance rule.
 
 ## What `apps/web-suite` is
 
@@ -79,8 +78,8 @@ Specifically deferred:
 | ---------------------- | ------------ |
 | Tree view              | **Shipped — Phase 1.1f** ([`TreeView.tsx`](../../apps/web-suite/src/TreeView.tsx)) |
 | Text view              | **Shipped — Phase 1.1f** ([`TextView.tsx`](../../apps/web-suite/src/TextView.tsx)) |
-| Table view             | Phase 1.1g   |
-| Search across keys/values | Phase 1.1g |
+| Table view             | **Shipped — Phase 1.1g** ([`TableView.tsx`](../../apps/web-suite/src/TableView.tsx)) |
+| Search across keys/values | **Shipped — Phase 1.1g** ([`search.ts`](../../apps/web-suite/src/search.ts)) |
 | Copy path / copy value | Phase 1.1h   |
 
 ## Reuse map

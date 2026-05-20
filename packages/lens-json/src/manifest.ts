@@ -90,6 +90,9 @@ export const jsonManifest: ToolManifest = {
       // Phase 1.1f — UI views shipped in apps/web-suite.
       'view.tree',
       'view.text',
+      // Phase 1.1g — table view + search shipped in apps/web-suite.
+      'view.table',
+      'search',
     ],
     pro: [
       'view.graph',

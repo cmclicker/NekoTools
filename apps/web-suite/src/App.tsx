@@ -9,28 +9,29 @@ import {
 import { Diagnostics } from './Diagnostics.js';
 import { TreeView } from './TreeView.js';
 import { TextView } from './TextView.js';
+import { TableView } from './TableView.js';
 import { parseInput } from './parse-input.js';
 
 /**
- * Phase 1.1f web-suite App.
+ * Phase 1.1g web-suite App.
  *
  * The user pastes JSON; the lens-json parser runs through the
- * tool-runtime registry; the result is rendered in either tree or
- * text view (toggled by the user). Active-path selection in the tree
- * is exposed via `uiState.activePath`, persisted in component state.
- * `uiState.viewMode` similarly mirrors the toggle.
+ * tool-runtime registry; the result renders in one of three views
+ * (tree, text, table). Active-path selection in the tree is exposed
+ * via `uiState.activePath`. `uiState.viewMode` mirrors the toggle.
+ * `uiState.searchQuery` filters tree and table rows.
  *
- * Workspace save/load to disk is NOT in 1.1f scope — the `uiState`
+ * Workspace save/load to disk is NOT in 1.1g scope — the `uiState`
  * shape lives in component state, and the workspace serializer's
- * round-trip is exercised by tests in the conformance suite. UI
- * affordances for save/load can land in a later PR.
+ * round-trip is exercised by tests in the conformance suite.
  */
 
-export type ViewMode = 'tree' | 'text';
+export type ViewMode = 'tree' | 'text' | 'table';
 
 export interface NekoJsonUiState {
   readonly viewMode: ViewMode;
   readonly activePath: string;
+  readonly searchQuery: string;
 }
 
 interface AppProps {
@@ -41,13 +42,14 @@ interface AppProps {
 const DEFAULT_UI_STATE: NekoJsonUiState = {
   viewMode: 'tree',
   activePath: '',
+  searchQuery: '',
 };
 
 const SAMPLE_INPUT = `{
   "tool": "NekoJSON",
-  "phase": "1.1f",
-  "features": ["tree view", "text view"],
-  "stats": { "tests": 224, "packages": 8 }
+  "phase": "1.1g",
+  "features": ["tree view", "text view", "table view", "search"],
+  "stats": { "tests": 252, "packages": 8 }
 }`;
 
 const registry = (() => {
@@ -64,6 +66,9 @@ export function App({ initialInput, initialUiState }: AppProps = {}): JSX.Elemen
   const [activePath, setActivePath] = useState<string>(
     initialUiState?.activePath ?? DEFAULT_UI_STATE.activePath,
   );
+  const [searchQuery, setSearchQuery] = useState<string>(
+    initialUiState?.searchQuery ?? DEFAULT_UI_STATE.searchQuery,
+  );
 
   const parsed = useMemo(() => parseInput(registry, input), [input]);
 
@@ -75,8 +80,8 @@ export function App({ initialInput, initialUiState }: AppProps = {}): JSX.Elemen
           Local-only, air-gapped-capable, zero-telemetry developer workbenches.
         </p>
         <p className="suite__phase">
-          Web shell — Phase 1.1f. Hosting <strong>{jsonManifest.name}</strong>{' '}
-          (tree + text views; table view and search are queued).
+          Web shell — Phase 1.1g. Hosting <strong>{jsonManifest.name}</strong>{' '}
+          (tree, text, and table views with search; copy affordances are queued for 1.1h).
         </p>
       </header>
 
@@ -121,7 +126,28 @@ export function App({ initialInput, initialUiState }: AppProps = {}): JSX.Elemen
               />
               Text
             </label>
+            <label className={viewMode === 'table' ? 'viewmode--active' : ''}>
+              <input
+                type="radio"
+                name="viewMode"
+                value="table"
+                checked={viewMode === 'table'}
+                onChange={() => setViewMode('table')}
+              />
+              Table
+            </label>
           </fieldset>
+
+          <label className="search">
+            <span className="visually-hidden">Search keys and values</span>
+            <input
+              type="search"
+              placeholder="Search keys / values…"
+              value={searchQuery}
+              onChange={(e: ChangeEvent<HTMLInputElement>) => setSearchQuery(e.target.value)}
+              data-testid="search-input"
+            />
+          </label>
 
           {activePath ? (
             <p className="results__path" data-testid="active-path">
@@ -140,14 +166,18 @@ export function App({ initialInput, initialUiState }: AppProps = {}): JSX.Elemen
               value={parsed.value}
               activePath={activePath}
               onSelectPath={setActivePath}
+              searchQuery={searchQuery}
             />
           ) : (
-            // PR #9 audit blocker 1: do NOT render invalid input as a
-            // fake `null` tree document. `null` is a valid JSON root
-            // and must reach TreeView only when parsing actually
-            // produced a `json.document` artifact. The text view
-            // remains useful for fixing the issue and gets the raw
-            // input + diagnostics regardless.
+            <div role="status" className="empty-state" data-testid="no-document">
+              No valid JSON document yet. Fix the diagnostics below or
+              switch to the Text view to inspect the raw input.
+            </div>
+          )
+        ) : viewMode === 'table' ? (
+          parsed.hasDocument ? (
+            <TableView value={parsed.value} searchQuery={searchQuery} />
+          ) : (
             <div role="status" className="empty-state" data-testid="no-document">
               No valid JSON document yet. Fix the diagnostics below or
               switch to the Text view to inspect the raw input.
@@ -169,4 +199,3 @@ export function App({ initialInput, initialUiState }: AppProps = {}): JSX.Elemen
     </main>
   );
 }
-

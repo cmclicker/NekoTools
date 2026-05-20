@@ -59,4 +59,32 @@ describe('TreeView', () => {
     const aRow = screen.getByText('a').closest('li');
     expect(aRow).toHaveAttribute('aria-selected', 'true');
   });
+
+  it('Phase 1.1g: searchQuery filters nodes to matches + ancestors', () => {
+    render(
+      <TreeView
+        value={{ outer: { needle: 1, other: 2 } }}
+        activePath=""
+        onSelectPath={() => {}}
+        searchQuery="needle"
+      />,
+    );
+    const tree = screen.getByRole('tree');
+    expect(within(tree).getByText('outer')).toBeInTheDocument();
+    expect(within(tree).getByText('needle')).toBeInTheDocument();
+    expect(within(tree).queryByText('other')).not.toBeInTheDocument();
+  });
+
+  it('Phase 1.1g: shows the no-matches hint when nothing matches', () => {
+    render(
+      <TreeView
+        value={{ a: 1 }}
+        activePath=""
+        onSelectPath={() => {}}
+        searchQuery="zzz-no-such-key"
+      />,
+    );
+    expect(screen.getByTestId('tree-no-matches')).toBeInTheDocument();
+    expect(screen.queryByRole('tree')).not.toBeInTheDocument();
+  });
 });

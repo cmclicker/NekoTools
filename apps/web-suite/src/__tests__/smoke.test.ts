@@ -22,14 +22,17 @@ describe('apps/web-suite scaffold', () => {
     expect(jsonManifest.offlinePolicy.networkPolicy).toBe('network-forbidden');
   });
 
-  it('manifest free entitlements include every feature shipped through Phase 1.1f', () => {
+  it('manifest free entitlements include every feature shipped through Phase 1.1g', () => {
     // Regression guard: confirms the shell sees the same manifest the
     // tests in lens-json see (no version drift, no stale bundle).
     expect(jsonManifest.entitlements.free).toContain('parse');
     expect(jsonManifest.entitlements.free).toContain('diff.textual');
-    // Phase 1.1f — UI views shipped in apps/web-suite.
+    // Phase 1.1f — tree + text views.
     expect(jsonManifest.entitlements.free).toContain('view.tree');
     expect(jsonManifest.entitlements.free).toContain('view.text');
+    // Phase 1.1g — table view + search.
+    expect(jsonManifest.entitlements.free).toContain('view.table');
+    expect(jsonManifest.entitlements.free).toContain('search');
     expect(jsonManifest.capabilities.canDiff).toBe(true);
   });
 
