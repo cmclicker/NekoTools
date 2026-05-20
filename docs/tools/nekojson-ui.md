@@ -96,19 +96,22 @@ The shell is a *consumer*, not a producer. It reuses:
 No new contracts are introduced by the UI. No new artifact kinds. The
 UI's job is to *render* what already exists.
 
-## Workspace persistence (Phase 1.1f+ — declared here for planning)
+## Workspace persistence (consumed as of Phase 1.1g)
 
-When views land, the UI will persist its `uiState` via the existing
-`jsonWorkspaceSerializer` shipped in Phase 0. Fields the UI will
-populate:
+The UI threads `uiState` through React state and accepts it via
+`App`'s `initialUiState` prop. All three fields the NekoJSON charter
+Section 6 "Intent for Phase 1.1+" declared are now consumed:
 
-- `uiState.viewMode` — `'tree' | 'text' | 'table'`
-- `uiState.activePath` — the JSON Pointer the user has selected
-- `uiState.searchQuery` — current search text
+| Field                  | Consumed by                                                                                                   | Shipped in |
+| ---------------------- | ------------------------------------------------------------------------------------------------------------- | ---------- |
+| `uiState.viewMode`     | The Tree / Text / Table radio in `App.tsx`.                                                                   | 1.1f (tree, text) + 1.1g (table) |
+| `uiState.activePath`   | `TreeView` highlights the matching row; the toolbar shows the JSON Pointer.                                   | 1.1f       |
+| `uiState.searchQuery`  | Filters `TreeView` (matches + ancestors, auto-expanded) and `TableView` rows (cell + column-name substring).  | 1.1g       |
 
-These were sketched in the NekoJSON charter Section 6 "Intent for
-Phase 1.1+" and remain unconsumed in this PR. They land with the view
-that needs them.
+The existing `jsonWorkspaceSerializer` (shipped in Phase 0) still
+treats `uiState` as opaque and round-trips it losslessly — the
+conformance suite pins all three fields with dedicated tests. The UI
+does not yet expose a save / load button; that's a follow-up.
 
 ## Offline policy
 
@@ -157,15 +160,25 @@ zero violations on this PR.
 - [x] No new entitlements in `jsonManifest.entitlements.free` — the
       shell does not yet implement any user-actionable feature.
 
-## Acceptance criteria for the *next* PR (Phase 1.1f, preview)
+## Acceptance criteria for the *next* PR (Phase 1.1h, preview)
 
 Tracked here for the implementation PR's checklist:
 
-- [ ] Tree-view component reads a `json.document` artifact and renders
-      collapsible nodes.
-- [ ] Text-view component renders raw JSON with diagnostic markers
-      (using tokenizer spans).
-- [ ] `manifest.entitlements.free` gains `view.tree` + `view.text` in
+- [ ] "Copy path" affordance writes the current `uiState.activePath`
+      (RFC 6901 JSON Pointer) to the user's clipboard via the local
+      Clipboard API — no network, no telemetry, no auth.
+- [ ] "Copy value" affordance serializes the JSON value at the active
+      path and writes it to the clipboard locally.
+- [ ] `manifest.entitlements.free` gains `copy.path` + `copy.value` in
       the same PR.
-- [ ] Workspace round-trip preserves `uiState.viewMode` and
-      `uiState.activePath`.
+- [ ] Clipboard path is purely local: `navigator.clipboard.writeText`
+      with a permissive in-page fallback (e.g. hidden `<textarea>` +
+      `document.execCommand`); no `fetch`, no remote helper, no
+      third-party clipboard library.
+- [ ] No new external runtime dependencies.
+- [ ] Pure-helper unit tests cover the pointer / value formatter.
+      Component-level tests use the testing-library `userEvent` /
+      `fireEvent` patterns from Phase 1.1f-g.
+
+When this PR merges, Phase 1 is fully closed and the queue's next-up
+becomes Phase 2.0 (NekoEnv charter).

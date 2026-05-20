@@ -45,11 +45,17 @@ const DEFAULT_UI_STATE: NekoJsonUiState = {
   searchQuery: '',
 };
 
+// The sample is intentionally release-stable: no test counts, no PR
+// numbers, no other fast-drifting values. Those are a liability in a
+// demo input — they go stale the next time we ship.
 const SAMPLE_INPUT = `{
   "tool": "NekoJSON",
-  "phase": "1.1g",
-  "features": ["tree view", "text view", "table view", "search"],
-  "stats": { "tests": 252, "packages": 8 }
+  "doctrine": "local-only",
+  "views": ["tree", "text", "table"],
+  "diagnostics": {
+    "kinds": ["error", "warning", "info"],
+    "examples": null
+  }
 }`;
 
 const registry = (() => {
