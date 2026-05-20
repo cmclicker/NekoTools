@@ -131,8 +131,12 @@ zero violations on this PR.
 - **In-editor diagnostics for text view** — Phase 1.1f. Either
   CodeMirror 6 or a hand-rolled gutter; both are achievable without
   new doctrine implications.
-- **Theming** — Out of scope for Phase 1. The shell ships one light
-  theme. Dark mode is a Phase 2+ topic.
+- **Theming** — A formal theming system is out of scope for Phase 1
+  and remains Phase 2+. The shell does include minimal
+  `prefers-color-scheme` compatibility in `styles.css` so it does not
+  blind users on dark-default systems, but there is no user-selectable
+  theme, no theme tokens, no design-system layer. That all lands when
+  theming is formally chartered.
 - **Routing** — None for now. The shell has one page (NekoJSON). When
   a second lens lands, a minimal hand-rolled hash router will
   introduce routes; no react-router until necessary.
