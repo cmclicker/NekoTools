@@ -14,9 +14,11 @@ import {
   findFirstErrorToken,
   findTokenAt,
   tokenize,
+  type JsonToken,
   type JsonTokenSpan,
 } from './tokenizer.js';
 import { makeIdFactory, type Clock } from './util.js';
+import { walkForDiagnostics } from './walker-diagnostics.js';
 
 const TOOL_ID = 'json';
 const PARSER_ID = 'json.text';
@@ -33,11 +35,14 @@ interface ParserDeps {
 
 /**
  * Phase 1 parser. `JSON.parse` is the source of truth for value-tree
- * construction and validity — that has not changed. What changed in
- * Phase 1.1c is the diagnostic span resolution: on a parse failure,
- * `resolveSyntaxErrorSpan` consults the in-tree tokenizer to pick a
- * multi-character span pointing at the offending token, instead of
- * just the single position the V8 error message reports.
+ * construction and validity — that has not changed. Phase 1.1c added
+ * the in-tree tokenizer for syntax-error span resolution; Phase 1.1d
+ * adds a token-stream walker that emits `json.duplicate_key` and
+ * `json.trailing_comma` warnings.
+ *
+ * Tokenization runs exactly once per `parse()` call. The token stream
+ * feeds both the walker (always) and the span resolver (only on a
+ * JSON.parse failure).
  *
  * All offsets in spans are JS string offsets into `input.raw`, not
  * UTF-8 byte offsets.
@@ -68,15 +73,21 @@ export function createJsonTextParser(deps: ParserDeps): Parser<JsonArtifact> {
         };
       }
 
+      // One tokenize per parse(). Both the walker and the error-span
+      // resolver consume the same token stream.
+      const tokens = tokenize(input.raw);
+      const walkerDiagnostics = walkForDiagnostics(tokens, diagIds);
+
       let value: unknown;
       try {
         value = JSON.parse(input.raw);
       } catch (err) {
         const message = err instanceof Error ? err.message : String(err);
-        const span = resolveSyntaxErrorSpan(input.raw, message);
+        const span = resolveSyntaxErrorSpan(tokens, input.raw, message);
         return {
           artifacts: [],
           diagnostics: [
+            ...walkerDiagnostics,
             makeDiagnostic(
               diagIds(),
               'error',
@@ -108,7 +119,7 @@ export function createJsonTextParser(deps: ParserDeps): Parser<JsonArtifact> {
       // threshold (`*Bytes`, "10 MB") is then accurate for non-ASCII
       // payloads. `TextEncoder` is a global in Node 16+ and modern
       // browsers — no new dependency.
-      const diagnostics: Diagnostic[] = [];
+      const diagnostics: Diagnostic[] = [...walkerDiagnostics];
       const threshold = deps.largeDocumentBytes ?? DEFAULT_LARGE_DOCUMENT_BYTES;
       const actualBytes = utf8ByteLength(input.raw);
       if (actualBytes > threshold) {
@@ -161,11 +172,10 @@ function utf8ByteLength(s: string): number {
  *      no position info is available at all.
  */
 function resolveSyntaxErrorSpan(
+  tokens: readonly JsonToken[],
   raw: string,
   message: string,
 ): JsonTokenSpan | { startOffset: number; endOffset: number } | undefined {
-  const tokens = tokenize(raw);
-
   const firstError = findFirstErrorToken(tokens);
   if (firstError) return firstError.span;
 

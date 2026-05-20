@@ -31,9 +31,9 @@ previous row `Done`.
 | 1     | Phase 1.0 Closeout | Docs       | Mark PR #2 / `324115c` as complete; add this Active Next Queue; set Phase 1.1a as next. | Done (PR #3 / `0f7c0a2`) |
 | 2     | Phase 1.1a | Implementation | `json.diff` artifact + basic textual diff exporter. Still engine-only; validates the multi-document workspace assumptions. | Done (PR #4 / `819f4bb`) |
 | 3     | Phase 1.1b | Implementation | Large-document soft threshold + `json.large_document` diagnostic.                              | Done (PR #5 / `6e5b639`) |
-| 4     | Phase 1.1c | Planning + Implementation | In-tree tokenizer foundation (always-accurate spans).                              | Done (this PR) |
-| 5     | Phase 1.1d | Implementation | `json.duplicate_key` + `json.trailing_comma` diagnostics using the new tokenizer.              | **Next** |
-| 6     | Phase 1.1e | UI Planning    | `apps/web-suite` shell for NekoJSON tree / text / table views, search, copy.path / copy.value. | Queued |
+| 4     | Phase 1.1c | Planning + Implementation | In-tree tokenizer foundation (always-accurate spans).                              | Done (PR #6 / `4089554`) |
+| 5     | Phase 1.1d | Implementation | `json.duplicate_key` + `json.trailing_comma` diagnostics using the new tokenizer.              | Done (this PR) |
+| 6     | Phase 1.1e | UI Planning    | `apps/web-suite` shell for NekoJSON tree / text / table views, search, copy.path / copy.value. | **Next** |
 | 7     | Phase 2.0  | Charter        | NekoEnv charter PR (10-question reuse gate).                                                   | Later  |
 
 `Later` rows are intentionally not in the queue order — they are
@@ -100,12 +100,12 @@ flag in the same PR.
 
 - basic textual diff + `json.diff` artifact — Phase 1.1a (PR #4)
 - large-document soft threshold (`json.large_document`) — Phase 1.1b (PR #5)
-- in-tree tokenizer for always-accurate spans — Phase 1.1c (this PR)
+- in-tree tokenizer for always-accurate spans — Phase 1.1c (PR #6)
+- duplicate-key detection (`json.duplicate_key`) — Phase 1.1d (this PR)
+- trailing-comma detection (`json.trailing_comma`) — Phase 1.1d (this PR)
 
 **Remaining**
 
-- duplicate-key detection (`json.duplicate_key`)
-- trailing-comma support / non-strict mode (`json.trailing_comma`)
 - tree / table / text views (UI; needs `apps/web-suite` to grow past
   placeholder)
 - search across keys and values (UI)
