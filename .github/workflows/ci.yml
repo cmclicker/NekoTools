@@ -21,3 +21,8 @@ jobs:
       - run: pnpm typecheck
       - run: pnpm lint
       - run: pnpm test
+      # Build verification — every package + app must compile cleanly.
+      # Added in Phase 1.1e (PR #8 audit) when `apps/web-suite` became
+      # the first real app shell. From here forward, "CI green" includes
+      # full build integrity, not just typecheck/lint/test.
+      - run: pnpm build
