@@ -17,6 +17,7 @@ export * from './diff-textual.js';
 export * from './exporters.js';
 export * from './manifest.js';
 export * from './tokenizer.js';
+export * from './walker-diagnostics.js';
 export { FIXED_CLOCK } from './util.js';
 
 /**

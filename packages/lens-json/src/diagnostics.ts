@@ -34,12 +34,12 @@ export function makeDiagnostic(
  *   - json.pointer.unresolved
  *   - json.diff.missing_input
  *   - json.large_document       (Phase 1.1b)
+ *   - json.duplicate_key        (Phase 1.1d — token-stream walker)
+ *   - json.trailing_comma       (Phase 1.1d — token-stream walker)
  *
- * Reserved for future PRs (charter-declared, names locked in this file
- * so a follow-up cannot accidentally re-use them with a different
- * meaning):
- *   - json.duplicate_key        (Phase 1.1d, depends on the tokenizer)
- *   - json.trailing_comma       (Phase 1.1d, depends on the tokenizer)
+ * No codes are currently reserved-only. The remaining Phase 1.1+
+ * follow-ups (UI views, search, copy) do not introduce new diagnostic
+ * codes.
  */
 export const JSON_DIAGNOSTIC_CODES = {
   syntaxError: 'json.syntax_error',
@@ -48,6 +48,8 @@ export const JSON_DIAGNOSTIC_CODES = {
   pointerInvalid: 'json.pointer.invalid',
   diffMissingInput: 'json.diff.missing_input',
   largeDocument: 'json.large_document',
+  duplicateKey: 'json.duplicate_key',
+  trailingComma: 'json.trailing_comma',
 } as const;
 
 /**

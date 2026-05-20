@@ -237,6 +237,60 @@ describe('NekoJSON: json.text parser', () => {
     expect(validation.ok, validation.errors.join('; ')).toBe(true);
   });
 
+  it('Phase 1.1d: json.text emits json.duplicate_key (warning) when an object has duplicate keys', () => {
+    // JSON.parse silently keeps the last value; the walker adds a
+    // warning the user can actually act on.
+    const r = registry();
+    const result = runParser(r, 'json', 'json.text', {
+      raw: '{"a":1,"a":2}',
+      source: { kind: 'paste', bytes: 13 },
+    });
+    // Document still produced — duplicate keys are a warning, not an error.
+    expect(result.artifacts).toHaveLength(1);
+    const dup = result.diagnostics.find((d) => d.code === 'json.duplicate_key');
+    expect(dup).toBeDefined();
+    expect(dup?.severity).toBe('warning');
+    expect(dup?.message).toContain('"a"');
+    expect(validate('diagnostic', dup).ok).toBe(true);
+  });
+
+  it('Phase 1.1d: json.text emits json.trailing_comma (warning) alongside the syntax error', () => {
+    // Strict JSON rejects trailing commas; JSON.parse will throw a
+    // syntax error. The walker adds the more specific
+    // json.trailing_comma warning at the comma's exact span.
+    const r = registry();
+    const result = runParser(r, 'json', 'json.text', {
+      raw: '{"a":1,}',
+      source: { kind: 'paste', bytes: 8 },
+    });
+    expect(result.artifacts).toHaveLength(0); // JSON.parse rejected it
+    const codes = result.diagnostics.map((d) => d.code);
+    expect(codes).toContain('json.syntax_error');
+    expect(codes).toContain('json.trailing_comma');
+    const tc = result.diagnostics.find((d) => d.code === 'json.trailing_comma');
+    expect(tc?.severity).toBe('warning');
+    expect(validate('diagnostic', tc).ok).toBe(true);
+  });
+
+  it('Phase 1.1d: duplicate keys in arrays are NOT flagged (only objects have keys)', () => {
+    const r = registry();
+    const result = runParser(r, 'json', 'json.text', {
+      raw: '["a","a"]',
+      source: { kind: 'paste', bytes: 9 },
+    });
+    expect(result.diagnostics.find((d) => d.code === 'json.duplicate_key')).toBeUndefined();
+  });
+
+  it('Phase 1.1d: clean JSON emits no walker diagnostics', () => {
+    const r = registry();
+    const result = runParser(r, 'json', 'json.text', {
+      raw: '{"items":[1,2,3],"meta":{"n":4}}',
+      source: { kind: 'paste', bytes: 32 },
+    });
+    expect(result.diagnostics.find((d) => d.code === 'json.duplicate_key')).toBeUndefined();
+    expect(result.diagnostics.find((d) => d.code === 'json.trailing_comma')).toBeUndefined();
+  });
+
   it('parses primitive root values too', () => {
     const r = registry();
     const result = runParser(r, 'json', 'json.text', {
