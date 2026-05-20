@@ -37,8 +37,24 @@ export const JSON_DIAGNOSTIC_CODES = {
   pointerUnresolved: 'json.pointer.unresolved',
   pointerInvalid: 'json.pointer.invalid',
   diffMissingInput: 'json.diff.missing_input',
+  largeDocument: 'json.large_document',
   // Reserved for future PRs (charter-declared, not yet implemented):
-  // - json.duplicate_key
-  // - json.trailing_comma
-  // - json.large_document
+  // - json.duplicate_key   (Phase 1.1d, depends on tokenizer)
+  // - json.trailing_comma  (Phase 1.1d, depends on tokenizer)
 } as const;
+
+/**
+ * Default soft size threshold for `json.text` parser input, in bytes
+ * (counted as `input.raw.length`, which approximates UTF-16 code units;
+ * close enough for an *info* heuristic).
+ *
+ * Chosen at 10 MB — the conservative end of the 10–50 MB range the
+ * charter sketched. The diagnostic is informational only: nothing in
+ * Phase 1 is blocked above this size. The Pro graph view and other
+ * heavy projections (Phase 3) will consume the diagnostic to decide
+ * when to refuse a render; until then, this just gives the user a
+ * heads-up that subsequent operations may be slow.
+ *
+ * Per-tool override via `LargeDocumentOptions.largeDocumentBytes`.
+ */
+export const DEFAULT_LARGE_DOCUMENT_BYTES = 10 * 1024 * 1024;

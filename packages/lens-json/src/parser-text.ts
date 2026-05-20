@@ -1,6 +1,10 @@
-import type { Parser, ParserInput, ParserResult } from '@nekotools/contracts';
+import type { Diagnostic, Parser, ParserInput, ParserResult } from '@nekotools/contracts';
 
-import { JSON_DIAGNOSTIC_CODES, makeDiagnostic } from './diagnostics.js';
+import {
+  DEFAULT_LARGE_DOCUMENT_BYTES,
+  JSON_DIAGNOSTIC_CODES,
+  makeDiagnostic,
+} from './diagnostics.js';
 import {
   JSON_KIND_DOCUMENT,
   type JsonArtifact,
@@ -13,6 +17,12 @@ const PARSER_ID = 'json.text';
 
 interface ParserDeps {
   readonly clock: Clock;
+  /**
+   * Soft size threshold for emitting `json.large_document`. Defaults
+   * to `DEFAULT_LARGE_DOCUMENT_BYTES` (10 MB). Tests inject a small
+   * value so they do not have to allocate megabytes of input.
+   */
+  readonly largeDocumentBytes?: number;
 }
 
 /**
@@ -81,7 +91,24 @@ export function createJsonTextParser(deps: ParserDeps): Parser<JsonArtifact> {
         value,
       };
 
-      return { artifacts: [artifact], diagnostics: [] };
+      // Soft-threshold info diagnostic. Emitted *alongside* the
+      // artifact — large input is not an error, just a heads-up that
+      // downstream operations may be slow. Heavy Pro projections in
+      // Phase 3 will read this diagnostic to gate themselves.
+      const diagnostics: Diagnostic[] = [];
+      const threshold = deps.largeDocumentBytes ?? DEFAULT_LARGE_DOCUMENT_BYTES;
+      if (input.raw.length > threshold) {
+        diagnostics.push(
+          makeDiagnostic(
+            diagIds(),
+            'info',
+            JSON_DIAGNOSTIC_CODES.largeDocument,
+            `document is ${input.raw.length} bytes; exceeds soft threshold of ${threshold} bytes — some heavy operations may be gated`,
+          ),
+        );
+      }
+
+      return { artifacts: [artifact], diagnostics };
     },
   };
 }
