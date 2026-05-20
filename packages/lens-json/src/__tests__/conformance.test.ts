@@ -46,6 +46,101 @@ describe('NekoJSON: manifest', () => {
     expect(jsonManifest.outOfScope.length).toBeGreaterThan(0);
     expect(jsonManifest.outOfScope.some((s) => s.includes('$ref'))).toBe(true);
   });
+
+  it('capabilities reflect current-build truth, not lifetime intent', () => {
+    expect(jsonManifest.capabilities.canSaveWorkspace).toBe(true);
+    expect(jsonManifest.capabilities.canExport).toBe(true);
+    // Diff and graph projection are charter-approved but not in MVP.
+    // These flip true in the PR that ships their implementation.
+    expect(jsonManifest.capabilities.canDiff).toBe(false);
+    expect(jsonManifest.capabilities.canProjectGraph).toBe(false);
+  });
+});
+
+/**
+ * Monetization safety: the free build must not bundle Pro
+ * implementations, and the manifest's free entitlements must not
+ * advertise features the build cannot actually perform.
+ *
+ * These tests are the mechanical enforcement of the rule in
+ * docs/open-core-strategy.md.
+ */
+describe('NekoJSON: monetization safety', () => {
+  const registration = buildJsonRegistration(clock);
+
+  const proExporterIds = [
+    'json.export.types.typescript',
+    'json.export.types.zod',
+    'json.export.docs.data-dictionary',
+  ];
+
+  const proProjectorIds = ['json.graph.references'];
+
+  it('no Pro exporter is registered in the free build', () => {
+    const registered = new Set(registration.exporters.map((e) => e.id));
+    for (const id of proExporterIds) {
+      expect(registered.has(id)).toBe(false);
+    }
+  });
+
+  it('no graph projector is registered in the free build', () => {
+    const projectors = registration.graphProjectors ?? [];
+    expect(projectors).toHaveLength(0);
+    for (const id of proProjectorIds) {
+      expect(projectors.find((p) => p.id === id)).toBeUndefined();
+    }
+  });
+
+  it('runExporter throws "unknown exporter" when invoked with a Pro id', () => {
+    const r = registry();
+    for (const id of proExporterIds) {
+      expect(() =>
+        runExporter(r, 'json', id, { artifacts: [], diagnostics: [] }),
+      ).toThrow(/unknown exporter/);
+    }
+  });
+
+  it('the manifest declares Pro exporters that are NOT in the registered set', () => {
+    const registered = new Set(registration.exporters.map((e) => e.id));
+    for (const id of proExporterIds) {
+      expect(jsonManifest.exporters).toContain(id);
+      expect(registered.has(id)).toBe(false);
+    }
+  });
+
+  it('the manifest free entitlements list matches what the build can actually do', () => {
+    const expectedFree = new Set([
+      'parse',
+      'format',
+      'minify',
+      'validate',
+      'inspect.pointer',
+      'schema.infer.basic',
+      'export.json.pretty',
+      'export.json.minified',
+      'export.markdown.summary',
+      'export.plaintext.paths',
+      'export.schema.basic',
+      'workspace.save',
+    ]);
+    const declared = new Set(jsonManifest.entitlements.free);
+    expect(declared).toEqual(expectedFree);
+
+    // Deferred free features must NOT be declared in the manifest
+    // until the implementation lands in the same PR.
+    const deferredFree = [
+      'view.tree',
+      'view.table',
+      'view.text',
+      'search',
+      'copy.path',
+      'copy.value',
+      'diff.textual',
+    ];
+    for (const id of deferredFree) {
+      expect(declared.has(id)).toBe(false);
+    }
+  });
 });
 
 describe('NekoJSON: json.text parser', () => {

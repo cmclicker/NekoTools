@@ -4,17 +4,30 @@ import { DEFAULT_OFFLINE_POLICY } from '@nekotools/contracts';
 import { JSON_KIND_DOCUMENT, JSON_KIND_PATH_RESULT, JSON_KIND_SCHEMA } from './kinds.js';
 
 /**
- * The NekoJSON manifest, matching the charter draft (see
- * docs/tools/nekojson.md). The manifest is the canonical declaration
- * of intent: it lists every parser, exporter, projector, and entitlement
- * the tool will support — including Pro entries that ship in a future
- * private package.
+ * The NekoJSON manifest.
  *
- * The free build registers only the free implementations. The runtime
- * registry validates that every *registered* parser/exporter is listed
- * here; it does not require that every listed entry be registered. So
- * Pro-declared entries are honest advertising — they cannot be invoked
- * by a free build that does not link the Pro module.
+ * Reading model (this is the rule that resolves the audit feedback on
+ * PR #2):
+ *
+ *   - `entitlements.free` lists features that THIS BUILD ships with a
+ *     working implementation. Unimplemented free features must not
+ *     appear here — they would be misleading advertising.
+ *   - `entitlements.pro` lists features that a future paid build will
+ *     ship via a private `@nekotools-pro/*` package. They appear here
+ *     as honest intent advertising; the free build does not link any
+ *     Pro implementation, so a free user cannot invoke them even if
+ *     they see them in the manifest.
+ *   - `capabilities.*` flags describe what THIS BUILD can do right
+ *     now. They are not lifetime promises of the tool family.
+ *   - `parsers` / `exporters` / `graphProjectors` may list ids that
+ *     are declared as Pro intent. The runtime registry only validates
+ *     the forward direction (every *registered* implementation must be
+ *     declared here); it does not require every declared id to be
+ *     registered. That asymmetry is what makes Pro advertising work
+ *     without lying about the free build.
+ *
+ * MVP-shipped features are kept in sync with `buildJsonRegistration()`
+ * by the monetization-safety tests in `__tests__/conformance.test.ts`.
  */
 export const jsonManifest: ToolManifest = {
   version: 1,
@@ -40,24 +53,24 @@ export const jsonManifest: ToolManifest = {
   capabilities: {
     canSaveWorkspace: true,
     canExport: true,
-    canDiff: true,
-    canProjectGraph: true,
+    // Diff and graph projection are charter-approved but not in the
+    // MVP. These flip true when their implementations land in
+    // follow-up PRs (textual diff) or in the Pro build (graph).
+    canDiff: false,
+    canProjectGraph: false,
   },
   entitlements: {
+    // Only features with a working free implementation in this build.
+    // Tree/table/text views, search, copy.path/copy.value, and
+    // diff.textual are charter-declared but deferred; they will be
+    // added here in the same PR that adds their implementation.
     free: [
       'parse',
       'format',
       'minify',
       'validate',
-      'view.tree',
-      'view.table',
-      'view.text',
       'inspect.pointer',
-      'search',
-      'copy.path',
-      'copy.value',
       'schema.infer.basic',
-      'diff.textual',
       'export.json.pretty',
       'export.json.minified',
       'export.markdown.summary',

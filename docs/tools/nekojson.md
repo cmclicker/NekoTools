@@ -46,32 +46,45 @@ outside NekoJSON.
 
 Reuses `@nekotools/contracts`'s `Parser<TArtifact>`. New parsers:
 
-- `json.text` — accepts raw JSON text, produces `json.document`. Emits
-  spanned diagnostics for syntax errors. Best-effort: a single trailing
-  comma produces a warning + a partial artifact instead of an empty
-  result.
+- `json.text` — accepts raw JSON text, produces `json.document`. **MVP
+  is strict mode only.** Backed by `JSON.parse`; on failure, the
+  diagnostic carries a best-effort `startOffset` extracted from the V8
+  error message when it reports `position N` (older Node / non-V8
+  runtimes may report no position, in which case the span is omitted —
+  the diagnostic still ships).
 - `json.pointer` — accepts a JSON Pointer (`/foo/bar/0`) against a
   loaded `json.document`, produces `json.path-result`. This is a
   parser, not a runtime, because it converts user input (the pointer)
   into a structured artifact.
 
+Non-strict parsing (trailing commas, comments, partial-artifact
+recovery) and an in-tree tokenizer with always-accurate spans are
+deferred to follow-up PRs — see the "Deferred from this PR" table.
+
 No `json.url` parser. NekoJSON never fetches.
 
 ### 3. Diagnostic contract
 
-Reuses the existing `Diagnostic` shape. New codes (non-exhaustive):
+Reuses the existing `Diagnostic` shape. Codes shipping in the MVP and
+codes reserved for follow-up PRs:
 
-| Code                          | Severity | Meaning |
-| ----------------------------- | -------- | ------- |
-| `json.syntax_error`           | error    | The text is not valid JSON. |
-| `json.trailing_comma`         | warning  | Comma before `]` or `}` (non-strict mode). |
-| `json.duplicate_key`          | warning  | Object has the same key twice. |
-| `json.empty_input`            | error    | Input was whitespace only. |
-| `json.large_document`         | info     | Document exceeds a soft size threshold; some Pro views are gated. |
-| `json.pointer.unresolved`     | error    | A JSON Pointer did not resolve. |
+| Code                          | Status   | Severity | Meaning |
+| ----------------------------- | -------- | -------- | ------- |
+| `json.syntax_error`           | shipped  | error    | The text is not valid JSON. |
+| `json.empty_input`            | shipped  | error    | Input was whitespace only. |
+| `json.pointer.invalid`        | shipped  | error    | Pointer text is syntactically invalid (RFC 6901). |
+| `json.pointer.unresolved`     | shipped  | error    | A JSON Pointer did not resolve. |
+| `json.trailing_comma`         | reserved | warning  | Comma before `]` or `}` (non-strict mode). |
+| `json.duplicate_key`          | reserved | warning  | Object has the same key twice. |
+| `json.large_document`         | reserved | info     | Document exceeds a soft size threshold; some Pro views are gated. |
 
-Spans are populated from a tracking tokenizer so the UI can highlight
-the offending byte range. No throwing; every malformed input produces
+"Reserved" codes appear in [`packages/lens-json/src/diagnostics.ts`](../../packages/lens-json/src/diagnostics.ts)
+as a comment so a follow-up PR cannot accidentally re-use the names
+with a different meaning. They are not emitted by the MVP.
+
+The MVP populates spans on a best-effort basis from `JSON.parse` error
+messages. An in-tree tokenizer that always produces accurate spans is
+deferred to a follow-up PR. No throwing; every malformed input produces
 diagnostics.
 
 ### 4. Export contract
@@ -150,17 +163,24 @@ instead. The "explain how to import" UI text is part of Phase 1.
 
 ### 9. Entitlements
 
-Free:
+Free **shipped in the MVP** (also the exact set in `manifest.entitlements.free`):
 
 - Parse / format / minify / validate
-- Tree / table / text views
 - JSON Pointer path inspector
-- Search across keys and values
-- Copy path / copy value
 - Basic schema inference (types, required-ness)
-- Basic textual diff
-- JSON, Markdown summary, plaintext path exports
+- JSON pretty / minified, Markdown summary, plaintext paths, basic
+  JSON Schema exports
 - Save / load local workspace
+
+Free **deferred to follow-up PRs** (will be added to
+`manifest.entitlements.free` when their implementations land — they are
+*not* declared there today, because unimplemented free features are
+misleading advertising):
+
+- Tree / table / text views (UI; `apps/web-suite` is still placeholder)
+- Search across keys and values (UI)
+- Copy path / copy value (UI)
+- Basic textual diff (engine; the `json.diff` artifact is also deferred)
 
 Pro:
 
@@ -266,19 +286,17 @@ export const jsonManifestDraft: ToolManifest = {
 };
 ```
 
-## What's deliberately undecided in Phase 1
+## What was deliberately undecided in Phase 1
 
-These are noted up front so reviewers do not block the charter on
-implementation details:
+Captured here before implementation so reviewers do not block on these
+details. Decisions taken during implementation:
 
-- Tokenizer choice (hand-written vs library, in-tree vs dependency).
-- Soft-size threshold value (likely ~10–50 MB; benchmarked during
-  implementation).
-- Whether `json.graph.references` ships as a stub in Phase 1 or only
-  declares its existence in the manifest.
-- The exact set of error recovery rules for non-strict parsing
-  (trailing commas, comments, unquoted keys). The default mode is
-  strict; non-strict toggles are scoped per-document.
+| Question | Decision in MVP |
+| --- | --- |
+| Tokenizer choice (hand-written vs library, in-tree vs dependency)   | None of the above — MVP wraps `JSON.parse`. An in-tree tokenizer with always-accurate spans is a follow-up PR. |
+| Soft-size threshold value (~10–50 MB; benchmarked during impl)      | Not implemented in MVP. `json.large_document` code is reserved. |
+| Whether `json.graph.references` ships as a stub or only declared     | Declared in the manifest as Pro intent; not registered in the free build. The `canProjectGraph` capability is `false` in the current build. |
+| Strict vs non-strict parsing rules                                   | MVP is strict-only. Trailing-comma / comment / unquoted-key recovery deferred. |
 
 ## Acceptance for the Phase 1 implementation PR
 

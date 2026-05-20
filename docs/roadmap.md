@@ -8,7 +8,7 @@
 | Phase   | State                       | Notes |
 | ------- | --------------------------- | ----- |
 | Phase 0 | **Complete** (commit `93efaa5`) | Platform spine + audit patches landed. |
-| Phase 1 | **Free-tier MVP in review** | Charter merged (PR #1). Implementation PR pending CI + auditor review. Follow-up PRs land the deferred items in `docs/tools/nekojson.md`. |
+| Phase 1.0 | **Engine MVP in review** | Charter merged (PR #1). Engine implementation PR #2 in review. No UI, no diff, no search — those land in Phase 1.1+ follow-up PRs. |
 | Phase 2 | Not started                 | Fast adjacent tools. |
 | Phase 3 | Not started                 | Premium engines (graph, semantic diff, migration). |
 | Phase 4 | Not started                 | Heavier tools (YAML, API Lens, Headers, Types, RBAC). |
@@ -51,22 +51,47 @@ Not flagship. Proof-grade. One tool, done well, that validates the
 spine generalizes from a trivial conformance lens to a real product
 tool.
 
-**Charter:** [docs/tools/nekojson.md](tools/nekojson.md). Implementation
-is blocked until the charter PR is merged.
+**Charter:** [docs/tools/nekojson.md](tools/nekojson.md).
 
-Scope (free, Phase 1):
+### Phase 1.0 — Engine MVP (this PR's scope)
 
-- parse, validate, format
-- tree / table / text views
-- path inspector, search
-- basic diff
-- basic schema inference
-- export (JSON pretty / minified, Markdown summary, plaintext paths,
-  basic JSON Schema)
+Engine-only, no UI. The features below are implementation-backed in
+`@nekotools/lens-json` and declared in `manifest.entitlements.free`:
 
-Pro features declared in the manifest are deferred to Phase 3 (graph,
-semantic diff, migration) and Phase 1 follow-ups (advanced schema,
-TS/Zod, data dictionary).
+- parse / validate / format / minify
+- JSON Pointer (`json.pointer`) inspector
+- basic schema inference (types + required keys)
+- exports: JSON pretty, JSON minified, Markdown summary, plaintext
+  paths, basic JSON Schema
+- save / load local workspace via the existing serializer
+
+### Phase 1.1+ — Follow-ups (free, not in this PR)
+
+Each lands in its own follow-up PR. Adding any of these requires also
+updating `manifest.entitlements.free` and the relevant `capabilities`
+flag in the same PR:
+
+- tree / table / text views (UI; needs `apps/web-suite` to grow past
+  placeholder)
+- search across keys and values (UI)
+- copy path / copy value (UI)
+- basic textual diff + `json.diff` artifact
+- duplicate-key detection (`json.duplicate_key`)
+- trailing-comma support / non-strict mode (`json.trailing_comma`)
+- large-document soft threshold (`json.large_document`)
+- in-tree tokenizer for always-accurate spans
+
+### Phase 1 Pro (future private package)
+
+Declared in the manifest as advertising. The implementations live in a
+future `@nekotools-pro/*` package and are not present in this binary:
+
+- graph mode (`json.graph.references` projector)
+- semantic diff, migration studio, batch transforms (depend on Phase 3
+  engines)
+- advanced schema inference (oneOf, format detection, enum collapse)
+- TS / Zod / data-dictionary exports
+- broken-reference and duplicate-entity detection
 
 ## Phase 2 — Fast adjacent tools
 
