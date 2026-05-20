@@ -46,20 +46,23 @@ outside NekoJSON.
 
 Reuses `@nekotools/contracts`'s `Parser<TArtifact>`. New parsers:
 
-- `json.text` — accepts raw JSON text, produces `json.document`. **MVP
-  is strict mode only.** Backed by `JSON.parse`; on failure, the
-  diagnostic carries a best-effort `startOffset` extracted from the V8
-  error message when it reports `position N` (older Node / non-V8
-  runtimes may report no position, in which case the span is omitted —
-  the diagnostic still ships).
+- `json.text` — accepts raw JSON text, produces `json.document`.
+  **Strict mode only.** Backed by `JSON.parse` for value-tree
+  construction. Phase 1.1c wired the new in-tree tokenizer (see
+  section 11 below) into the syntax-error path, so `json.syntax_error`
+  diagnostics now carry **multi-character spans** pointing at the
+  offending token (instead of the single-position span the V8
+  `position N` regex was producing alone). `JSON.parse` still decides
+  validity; the tokenizer's job is to give the diagnostic an accurate
+  source location.
 - `json.pointer` — accepts a JSON Pointer (`/foo/bar/0`) against a
   loaded `json.document`, produces `json.path-result`. This is a
   parser, not a runtime, because it converts user input (the pointer)
   into a structured artifact.
 
 Non-strict parsing (trailing commas, comments, partial-artifact
-recovery) and an in-tree tokenizer with always-accurate spans are
-deferred to follow-up PRs — see the "Deferred from this PR" table.
+recovery) is still deferred to Phase 1.1d — see the "Deferred from
+this PR" table.
 
 No `json.url` parser. NekoJSON never fetches.
 
@@ -83,10 +86,14 @@ codes reserved for follow-up PRs:
 as a comment so a follow-up PR cannot accidentally re-use the names
 with a different meaning. They are not emitted by the MVP.
 
-The MVP populates spans on a best-effort basis from `JSON.parse` error
-messages. An in-tree tokenizer that always produces accurate spans is
-deferred to a follow-up PR. No throwing; every malformed input produces
-diagnostics.
+Phase 1.1c made syntax-error spans **tokenizer-assisted**: the in-tree
+tokenizer (see Section 11) is consulted on `JSON.parse` failure to pick
+a multi-character span pointing at the offending token. `JSON.parse`
+still decides validity; the tokenizer only refines the diagnostic's
+location. Remaining span work is the Phase 1.1d duplicate-key and
+trailing-comma diagnostics, which walk the tokenizer's token stream
+directly. No throwing anywhere; every malformed input produces
+structured diagnostics.
 
 ### 4. Export contract
 
@@ -233,6 +240,48 @@ Free is genuinely useful on its own.
   above it, Pro views are gated and certain operations are disabled.
 - Anything that requires a server.
 
+### 11. Tokenizer (Phase 1.1c)
+
+Source: [`packages/lens-json/src/tokenizer.ts`](../../packages/lens-json/src/tokenizer.ts).
+
+A hand-written, in-tree JSON scanner. The tokenizer exists to give the
+rest of NekoJSON a typed token stream with always-accurate source
+spans. It does **not** validate JSON structure — `JSON.parse` still
+decides whether an input is a valid JSON value tree.
+
+Token kinds:
+
+- structural: `lbrace`, `rbrace`, `lbracket`, `rbracket`, `colon`, `comma`
+- literal:    `string` (raw + decoded value), `number` (raw + numeric value), `true`, `false`, `null`
+- lexical error recovery: `error` (with `code` and `message`)
+
+Every token carries a `JsonTokenSpan`:
+`{ startOffset, endOffset, startLine, startColumn, endLine, endColumn }`.
+Line / column are 1-indexed; offsets are JS string indices (UTF-16 code
+units).
+
+What Phase 1.1c uses the tokenizer for:
+
+- `json.text`'s `json.syntax_error` diagnostic now consults the
+  tokenizer to pick a multi-character span (the whole unterminated
+  string, the whole malformed number, the whole token at the V8
+  failure position) instead of the single-position span the regex
+  alone produced.
+
+What Phase 1.1d will use it for:
+
+- `json.duplicate_key` — walk the token stream and detect object
+  scopes with the same string-token key twice. Both occurrences'
+  spans are available.
+- `json.trailing_comma` — detect `comma` followed by `rbrace` / `rbracket`.
+
+Out of scope for the tokenizer:
+
+- Non-strict modes (comments, trailing commas in the stream are
+  reported by 1.1d, not silently allowed at the lexer).
+- Building a JSON value tree.
+- Streaming / incremental tokenization. The function is whole-string.
+
 ## `ToolManifest`
 
 The canonical NekoJSON manifest lives at
@@ -270,7 +319,7 @@ details. Decisions taken during implementation:
 
 | Question | Decision in MVP |
 | --- | --- |
-| Tokenizer choice (hand-written vs library, in-tree vs dependency)   | None of the above — MVP wraps `JSON.parse`. An in-tree tokenizer with always-accurate spans is a follow-up PR. |
+| Tokenizer choice (hand-written vs library, in-tree vs dependency)   | **Phase 1.1c: hand-written in-tree scanner** ([`packages/lens-json/src/tokenizer.ts`](../../packages/lens-json/src/tokenizer.ts)). Emits a typed `JsonToken` stream with always-accurate `startOffset`/`endOffset`/line/column spans, recognizes every JSON token kind, and emits `kind: 'error'` tokens for lexical problems (unterminated string, malformed number, invalid escape, unexpected character). `JSON.parse` still builds the value tree; the tokenizer feeds the syntax-error diagnostic path and unlocks Phase 1.1d's duplicate-key / trailing-comma detection. |
 | Soft-size threshold value (~10–50 MB; benchmarked during impl)      | Phase 1.1b: set at the conservative end — **10 MB** (`DEFAULT_LARGE_DOCUMENT_BYTES = 10 * 1024 * 1024`). Configurable per-registration via `buildJsonRegistration(clock, { largeDocumentBytes })`. The diagnostic is `info` severity; nothing in the free build is blocked above it. |
 | Whether `json.graph.references` ships as a stub or only declared     | Declared in the manifest as Pro intent; not registered in the free build. The `canProjectGraph` capability is `false` in the current build. |
 | Strict vs non-strict parsing rules                                   | MVP is strict-only. Trailing-comma / comment / unquoted-key recovery deferred. |
@@ -301,9 +350,9 @@ explicit follow-up PRs, not silently:
 | -------------------------------------------------- | ------------- | ----- |
 | `json.diff` artifact + textual diff exporter       | **Shipped — Phase 1.1a** | Line-level diff against a canonical (key-sorted) pretty-print. Semantic diff is still Pro. |
 | Large-document threshold (`json.large_document`)   | **Shipped — Phase 1.1b** | `json.text` emits `info` diagnostic when input exceeds the soft threshold (default 10 MB). Configurable. |
-| In-tree tokenizer with accurate spans              | Follow-up     | Current spans are best-effort from `JSON.parse` error messages. Tracked as Phase 1.1c. |
-| Duplicate-key detection (`json.duplicate_key`)     | Follow-up     | Diagnostic code reserved. Tracked as Phase 1.1d, depends on the tokenizer. |
-| Trailing-comma support (`json.trailing_comma`)     | Follow-up     | Diagnostic code reserved. Default mode is strict. Tracked as Phase 1.1d. |
+| In-tree tokenizer with accurate spans              | **Shipped — Phase 1.1c** | Hand-written scanner at [`src/tokenizer.ts`](../../packages/lens-json/src/tokenizer.ts). Wired into `json.text`'s syntax-error path; ready to be consumed by Phase 1.1d's `json.duplicate_key` and `json.trailing_comma` diagnostics. |
+| Duplicate-key detection (`json.duplicate_key`)     | Follow-up     | Diagnostic code reserved. Tracked as Phase 1.1d. The tokenizer foundation now exists. |
+| Trailing-comma support (`json.trailing_comma`)     | Follow-up     | Diagnostic code reserved. Default mode is strict. Tracked as Phase 1.1d. The tokenizer foundation now exists. |
 | TS / Zod / data-dictionary exports                 | Pro (future)  | Declared in manifest. Implementation lives in a future private package. |
 | Graph projector (`json.graph.references`)          | Pro (future)  | Declared in manifest. Phase 3 graph engine prerequisite. |
 | Semantic diff, migration studio, batch transforms  | Pro (future)  | Declared in manifest. Phase 3 dependencies. |

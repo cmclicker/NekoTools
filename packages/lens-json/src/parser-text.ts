@@ -10,6 +10,12 @@ import {
   type JsonArtifact,
   type JsonDocumentArtifact,
 } from './kinds.js';
+import {
+  findFirstErrorToken,
+  findTokenAt,
+  tokenize,
+  type JsonTokenSpan,
+} from './tokenizer.js';
 import { makeIdFactory, type Clock } from './util.js';
 
 const TOOL_ID = 'json';
@@ -26,14 +32,15 @@ interface ParserDeps {
 }
 
 /**
- * Phase 1 MVP: wraps `JSON.parse` and emits a structured diagnostic on
- * failure. When V8 / Node attaches a `at position N` to the error
- * message, we extract it into a span so the UI can highlight the
- * offending byte. When that information is absent (older Node, weird
- * messages), the diagnostic is still emitted — just without a span.
+ * Phase 1 parser. `JSON.parse` is the source of truth for value-tree
+ * construction and validity — that has not changed. What changed in
+ * Phase 1.1c is the diagnostic span resolution: on a parse failure,
+ * `resolveSyntaxErrorSpan` consults the in-tree tokenizer to pick a
+ * multi-character span pointing at the offending token, instead of
+ * just the single position the V8 error message reports.
  *
- * A real tokenizer that always produces accurate spans is deferred (see
- * docs/tools/nekojson.md "Deliberately undecided in Phase 1").
+ * All offsets in spans are JS string offsets into `input.raw`, not
+ * UTF-8 byte offsets.
  */
 export function createJsonTextParser(deps: ParserDeps): Parser<JsonArtifact> {
   return {
@@ -66,7 +73,7 @@ export function createJsonTextParser(deps: ParserDeps): Parser<JsonArtifact> {
         value = JSON.parse(input.raw);
       } catch (err) {
         const message = err instanceof Error ? err.message : String(err);
-        const span = extractPositionSpan(message, input.raw.length);
+        const span = resolveSyntaxErrorSpan(input.raw, message);
         return {
           artifacts: [],
           diagnostics: [
@@ -134,23 +141,42 @@ function utf8ByteLength(s: string): number {
 }
 
 /**
- * Best-effort extraction of an offset from a JSON.parse error message.
+ * Phase 1.1c: derive a span for a `json.syntax_error` diagnostic by
+ * consulting the in-tree tokenizer.
  *
- * V8 historically emits "Unexpected token ... in JSON at position 42"
- * or (Node 21+) "Unexpected token ... is not valid JSON". The "position
- * N" value is treated as an offset into `input.raw` (i.e., a JS string
- * index, not necessarily a UTF-8 byte offset) and clamped to the input
- * length. The regex is intentionally permissive: any failure returns
- * `undefined` and the diagnostic carries no span.
+ * Resolution order:
+ *   1. If the tokenizer found a lexical error token (unterminated
+ *      string, malformed number, invalid escape, unexpected char),
+ *      use its span — those are the *exact* source ranges that broke
+ *      `JSON.parse`.
+ *   2. Otherwise the input was lexically clean but structurally broken
+ *      (e.g. `{"a"}` — JSON.parse complains about `}` because it
+ *      wants `:`). Try to pull a `position N` out of the V8 error
+ *      message, then find the *token* containing that position and
+ *      use that token's span. This produces a multi-character
+ *      highlight instead of the single-char span the regex alone gave
+ *      us in Phase 1.0.
+ *   3. As a last resort, fall back to the one-character span at the
+ *      position the message reported. `undefined` is returned only if
+ *      no position info is available at all.
  */
-function extractPositionSpan(
+function resolveSyntaxErrorSpan(
+  raw: string,
   message: string,
-  inputLength: number,
-): { startOffset: number; endOffset: number } | undefined {
-  const match = /position\s+(\d+)/i.exec(message);
-  if (!match) return undefined;
-  const offset = Number(match[1]);
+): JsonTokenSpan | { startOffset: number; endOffset: number } | undefined {
+  const tokens = tokenize(raw);
+
+  const firstError = findFirstErrorToken(tokens);
+  if (firstError) return firstError.span;
+
+  const positionMatch = /position\s+(\d+)/i.exec(message);
+  if (!positionMatch) return undefined;
+  const offset = Number(positionMatch[1]);
   if (!Number.isFinite(offset) || offset < 0) return undefined;
-  const clamped = Math.min(offset, inputLength);
-  return { startOffset: clamped, endOffset: Math.min(clamped + 1, inputLength) };
+  const clamped = Math.min(offset, raw.length);
+
+  const containing = findTokenAt(tokens, clamped);
+  if (containing) return containing.span;
+
+  return { startOffset: clamped, endOffset: Math.min(clamped + 1, raw.length) };
 }

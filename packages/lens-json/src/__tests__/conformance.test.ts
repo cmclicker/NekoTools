@@ -184,6 +184,59 @@ describe('NekoJSON: json.text parser', () => {
     }
   });
 
+  it('Phase 1.1c: syntax_error span comes from the tokenizer for lexical errors (multi-char range)', () => {
+    // An unterminated string is a lexical-level break — the tokenizer
+    // sees it before JSON.parse does. The diagnostic span should
+    // cover the *whole* unterminated literal, not a single position.
+    const r = registry();
+    const result = runParser(r, 'json', 'json.text', {
+      raw: '"unterminated',
+      source: { kind: 'paste', bytes: 13 },
+    });
+    expect(result.diagnostics[0]?.code).toBe('json.syntax_error');
+    const span = result.diagnostics[0]?.span;
+    expect(span).toBeDefined();
+    expect(span?.startOffset).toBe(0);
+    expect(span?.endOffset).toBe(13); // the whole unterminated literal
+  });
+
+  it('Phase 1.1c: syntax_error span snaps to the containing token for structural errors', () => {
+    // `{"a"}` is lexically clean (every individual token is fine).
+    // JSON.parse fails on the `}` because it wanted `:`. With the
+    // tokenizer wired in, the diagnostic span should be a real token
+    // span (multi-character when V8 reports a position inside one).
+    const r = registry();
+    const result = runParser(r, 'json', 'json.text', {
+      raw: '{"a"}',
+      source: { kind: 'paste', bytes: 5 },
+    });
+    expect(result.diagnostics[0]?.code).toBe('json.syntax_error');
+    const span = result.diagnostics[0]?.span;
+    // We only assert that the span has positive length and lies
+    // inside the input — V8 / Node may shift `position N` slightly
+    // across releases, so we don't pin the exact offset.
+    if (span) {
+      expect(span.endOffset).toBeGreaterThan(span.startOffset);
+      expect(span.startOffset).toBeGreaterThanOrEqual(0);
+      expect(span.endOffset).toBeLessThanOrEqual(5);
+    }
+  });
+
+  it('PR #6 audit blocker 5: tokenizer-backed syntax_error diagnostics validate against the diagnostic schema', () => {
+    // The tokenizer emits spans with line/column fields, which the
+    // DiagnosticSpan schema permits. This test exercises that path
+    // end-to-end: the runtime-produced diagnostic must be a valid
+    // instance of diagnostic.schema.json.
+    const r = registry();
+    const result = runParser(r, 'json', 'json.text', {
+      raw: '"unterminated',
+      source: { kind: 'paste', bytes: 13 },
+    });
+    expect(result.diagnostics[0]?.code).toBe('json.syntax_error');
+    const validation = validate('diagnostic', result.diagnostics[0]);
+    expect(validation.ok, validation.errors.join('; ')).toBe(true);
+  });
+
   it('parses primitive root values too', () => {
     const r = registry();
     const result = runParser(r, 'json', 'json.text', {
