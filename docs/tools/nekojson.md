@@ -1,8 +1,9 @@
 # NekoJSON — Phase 1 charter
 
-> Status: **PROPOSED.** This document is the charter pass required by
-> [`tool-charter.md`](../tool-charter.md). No NekoJSON implementation
-> code may land until this charter is approved.
+> Status: **IMPLEMENTED (free tier MVP).** The charter was approved in
+> [PR #1](https://github.com/cmclicker/NekoTools/pull/1). The MVP
+> implementation landed in the Phase 1 implementation PR. Features
+> deferred from this PR are listed under "Deferred from this PR" below.
 
 NekoJSON is the Phase 1 proof tool. The point of Phase 1 is to validate
 that the platform spine generalizes from the trivial NekoBinary
@@ -279,17 +280,37 @@ implementation details:
   (trailing commas, comments, unquoted keys). The default mode is
   strict; non-strict toggles are scoped per-document.
 
-## Acceptance for the Phase 1 *implementation* PR (preview)
+## Acceptance for the Phase 1 implementation PR
 
-Tracked here so the implementation PR has a checklist to point at, not
-to gate this charter PR:
-
-- [ ] `@nekotools/lens-json` package exists, registered via
-      `ToolRegistry`.
-- [ ] Manifest passes `validateManifest`.
-- [ ] All declared parsers and exporters exist and pass tests.
-- [ ] Conformance test parallel to `lens-binary` covers parser →
+- [x] `@nekotools/lens-json` package exists, registered via
+      `buildJsonRegistration` + `ToolRegistry`.
+- [x] Manifest passes `validateManifest`.
+- [x] Free-tier parsers and exporters exist and pass tests
+      (`json.text`, `json.pointer`; pretty, minified, markdown summary,
+      plaintext paths, basic JSON Schema).
+- [x] Conformance test parallel to `lens-binary` covers parser →
       diagnostic → export → workspace round-trip.
-- [ ] Offline guard sees no new violations.
-- [ ] Charter doc updated from "PROPOSED" to "IMPLEMENTED" and linked
-      from `docs/roadmap.md`.
+- [x] Offline guard sees no new violations.
+- [x] Charter doc updated from "PROPOSED" to "IMPLEMENTED".
+- [x] Pro-tier parsers/exporters declared in the manifest as honest
+      advertising, with no implementation present in the public/free
+      package set.
+
+## Deferred from this PR (scope contract)
+
+The implementation PR landed the **tight engine MVP** (user-chosen
+scope). The following items remain charter-approved and will land in
+explicit follow-up PRs, not silently:
+
+| Deferred item                                      | Status      | Notes |
+| -------------------------------------------------- | ----------- | ----- |
+| `json.diff` artifact + textual diff exporter       | Follow-up   | Charter-approved. Reserve the kind name; no impl yet. |
+| Duplicate-key detection (`json.duplicate_key`)     | Follow-up   | Diagnostic code reserved in `diagnostics.ts`. |
+| Trailing-comma support (`json.trailing_comma`)     | Follow-up   | Diagnostic code reserved. Default mode is strict. |
+| Large-document threshold (`json.large_document`)   | Follow-up   | Diagnostic code reserved. |
+| In-tree tokenizer with accurate spans              | Follow-up   | Current spans are best-effort from `JSON.parse` error messages. |
+| TS / Zod / data-dictionary exports                 | Pro (future) | Declared in manifest. Implementation lives in a future private package. |
+| Graph projector (`json.graph.references`)          | Pro (future) | Declared in manifest. Phase 3 graph engine prerequisite. |
+| Semantic diff, migration studio, batch transforms  | Pro (future) | Declared in manifest. Phase 3 dependencies. |
+| Advanced schema inference                          | Pro (future) | `oneOf`, format detection, enum collapse, sample unification. |
+| UI views (tree / table / text, search)             | Follow-up   | Engine-only PR. `apps/web-suite` is still a placeholder. |

@@ -8,7 +8,7 @@
 | Phase   | State                       | Notes |
 | ------- | --------------------------- | ----- |
 | Phase 0 | **Complete** (commit `93efaa5`) | Platform spine + audit patches landed. |
-| Phase 1 | **Charter in review**       | This branch's PR. NekoJSON implementation is gated on charter approval. |
+| Phase 1 | **Free-tier MVP in review** | Charter merged (PR #1). Implementation PR pending CI + auditor review. Follow-up PRs land the deferred items in `docs/tools/nekojson.md`. |
 | Phase 2 | Not started                 | Fast adjacent tools. |
 | Phase 3 | Not started                 | Premium engines (graph, semantic diff, migration). |
 | Phase 4 | Not started                 | Heavier tools (YAML, API Lens, Headers, Types, RBAC). |
