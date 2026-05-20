@@ -33,9 +33,9 @@ previous row `Done`.
 | 3     | Phase 1.1b | Implementation | Large-document soft threshold + `json.large_document` diagnostic.                              | Done (PR #5 / `6e5b639`) |
 | 4     | Phase 1.1c | Planning + Implementation | In-tree tokenizer foundation (always-accurate spans).                              | Done (PR #6 / `4089554`) |
 | 5     | Phase 1.1d | Implementation | `json.duplicate_key` + `json.trailing_comma` diagnostics using the new tokenizer.              | Done (PR #7 / `6a230f0`) |
-| 6     | Phase 1.1e | UI Planning + Shell | `apps/web-suite` shell scaffold + UI charter; manifest-summary panel. Views/search/copy queued as 1.1f–h. | Done (this PR) |
-| 7     | Phase 1.1f | Implementation | NekoJSON **tree view** + **text view** + flip `view.tree` / `view.text` into `entitlements.free`. | **Next** |
-| 8     | Phase 1.1g | Implementation | NekoJSON **table view** + **search** across keys/values + flip `view.table` / `search` into `entitlements.free`. | Queued |
+| 6     | Phase 1.1e | UI Planning + Shell | `apps/web-suite` shell scaffold + UI charter; manifest-summary panel. Views/search/copy queued as 1.1f–h. | Done (PR #8 / `50ab36c`) |
+| 7     | Phase 1.1f | Implementation | NekoJSON **tree view** + **text view** + flip `view.tree` / `view.text` into `entitlements.free`. | Done (this PR) |
+| 8     | Phase 1.1g | Implementation | NekoJSON **table view** + **search** across keys/values + flip `view.table` / `search` into `entitlements.free`. | **Next** |
 | 9     | Phase 1.1h | Implementation | **Copy.path** + **copy.value** affordances + flip both into `entitlements.free`.               | Queued |
 | 10    | Phase 2.0  | Charter        | NekoEnv charter PR (10-question reuse gate).                                                   | Later  |
 
@@ -106,11 +106,11 @@ flag in the same PR.
 - in-tree tokenizer for always-accurate spans — Phase 1.1c (PR #6)
 - duplicate-key detection (`json.duplicate_key`) — Phase 1.1d (PR #7)
 - trailing-comma detection (`json.trailing_comma`) — Phase 1.1d (PR #7)
-- `apps/web-suite` shell + UI charter ([`docs/tools/nekojson-ui.md`](tools/nekojson-ui.md)) — Phase 1.1e (this PR)
+- `apps/web-suite` shell + UI charter ([`docs/tools/nekojson-ui.md`](tools/nekojson-ui.md)) — Phase 1.1e (PR #8)
+- tree view + text view (`view.tree`, `view.text`) — Phase 1.1f (this PR)
 
 **Remaining** (each PR adds its entitlement(s) to `manifest.entitlements.free` in the same commit):
 
-- tree view + text view — Phase 1.1f
 - table view + search across keys/values — Phase 1.1g
 - copy path + copy value — Phase 1.1h
 

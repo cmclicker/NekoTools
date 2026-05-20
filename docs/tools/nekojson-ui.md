@@ -1,9 +1,11 @@
 # NekoJSON UI — Phase 1.1e charter
 
-> Status: **IMPLEMENTED (shell + planning).** This PR ships the
-> `apps/web-suite` shell + this charter. The actual NekoJSON views
-> (tree, text, table, search, copy) land in Phase 1.1f / 1.1g / 1.1h
-> as queued follow-up PRs.
+> Status: **IMPLEMENTED through Phase 1.1f.** The shell (Phase 1.1e)
+> and the tree + text views (Phase 1.1f) ship. Table view + search
+> are Phase 1.1g. Copy.path + copy.value are Phase 1.1h. All four
+> remaining items will update `manifest.entitlements.free` in the
+> same PR that adds their implementation, per the open-core
+> governance rule.
 
 ## What `apps/web-suite` is
 
@@ -75,8 +77,8 @@ Specifically deferred:
 
 | Feature                | Tracked in   |
 | ---------------------- | ------------ |
-| Tree view              | Phase 1.1f   |
-| Text view              | Phase 1.1f   |
+| Tree view              | **Shipped — Phase 1.1f** ([`TreeView.tsx`](../../apps/web-suite/src/TreeView.tsx)) |
+| Text view              | **Shipped — Phase 1.1f** ([`TextView.tsx`](../../apps/web-suite/src/TextView.tsx)) |
 | Table view             | Phase 1.1g   |
 | Search across keys/values | Phase 1.1g |
 | Copy path / copy value | Phase 1.1h   |

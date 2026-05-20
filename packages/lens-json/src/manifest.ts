@@ -87,6 +87,9 @@ export const jsonManifest: ToolManifest = {
       'export.schema.basic',
       'export.diff.textual',
       'workspace.save',
+      // Phase 1.1f — UI views shipped in apps/web-suite.
+      'view.tree',
+      'view.text',
     ],
     pro: [
       'view.graph',
