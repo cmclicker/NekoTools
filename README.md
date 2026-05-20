@@ -52,6 +52,10 @@ pnpm offline-guard
 
 See [docs/release-checklist.md](docs/release-checklist.md).
 
+## How work moves through this repo
+
+All changes ship via a branch + PR. See [docs/governance.md](docs/governance.md).
+
 ## License
 
 See [LICENSE](LICENSE). The public core is **source-available**, not

@@ -1,11 +1,25 @@
 # Roadmap
 
-## Current: Phase 0 — Platform spine
+> See [governance.md](governance.md) for how phases advance and how
+> work is reviewed.
 
-Build the minimum real NekoTools spine that proves the architecture is
+## Status board
+
+| Phase   | State                       | Notes |
+| ------- | --------------------------- | ----- |
+| Phase 0 | **Complete** (commit `93efaa5`) | Platform spine + audit patches landed. |
+| Phase 1 | **Charter in review**       | This branch's PR. NekoJSON implementation is gated on charter approval. |
+| Phase 2 | Not started                 | Fast adjacent tools. |
+| Phase 3 | Not started                 | Premium engines (graph, semantic diff, migration). |
+| Phase 4 | Not started                 | Heavier tools (YAML, API Lens, Headers, Types, RBAC). |
+| Phase 5 | Not started                 | Expansion packs. |
+
+## Phase 0 — Platform spine — COMPLETE
+
+Built the minimum real NekoTools spine that proves the architecture is
 not theoretical.
 
-Phase 0 is complete when:
+Phase 0 was complete when:
 
 - contracts exist (versioned, TypeScript)
 - schemas validate (JSON Schema, with valid + invalid fixtures)
@@ -31,18 +45,28 @@ Phase 0 is complete when:
   artifact model, offline policy, monetization, open-core, roadmap,
   release checklist.
 
-## Next: Phase 1 — NekoJSON proof tool
+## Active: Phase 1 — NekoJSON proof tool
 
 Not flagship. Proof-grade. One tool, done well, that validates the
 spine generalizes from a trivial conformance lens to a real product
 tool.
 
+**Charter:** [docs/tools/nekojson.md](tools/nekojson.md). Implementation
+is blocked until the charter PR is merged.
+
+Scope (free, Phase 1):
+
 - parse, validate, format
 - tree / table / text views
 - path inspector, search
 - basic diff
-- schema inference
-- export
+- basic schema inference
+- export (JSON pretty / minified, Markdown summary, plaintext paths,
+  basic JSON Schema)
+
+Pro features declared in the manifest are deferred to Phase 3 (graph,
+semantic diff, migration) and Phase 1 follow-ups (advanced schema,
+TS/Zod, data dictionary).
 
 ## Phase 2 — Fast adjacent tools
 
