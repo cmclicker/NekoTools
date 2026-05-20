@@ -58,10 +58,15 @@ export const fixtures: Record<SchemaName, FixtureSet> = {
     invalid: [
       { ...artifactValid, version: 2 },
       { ...artifactValid, kind: '' },
-      (() => {
-        const { id: _id, ...rest } = artifactValid;
-        return rest;
-      })(),
+      // artifact missing the required `id` field
+      {
+        version: artifactValid.version,
+        kind: artifactValid.kind,
+        producedBy: artifactValid.producedBy,
+        producedAt: artifactValid.producedAt,
+        source: artifactValid.source,
+        value: artifactValid.value,
+      },
       { ...artifactValid, source: { kind: 'fetch', url: 'https://x' } },
       { ...artifactValid, producedAt: 'yesterday' },
     ],

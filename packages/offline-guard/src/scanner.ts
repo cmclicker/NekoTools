@@ -1,4 +1,5 @@
 import { promises as fs } from 'node:fs';
+import type { Dirent } from 'node:fs';
 import path from 'node:path';
 
 import { DEPENDENCY_DENYLIST, IMPORT_DENYLIST, SOURCE_URL_PATTERN } from './denylist.js';
@@ -54,7 +55,7 @@ export async function scan(root: string): Promise<ScanReport> {
   let scannedPackages = 0;
 
   async function walk(dir: string): Promise<void> {
-    let entries: import('node:fs').Dirent[];
+    let entries: Dirent[];
     try {
       entries = await fs.readdir(dir, { withFileTypes: true });
     } catch {
