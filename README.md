@@ -54,5 +54,10 @@ See [docs/release-checklist.md](docs/release-checklist.md).
 
 ## License
 
-See [LICENSE](LICENSE). The NekoTools name and marks are not covered by the
-source license.
+See [LICENSE](LICENSE). The public core is **source-available**, not
+OSI-approved open-source: non-commercial use is permitted; commercial
+use, redistribution as a paid product, and use in a competing product
+require a separate commercial license. The NekoTools name and marks are
+trademarks and are not covered by the source license. See
+[docs/open-core-strategy.md](docs/open-core-strategy.md) for the full
+breakdown.

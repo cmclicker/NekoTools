@@ -30,9 +30,26 @@ It scans test files too. "It's only in a test" is not an exemption.
 
 The only escape hatch is the literal comment marker `offline-guard:allow`
 inside a file. Used for the scanner's own data files and for tests that
-must contain forbidden patterns as fixtures. Any new use of the marker
-should be reviewed as part of the PR — it is a manual override of the
-machine check.
+must contain forbidden patterns as fixtures.
+
+**Marker review rule** (enforced by code review, not the scanner):
+
+1. Every `offline-guard:allow` occurrence MUST be accompanied by an
+   inline comment explaining *why* the file legitimately contains the
+   banned pattern (data file, test fixture, etc.).
+2. PRs that add a new marker MUST be approved by a maintainer who has
+   explicitly justified the exemption in the PR description.
+3. A marker without a written reason is a CI bypass and is treated as
+   a doctrine violation in review.
+
+There are currently two markers in the repo:
+
+| File                                                    | Reason |
+| ------------------------------------------------------- | ------ |
+| `packages/offline-guard/src/denylist.ts`                | Source of truth for the scanner; patterns appear as data. |
+| `packages/offline-guard/src/__tests__/scanner.test.ts`  | Fixtures must contain banned patterns so the scanner has something to catch. |
+
+Any third marker requires explicit review.
 
 ## Data collection
 

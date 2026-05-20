@@ -11,6 +11,21 @@ import type {
 import type { ToolRegistry } from './registry.js';
 
 /**
+ * Optional runtime injection points. The runner generates diagnostic
+ * IDs for thrown-parser exceptions; that ID must be reproducible from
+ * the same input, the same way artifact timestamps must be. Callers
+ * that batch many runs and want monotonic IDs pass `diagnosticId`.
+ * Tests and one-shot calls accept the deterministic default.
+ */
+export interface RunParserOptions {
+  readonly diagnosticId?: () => string;
+}
+
+function defaultRunnerDiagnosticId(parserId: string): string {
+  return `diag_runner_${parserId.replace(/\W+/g, '_')}`;
+}
+
+/**
  * Run a named parser. Parsers are pure: same input → same output. The
  * runner never silently swallows exceptions — if a parser throws, it
  * is upgraded to an error diagnostic so the UI can surface it.
@@ -20,6 +35,7 @@ export function runParser(
   toolId: string,
   parserId: string,
   input: ParserInput,
+  options: RunParserOptions = {},
 ): ParserResult {
   const tool = registry.get(toolId);
   if (!tool) throw new Error(`unknown tool: ${toolId}`);
@@ -30,9 +46,10 @@ export function runParser(
     return parser.parse(input);
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err);
+    const id = options.diagnosticId?.() ?? defaultRunnerDiagnosticId(parserId);
     const diagnostic: Diagnostic = {
       version: 1,
-      id: `diag_runner_${Date.now().toString(36)}`,
+      id,
       severity: 'error',
       code: 'runner.parser_threw',
       message: `parser "${parserId}" threw: ${message}`,

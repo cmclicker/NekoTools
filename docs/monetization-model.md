@@ -7,7 +7,9 @@ license validation during normal use.
 
 ## What's free
 
-- The open-source core packages.
+- The source-available core packages (see
+  [open-core-strategy.md](open-core-strategy.md) — the current LICENSE
+  is source-available, not OSI-approved).
 - Local parsing, validation, viewing, basic export.
 - CLI basics.
 - No account. No telemetry. No cloud dependency.

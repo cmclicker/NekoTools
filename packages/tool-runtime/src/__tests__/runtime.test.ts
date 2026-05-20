@@ -102,6 +102,25 @@ describe('runtime: registry', () => {
     const stray: Exporter = { ...exporter, id: 'test.unexpected' };
     expect(() => r.register({ manifest, parsers: [parser], exporters: [stray] })).toThrow();
   });
+
+  it('fails closed on a schema-invalid manifest', () => {
+    const r = new ToolRegistry();
+    const bad: ToolManifest = { ...manifest, name: '' };
+    expect(() => r.register({ manifest: bad, parsers: [parser], exporters: [exporter] })).toThrow(
+      /invalid manifest/,
+    );
+  });
+
+  it('fails closed on a cross-field-invalid manifest (free + pro overlap)', () => {
+    const r = new ToolRegistry();
+    const bad: ToolManifest = {
+      ...manifest,
+      entitlements: { free: ['parse', 'migrate'], pro: ['migrate'] },
+    };
+    expect(() => r.register({ manifest: bad, parsers: [parser], exporters: [exporter] })).toThrow(
+      /invalid manifest/,
+    );
+  });
 });
 
 describe('runtime: parser runner', () => {
@@ -126,6 +145,35 @@ describe('runtime: parser runner', () => {
     expect(result.artifacts).toHaveLength(0);
     expect(result.diagnostics[0]?.severity).toBe('error');
     expect(result.diagnostics[0]?.code).toBe('runner.parser_threw');
+  });
+
+  it('produces a deterministic diagnostic id when a parser throws', () => {
+    const r = new ToolRegistry();
+    r.register({ manifest, parsers: [parser], exporters: [exporter] });
+    const a = runParser(r, 'test', 'test.parser', {
+      raw: 'throw',
+      source: { kind: 'paste', bytes: 5 },
+    });
+    const b = runParser(r, 'test', 'test.parser', {
+      raw: 'throw',
+      source: { kind: 'paste', bytes: 5 },
+    });
+    expect(a.diagnostics[0]?.id).toBe(b.diagnostics[0]?.id);
+    expect(a.diagnostics[0]?.id).toMatch(/^diag_runner_test_parser$/);
+  });
+
+  it('lets callers override the diagnostic id factory', () => {
+    const r = new ToolRegistry();
+    r.register({ manifest, parsers: [parser], exporters: [exporter] });
+    let n = 0;
+    const result = runParser(
+      r,
+      'test',
+      'test.parser',
+      { raw: 'throw', source: { kind: 'paste', bytes: 5 } },
+      { diagnosticId: () => `diag_${++n}` },
+    );
+    expect(result.diagnostics[0]?.id).toBe('diag_1');
   });
 });
 

@@ -5,13 +5,16 @@ import type {
   ToolManifest,
 } from '@nekotools/contracts';
 
+import { validateManifest } from './manifest-validator.js';
+
 /**
  * The tool registry — the only place tools enter the runtime.
  *
  * Tools register their manifest plus their parsers, exporters, and
  * (optionally) graph projectors. The registry validates every manifest
- * against the schema before accepting it. A tool that does not match
- * its declared contract is rejected at registration time.
+ * against the schema AND against cross-field invariants before accepting
+ * it. A tool that does not match its declared contract is rejected at
+ * registration time — fail closed.
  */
 export interface ToolRegistration {
   readonly manifest: ToolManifest;
@@ -25,6 +28,14 @@ export class ToolRegistry {
 
   register(reg: ToolRegistration): void {
     const { manifest } = reg;
+
+    const validation = validateManifest(manifest);
+    if (!validation.ok) {
+      throw new Error(
+        `invalid manifest for "${manifest.id}": ${validation.errors.join('; ')}`,
+      );
+    }
+
     if (this.tools.has(manifest.id)) {
       throw new Error(`tool already registered: ${manifest.id}`);
     }

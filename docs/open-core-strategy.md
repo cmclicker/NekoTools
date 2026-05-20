@@ -1,8 +1,15 @@
 # Open-Core Strategy
 
-NekoTools is open-core, not fully open-source. The architecture is built
-around this distinction so that "flip a flag to unlock Pro" is
-structurally impossible.
+NekoTools is open-core with a **source-available** public core — not
+OSI-approved open-source. The current `LICENSE` allows non-commercial
+use; commercial use, redistribution as a paid product, or use in a
+competing product requires a separate commercial license. We may
+relicense the public core to an OSI-approved license (MPL-2.0 /
+Apache-2.0) in the future; until then, do not describe the repo as
+"open-source" in shipped material.
+
+The architecture is built around the open-core split so that "flip a
+flag to unlock Pro" is structurally impossible.
 
 ## Two repositories
 
