@@ -1,11 +1,15 @@
 import type { Exporter } from '@nekotools/contracts';
 
 import {
-  FREE_JSON_KINDS,
+  JSON_DIFF_EXPORT_KINDS,
+  JSON_DOCUMENT_EXPORT_KINDS,
+  JSON_KIND_DIFF,
   JSON_KIND_DOCUMENT,
   JSON_KIND_PATH_RESULT,
   JSON_KIND_SCHEMA,
+  JSON_SUMMARY_EXPORT_KINDS,
   type JsonArtifact,
+  type JsonDiffArtifact,
   type JsonDocumentArtifact,
   type JsonPathResult,
   type JsonSchemaValue,
@@ -21,7 +25,7 @@ export const jsonPrettyExporter: Exporter<JsonArtifact> = {
   id: 'json.export.json.pretty',
   toolId: TOOL_ID,
   target: 'json',
-  accepts: FREE_JSON_KINDS,
+  accepts: JSON_DOCUMENT_EXPORT_KINDS,
   producesMimeType: 'application/json',
   producesExtension: 'json',
   export({ artifacts }) {
@@ -39,7 +43,7 @@ export const jsonMinifiedExporter: Exporter<JsonArtifact> = {
   id: 'json.export.json.minified',
   toolId: TOOL_ID,
   target: 'json',
-  accepts: FREE_JSON_KINDS,
+  accepts: JSON_DOCUMENT_EXPORT_KINDS,
   producesMimeType: 'application/json',
   producesExtension: 'json',
   export({ artifacts }) {
@@ -51,13 +55,18 @@ export const jsonMinifiedExporter: Exporter<JsonArtifact> = {
   },
 };
 
-/** Human-readable summary: top-level keys, diagnostics, path counts. */
+/**
+ * Human-readable summary: top-level shape per document, path
+ * inspections, inferred schemas, diff summaries, and diagnostics.
+ * Accepts every shipped artifact kind and renders the appropriate
+ * section for each.
+ */
 export const markdownSummaryExporter: Exporter<JsonArtifact> = {
   version: 1,
   id: 'json.export.markdown.summary',
   toolId: TOOL_ID,
   target: 'markdown',
-  accepts: FREE_JSON_KINDS,
+  accepts: JSON_SUMMARY_EXPORT_KINDS,
   producesMimeType: 'text/markdown',
   producesExtension: 'md',
   export({ artifacts, diagnostics }) {
@@ -95,6 +104,21 @@ export const markdownSummaryExporter: Exporter<JsonArtifact> = {
       lines.push('');
     }
 
+    const diffs = artifacts.filter(
+      (a): a is JsonDiffArtifact => a.kind === JSON_KIND_DIFF,
+    );
+    if (diffs.length > 0) {
+      lines.push('## Diffs', '');
+      for (const d of diffs) {
+        const adds = d.value.hunks.filter((h) => h.kind === 'add').length;
+        const removes = d.value.hunks.filter((h) => h.kind === 'remove').length;
+        lines.push(
+          `- \`${d.value.leftArtifactId}\` → \`${d.value.rightArtifactId}\` — ${adds} added, ${removes} removed`,
+        );
+      }
+      lines.push('');
+    }
+
     if (diagnostics.length > 0) {
       lines.push('## Diagnostics', '');
       for (const d of diagnostics) {
@@ -113,7 +137,7 @@ export const plaintextPathsExporter: Exporter<JsonArtifact> = {
   id: 'json.export.plaintext.paths',
   toolId: TOOL_ID,
   target: 'plaintext',
-  accepts: [JSON_KIND_DOCUMENT],
+  accepts: JSON_DOCUMENT_EXPORT_KINDS,
   producesMimeType: 'text/plain',
   producesExtension: 'txt',
   export({ artifacts }) {
@@ -134,7 +158,7 @@ export const basicSchemaExporter: Exporter<JsonArtifact> = {
   id: 'json.export.schema.json-schema',
   toolId: TOOL_ID,
   target: 'json',
-  accepts: [JSON_KIND_DOCUMENT],
+  accepts: JSON_DOCUMENT_EXPORT_KINDS,
   producesMimeType: 'application/schema+json',
   producesExtension: 'json',
   export({ artifacts }) {
@@ -145,6 +169,55 @@ export const basicSchemaExporter: Exporter<JsonArtifact> = {
         ? JSON.stringify(schemas[0], null, 2)
         : JSON.stringify(schemas, null, 2);
     return { mimeType: 'application/schema+json', extension: 'json', body };
+  },
+};
+
+/**
+ * Renders a `json.diff` artifact as unified-diff-style plaintext.
+ *
+ *   "  " before equal lines
+ *   "+ " before added lines
+ *   "- " before removed lines
+ *
+ * Multiple diff artifacts are concatenated with a single blank line
+ * between them. Non-diff artifacts in the input are ignored.
+ */
+export const textualDiffExporter: Exporter<JsonArtifact> = {
+  version: 1,
+  id: 'json.export.diff.textual',
+  toolId: TOOL_ID,
+  target: 'plaintext',
+  accepts: JSON_DIFF_EXPORT_KINDS,
+  producesMimeType: 'text/plain',
+  producesExtension: 'diff',
+  export({ artifacts }) {
+    const diffs = artifacts.filter(
+      (a): a is JsonDiffArtifact => a.kind === JSON_KIND_DIFF,
+    );
+    const blocks: string[] = [];
+    for (const d of diffs) {
+      const { leftArtifactId, rightArtifactId, hunks } = d.value;
+      const lines: string[] = [`--- ${leftArtifactId}`, `+++ ${rightArtifactId}`];
+      for (const h of hunks) {
+        switch (h.kind) {
+          case 'equal':
+            lines.push(`  ${h.text}`);
+            break;
+          case 'add':
+            lines.push(`+ ${h.text}`);
+            break;
+          case 'remove':
+            lines.push(`- ${h.text}`);
+            break;
+        }
+      }
+      blocks.push(lines.join('\n'));
+    }
+    return {
+      mimeType: 'text/plain',
+      extension: 'diff',
+      body: blocks.join('\n\n'),
+    };
   },
 };
 
@@ -170,4 +243,5 @@ export const freeExporters: readonly Exporter<JsonArtifact>[] = [
   markdownSummaryExporter,
   plaintextPathsExporter,
   basicSchemaExporter,
+  textualDiffExporter,
 ];

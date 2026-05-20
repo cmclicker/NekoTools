@@ -12,12 +12,15 @@ import { validate } from '@nekotools/schemas';
 import {
   FIXED_CLOCK,
   buildJsonRegistration,
+  canonicalize,
+  computeTextualDiff,
+  diffLines,
   inferBasicSchema,
   jsonManifest,
   listPaths,
   parsePointer,
 } from '../index.js';
-import type { JsonDocumentArtifact, JsonPathResult } from '../kinds.js';
+import type { JsonDiff, JsonDiffArtifact, JsonDocumentArtifact, JsonPathResult } from '../kinds.js';
 
 const clock = FIXED_CLOCK('2026-05-20T00:00:00.000Z');
 
@@ -50,9 +53,9 @@ describe('NekoJSON: manifest', () => {
   it('capabilities reflect current-build truth, not lifetime intent', () => {
     expect(jsonManifest.capabilities.canSaveWorkspace).toBe(true);
     expect(jsonManifest.capabilities.canExport).toBe(true);
-    // Diff and graph projection are charter-approved but not in MVP.
-    // These flip true in the PR that ships their implementation.
-    expect(jsonManifest.capabilities.canDiff).toBe(false);
+    // Phase 1.1a flipped canDiff to true. Graph projection stays false
+    // until the Pro build registers a graph projector.
+    expect(jsonManifest.capabilities.canDiff).toBe(true);
     expect(jsonManifest.capabilities.canProjectGraph).toBe(false);
   });
 });
@@ -116,18 +119,21 @@ describe('NekoJSON: monetization safety', () => {
       'validate',
       'inspect.pointer',
       'schema.infer.basic',
+      'diff.textual',
       'export.json.pretty',
       'export.json.minified',
       'export.markdown.summary',
       'export.plaintext.paths',
       'export.schema.basic',
+      'export.diff.textual',
       'workspace.save',
     ]);
     const declared = new Set(jsonManifest.entitlements.free);
     expect(declared).toEqual(expectedFree);
 
     // Deferred free features must NOT be declared in the manifest
-    // until the implementation lands in the same PR.
+    // until the implementation lands in the same PR. Phase 1.1a
+    // shipped textual diff, so it was removed from this list.
     const deferredFree = [
       'view.tree',
       'view.table',
@@ -135,7 +141,6 @@ describe('NekoJSON: monetization safety', () => {
       'search',
       'copy.path',
       'copy.value',
-      'diff.textual',
     ];
     for (const id of deferredFree) {
       expect(declared.has(id)).toBe(false);
@@ -440,5 +445,322 @@ describe('NekoJSON: workspace round-trip', () => {
     });
     const result = validate('artifact', parsed.artifacts[0]);
     expect(result.ok, result.errors.join('; ')).toBe(true);
+  });
+});
+
+describe('NekoJSON: textual diff (Phase 1.1a)', () => {
+  it('canonicalize sorts object keys recursively', () => {
+    const a = canonicalize({ b: 1, a: { d: 2, c: 3 } });
+    const b = canonicalize({ a: { c: 3, d: 2 }, b: 1 });
+    expect(a).toBe(b);
+  });
+
+  it('canonicalize throws TypeError on non-JSON roots (undefined, function, symbol)', () => {
+    // Defense-in-depth: the parser is the primary fail-closed
+    // boundary, but if a future direct caller hands us a non-JSON
+    // value, the function must throw rather than silently return
+    // undefined (which it would do if we just returned
+    // JSON.stringify's result unchecked).
+    expect(() => canonicalize(undefined)).toThrow(TypeError);
+    expect(() => canonicalize(() => 1)).toThrow(TypeError);
+    expect(() => canonicalize(Symbol('x'))).toThrow(TypeError);
+  });
+
+  it('diffLines returns all-equal hunks for identical inputs', () => {
+    const hunks = diffLines(['x', 'y'], ['x', 'y']);
+    expect(hunks.every((h) => h.kind === 'equal')).toBe(true);
+    expect(hunks).toHaveLength(2);
+  });
+
+  it('diffLines distinguishes add, remove, and equal', () => {
+    const hunks = diffLines(['a', 'b', 'c'], ['a', 'B', 'c']);
+    const kinds = hunks.map((h) => h.kind);
+    expect(kinds).toContain('equal');
+    expect(kinds).toContain('add');
+    expect(kinds).toContain('remove');
+  });
+
+  it('computeTextualDiff produces a diff artifact ignoring key order', () => {
+    const diff = computeTextualDiff('left', 'right', { a: 1, b: 2 }, { b: 2, a: 1 });
+    // Canonical form sorts keys, so reordering keys produces no diff.
+    expect(diff.hunks.every((h) => h.kind === 'equal')).toBe(true);
+  });
+
+  it('computeTextualDiff emits hunks when values actually differ', () => {
+    const diff = computeTextualDiff('left', 'right', { name: 'a' }, { name: 'b' });
+    expect(diff.hunks.some((h) => h.kind === 'add')).toBe(true);
+    expect(diff.hunks.some((h) => h.kind === 'remove')).toBe(true);
+  });
+});
+
+describe('NekoJSON: json.diff.textual parser', () => {
+  function diffArtifact(left: unknown, right: unknown): JsonDiffArtifact {
+    const r = registry();
+    const result = runParser(r, 'json', 'json.diff.textual', {
+      raw: '',
+      source: { kind: 'derived', from: ['left_id', 'right_id'] },
+      hints: {
+        leftArtifactId: 'left_id',
+        leftDocument: left,
+        rightArtifactId: 'right_id',
+        rightDocument: right,
+      },
+    });
+    expect(result.diagnostics).toHaveLength(0);
+    expect(result.artifacts).toHaveLength(1);
+    return result.artifacts[0] as JsonDiffArtifact;
+  }
+
+  it('produces a json.diff artifact with the right shape', () => {
+    const art = diffArtifact({ a: 1 }, { a: 1 });
+    expect(art.kind).toBe('json.diff');
+    expect(art.source).toEqual({ kind: 'derived', from: ['left_id', 'right_id'] });
+    const v = art.value as JsonDiff;
+    expect(v.leftArtifactId).toBe('left_id');
+    expect(v.rightArtifactId).toBe('right_id');
+    expect(v.hunks.every((h) => h.kind === 'equal')).toBe(true);
+  });
+
+  it('emits a diagnostic when artifact ids are missing', () => {
+    const r = registry();
+    const result = runParser(r, 'json', 'json.diff.textual', {
+      raw: '',
+      source: { kind: 'derived', from: [] },
+      hints: { leftDocument: { a: 1 }, rightDocument: { a: 2 } },
+    });
+    expect(result.artifacts).toHaveLength(0);
+    expect(result.diagnostics[0]?.code).toBe('json.diff.missing_input');
+  });
+
+  it('emits a diagnostic when leftDocument hint key is absent (does not throw)', () => {
+    const r = registry();
+    const call = () =>
+      runParser(r, 'json', 'json.diff.textual', {
+        raw: '',
+        source: { kind: 'derived', from: ['l', 'r'] },
+        hints: { leftArtifactId: 'l', rightArtifactId: 'r', rightDocument: { a: 1 } },
+      });
+    expect(call).not.toThrow();
+    const result = call();
+    expect(result.artifacts).toHaveLength(0);
+    expect(result.diagnostics[0]?.code).toBe('json.diff.missing_input');
+  });
+
+  it('emits a diagnostic when rightDocument hint key is absent (does not throw)', () => {
+    const r = registry();
+    const call = () =>
+      runParser(r, 'json', 'json.diff.textual', {
+        raw: '',
+        source: { kind: 'derived', from: ['l', 'r'] },
+        hints: { leftArtifactId: 'l', rightArtifactId: 'r', leftDocument: { a: 1 } },
+      });
+    expect(call).not.toThrow();
+    const result = call();
+    expect(result.artifacts).toHaveLength(0);
+    expect(result.diagnostics[0]?.code).toBe('json.diff.missing_input');
+  });
+
+  it('emits a diagnostic when leftDocument is explicitly undefined (does not throw)', () => {
+    const r = registry();
+    const call = () =>
+      runParser(r, 'json', 'json.diff.textual', {
+        raw: '',
+        source: { kind: 'derived', from: ['l', 'r'] },
+        hints: {
+          leftArtifactId: 'l',
+          rightArtifactId: 'r',
+          leftDocument: undefined,
+          rightDocument: { a: 1 },
+        },
+      });
+    expect(call).not.toThrow();
+    const result = call();
+    expect(result.artifacts).toHaveLength(0);
+    expect(result.diagnostics[0]?.code).toBe('json.diff.missing_input');
+  });
+
+  it('emits a diagnostic when rightDocument is explicitly undefined (does not throw)', () => {
+    const r = registry();
+    const call = () =>
+      runParser(r, 'json', 'json.diff.textual', {
+        raw: '',
+        source: { kind: 'derived', from: ['l', 'r'] },
+        hints: {
+          leftArtifactId: 'l',
+          rightArtifactId: 'r',
+          leftDocument: { a: 1 },
+          rightDocument: undefined,
+        },
+      });
+    expect(call).not.toThrow();
+    const result = call();
+    expect(result.artifacts).toHaveLength(0);
+    expect(result.diagnostics[0]?.code).toBe('json.diff.missing_input');
+  });
+
+  it('accepts null / 0 as legitimate JSON root values, not "missing"', () => {
+    // These are valid JSON roots. The hasOwnProperty presence check
+    // exists precisely so a truthy check does not reject them.
+    const r = registry();
+    const result = runParser(r, 'json', 'json.diff.textual', {
+      raw: '',
+      source: { kind: 'derived', from: ['l', 'r'] },
+      hints: {
+        leftArtifactId: 'l',
+        rightArtifactId: 'r',
+        leftDocument: null,
+        rightDocument: 0,
+      },
+    });
+    expect(result.diagnostics).toHaveLength(0);
+    expect(result.artifacts).toHaveLength(1);
+  });
+
+  it('produced artifact validates against the artifact schema', () => {
+    const art = diffArtifact({ a: 1 }, { a: 2 });
+    const result = validate('artifact', art);
+    expect(result.ok, result.errors.join('; ')).toBe(true);
+  });
+});
+
+describe('NekoJSON: diff exporter', () => {
+  function diffArtifact(left: unknown, right: unknown): JsonDiffArtifact {
+    const r = registry();
+    const result = runParser(r, 'json', 'json.diff.textual', {
+      raw: '',
+      source: { kind: 'derived', from: ['left_id', 'right_id'] },
+      hints: {
+        leftArtifactId: 'left_id',
+        leftDocument: left,
+        rightArtifactId: 'right_id',
+        rightDocument: right,
+      },
+    });
+    return result.artifacts[0] as JsonDiffArtifact;
+  }
+
+  it('renders a unified-diff-style plaintext block', () => {
+    const r = registry();
+    const out = runExporter(r, 'json', 'json.export.diff.textual', {
+      artifacts: [diffArtifact({ name: 'a' }, { name: 'b' })],
+      diagnostics: [],
+    });
+    const body = String(out.body);
+    expect(body).toContain('--- left_id');
+    expect(body).toContain('+++ right_id');
+    expect(body).toMatch(/^- /m);
+    expect(body).toMatch(/^\+ /m);
+    expect(out.extension).toBe('diff');
+  });
+
+  it('refuses non-diff artifacts in the input (runtime enforces accepts)', () => {
+    const r = registry();
+    const docParsed = runParser(r, 'json', 'json.text', {
+      raw: '{"a":1}',
+      source: { kind: 'paste', bytes: 7 },
+    });
+    expect(() =>
+      runExporter(r, 'json', 'json.export.diff.textual', {
+        artifacts: docParsed.artifacts,
+        diagnostics: [],
+      }),
+    ).toThrow(/does not accept artifact kind/);
+  });
+});
+
+describe('NekoJSON: exporter accept boundaries (PR #4 audit)', () => {
+  function diffArtifact(): JsonDiffArtifact {
+    const r = registry();
+    const result = runParser(r, 'json', 'json.diff.textual', {
+      raw: '',
+      source: { kind: 'derived', from: ['l', 'r'] },
+      hints: {
+        leftArtifactId: 'l',
+        leftDocument: { a: 1 },
+        rightArtifactId: 'r',
+        rightDocument: { a: 2 },
+      },
+    });
+    return result.artifacts[0] as JsonDiffArtifact;
+  }
+
+  it('json.export.json.pretty refuses json.diff artifacts', () => {
+    const r = registry();
+    expect(() =>
+      runExporter(r, 'json', 'json.export.json.pretty', {
+        artifacts: [diffArtifact()],
+        diagnostics: [],
+      }),
+    ).toThrow(/does not accept artifact kind/);
+  });
+
+  it('json.export.json.minified refuses json.diff artifacts', () => {
+    const r = registry();
+    expect(() =>
+      runExporter(r, 'json', 'json.export.json.minified', {
+        artifacts: [diffArtifact()],
+        diagnostics: [],
+      }),
+    ).toThrow(/does not accept artifact kind/);
+  });
+
+  it('json.export.plaintext.paths refuses json.diff artifacts', () => {
+    const r = registry();
+    expect(() =>
+      runExporter(r, 'json', 'json.export.plaintext.paths', {
+        artifacts: [diffArtifact()],
+        diagnostics: [],
+      }),
+    ).toThrow(/does not accept artifact kind/);
+  });
+
+  it('json.export.schema.json-schema refuses json.diff artifacts', () => {
+    const r = registry();
+    expect(() =>
+      runExporter(r, 'json', 'json.export.schema.json-schema', {
+        artifacts: [diffArtifact()],
+        diagnostics: [],
+      }),
+    ).toThrow(/does not accept artifact kind/);
+  });
+
+  it('json.export.markdown.summary accepts json.diff and renders a Diffs section', () => {
+    const r = registry();
+    const out = runExporter(r, 'json', 'json.export.markdown.summary', {
+      artifacts: [diffArtifact()],
+      diagnostics: [],
+    });
+    const body = String(out.body);
+    expect(body).toContain('## Diffs');
+    expect(body).toContain('`l` → `r`');
+  });
+});
+
+describe('NekoJSON: workspace round-trip with diff artifact', () => {
+  it('a diff artifact survives serialize -> deserialize losslessly', () => {
+    const r = registry();
+    const parsed = runParser(r, 'json', 'json.diff.textual', {
+      raw: '',
+      source: { kind: 'derived', from: ['l', 'r'] },
+      hints: {
+        leftArtifactId: 'l',
+        leftDocument: { a: 1 },
+        rightArtifactId: 'r',
+        rightDocument: { a: 2 },
+      },
+    });
+    const ws: Workspace = {
+      version: 1,
+      id: 'ws_diff',
+      toolId: 'json',
+      toolVersion: 1,
+      createdAt: '2026-05-20T00:00:00.000Z',
+      updatedAt: '2026-05-20T00:00:00.000Z',
+      artifacts: parsed.artifacts,
+      diagnostics: parsed.diagnostics,
+    };
+    const raw = jsonWorkspaceSerializer.serialize(ws);
+    const back = jsonWorkspaceSerializer.deserialize(raw);
+    expect(back).toEqual(ws);
   });
 });

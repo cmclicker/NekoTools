@@ -28,9 +28,9 @@ previous row `Done`.
 
 | Order | Phase     | PR Type        | Scope                                                                                          | Status |
 | ----- | --------- | -------------- | ---------------------------------------------------------------------------------------------- | ------ |
-| 1     | Phase 1.0 Closeout | Docs       | Mark PR #2 / `324115c` as complete; add this Active Next Queue; set Phase 1.1a as next. | Next |
-| 2     | Phase 1.1a | Implementation | `json.diff` artifact + basic textual diff exporter. Still engine-only; validates the multi-document workspace assumptions. | Queued |
-| 3     | Phase 1.1b | Implementation | Large-document soft threshold + `json.large_document` diagnostic.                              | Queued |
+| 1     | Phase 1.0 Closeout | Docs       | Mark PR #2 / `324115c` as complete; add this Active Next Queue; set Phase 1.1a as next. | Done (PR #3 / `0f7c0a2`) |
+| 2     | Phase 1.1a | Implementation | `json.diff` artifact + basic textual diff exporter. Still engine-only; validates the multi-document workspace assumptions. | Done (this PR) |
+| 3     | Phase 1.1b | Implementation | Large-document soft threshold + `json.large_document` diagnostic.                              | **Next** |
 | 4     | Phase 1.1c | Planning + Implementation | In-tree tokenizer foundation (always-accurate spans).                              | Queued |
 | 5     | Phase 1.1d | Implementation | `json.duplicate_key` + `json.trailing_comma` diagnostics using the new tokenizer.              | Queued |
 | 6     | Phase 1.1e | UI Planning    | `apps/web-suite` shell for NekoJSON tree / text / table views, search, copy.path / copy.value. | Queued |
@@ -78,7 +78,7 @@ tool.
 
 **Charter:** [docs/tools/nekojson.md](tools/nekojson.md).
 
-### Phase 1.0 — Engine MVP (this PR's scope)
+### Phase 1.0 — Engine MVP (shipped, PR #2)
 
 Engine-only, no UI. The features below are implementation-backed in
 `@nekotools/lens-json` and declared in `manifest.entitlements.free`:
@@ -90,21 +90,26 @@ Engine-only, no UI. The features below are implementation-backed in
   paths, basic JSON Schema
 - save / load local workspace via the existing serializer
 
-### Phase 1.1+ — Follow-ups (free, not in this PR)
+### Phase 1.1+ — Follow-ups
 
 Each lands in its own follow-up PR. Adding any of these requires also
 updating `manifest.entitlements.free` and the relevant `capabilities`
-flag in the same PR:
+flag in the same PR.
 
+**Shipped**
+
+- basic textual diff + `json.diff` artifact — Phase 1.1a (PR #4)
+
+**Remaining**
+
+- large-document soft threshold (`json.large_document`)
+- in-tree tokenizer for always-accurate spans
+- duplicate-key detection (`json.duplicate_key`)
+- trailing-comma support / non-strict mode (`json.trailing_comma`)
 - tree / table / text views (UI; needs `apps/web-suite` to grow past
   placeholder)
 - search across keys and values (UI)
 - copy path / copy value (UI)
-- basic textual diff + `json.diff` artifact
-- duplicate-key detection (`json.duplicate_key`)
-- trailing-comma support / non-strict mode (`json.trailing_comma`)
-- large-document soft threshold (`json.large_document`)
-- in-tree tokenizer for always-accurate spans
 
 ### Phase 1 Pro (future private package)
 
