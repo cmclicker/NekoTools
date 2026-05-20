@@ -93,6 +93,10 @@ export const jsonManifest: ToolManifest = {
       // Phase 1.1g — table view + search shipped in apps/web-suite.
       'view.table',
       'search',
+      // Phase 1.1h — local-clipboard copy affordances shipped in
+      // apps/web-suite. Closes the Phase 1 free-tier feature set.
+      'copy.path',
+      'copy.value',
     ],
     pro: [
       'view.graph',

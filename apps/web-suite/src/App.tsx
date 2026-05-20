@@ -1,4 +1,4 @@
-import { useMemo, useState, type ChangeEvent } from 'react';
+import { useCallback, useMemo, useState, type ChangeEvent } from 'react';
 import { ToolRegistry } from '@nekotools/tool-runtime';
 import {
   buildJsonRegistration,
@@ -11,6 +11,8 @@ import { TreeView } from './TreeView.js';
 import { TextView } from './TextView.js';
 import { TableView } from './TableView.js';
 import { parseInput } from './parse-input.js';
+import { copyToClipboard, type ClipboardDeps } from './clipboard.js';
+import { resolveJsonPointer } from './pointer-resolve.js';
 
 /**
  * Phase 1.1g web-suite App.
@@ -37,6 +39,25 @@ export interface NekoJsonUiState {
 interface AppProps {
   readonly initialInput?: string;
   readonly initialUiState?: Partial<NekoJsonUiState>;
+  /**
+   * Phase 1.1h — test seam. Lets unit tests inject in-memory copy
+   * implementations instead of relying on jsdom's lack of
+   * `navigator.clipboard` / `document.execCommand`. Defaults to the
+   * production helper's auto-detected paths.
+   */
+  readonly clipboardDeps?: ClipboardDeps;
+}
+
+/**
+ * Discriminated state for the "Copied!" status pill in the toolbar.
+ * `kind` mirrors the button the user pressed; `method` tells the
+ * status text whether the Clipboard API or the DOM fallback won.
+ */
+interface CopyStatus {
+  readonly kind: 'path' | 'value';
+  readonly ok: boolean;
+  readonly method: 'clipboard-api' | 'execCommand' | 'none';
+  readonly reason?: string;
 }
 
 const DEFAULT_UI_STATE: NekoJsonUiState = {
@@ -64,7 +85,11 @@ const registry = (() => {
   return r;
 })();
 
-export function App({ initialInput, initialUiState }: AppProps = {}): JSX.Element {
+export function App({
+  initialInput,
+  initialUiState,
+  clipboardDeps,
+}: AppProps = {}): JSX.Element {
   const [input, setInput] = useState<string>(initialInput ?? SAMPLE_INPUT);
   const [viewMode, setViewMode] = useState<ViewMode>(
     initialUiState?.viewMode ?? DEFAULT_UI_STATE.viewMode,
@@ -75,8 +100,46 @@ export function App({ initialInput, initialUiState }: AppProps = {}): JSX.Elemen
   const [searchQuery, setSearchQuery] = useState<string>(
     initialUiState?.searchQuery ?? DEFAULT_UI_STATE.searchQuery,
   );
+  const [copyStatus, setCopyStatus] = useState<CopyStatus | null>(null);
 
   const parsed = useMemo(() => parseInput(registry, input), [input]);
+
+  const handleCopyPath = useCallback(async () => {
+    const result = await copyToClipboard(activePath, clipboardDeps);
+    setCopyStatus({
+      kind: 'path',
+      ok: result.ok,
+      method: result.method,
+      ...(result.reason !== undefined && { reason: result.reason }),
+    });
+  }, [activePath, clipboardDeps]);
+
+  const handleCopyValue = useCallback(async () => {
+    if (!parsed.hasDocument) return;
+    const resolved = resolveJsonPointer(parsed.value, activePath);
+    const text = resolved.ok ? JSON.stringify(resolved.value, null, 2) : '';
+    if (!resolved.ok) {
+      setCopyStatus({
+        kind: 'value',
+        ok: false,
+        method: 'none',
+        reason: resolved.reason,
+      });
+      return;
+    }
+    const result = await copyToClipboard(text, clipboardDeps);
+    setCopyStatus({
+      kind: 'value',
+      ok: result.ok,
+      method: result.method,
+      ...(result.reason !== undefined && { reason: result.reason }),
+    });
+  }, [parsed.hasDocument, parsed.value, activePath, clipboardDeps]);
+
+  // Active path is empty by default — copy buttons are disabled until
+  // the user selects a tree node.
+  const copyPathDisabled = activePath === '';
+  const copyValueDisabled = activePath === '' || !parsed.hasDocument;
 
   return (
     <main className="suite">
@@ -86,8 +149,8 @@ export function App({ initialInput, initialUiState }: AppProps = {}): JSX.Elemen
           Local-only, air-gapped-capable, zero-telemetry developer workbenches.
         </p>
         <p className="suite__phase">
-          Web shell — Phase 1.1g. Hosting <strong>{jsonManifest.name}</strong>{' '}
-          (tree, text, and table views with search; copy affordances are queued for 1.1h).
+          Web shell — Phase 1.1h. Hosting <strong>{jsonManifest.name}</strong>{' '}
+          (tree, text, and table views with search and local clipboard copy).
         </p>
       </header>
 
@@ -155,6 +218,27 @@ export function App({ initialInput, initialUiState }: AppProps = {}): JSX.Elemen
             />
           </label>
 
+          <div className="copy" role="group" aria-label="Copy affordances">
+            <button
+              type="button"
+              className="copy__btn"
+              onClick={handleCopyPath}
+              disabled={copyPathDisabled}
+              data-testid="copy-path"
+            >
+              Copy path
+            </button>
+            <button
+              type="button"
+              className="copy__btn"
+              onClick={handleCopyValue}
+              disabled={copyValueDisabled}
+              data-testid="copy-value"
+            >
+              Copy value
+            </button>
+          </div>
+
           {activePath ? (
             <p className="results__path" data-testid="active-path">
               Active path: <code>{activePath}</code>
@@ -164,6 +248,20 @@ export function App({ initialInput, initialUiState }: AppProps = {}): JSX.Elemen
               No path selected.
             </p>
           )}
+
+          {copyStatus !== null ? (
+            <p
+              className={`copy__status copy__status--${copyStatus.ok ? 'ok' : 'fail'}`}
+              data-testid="copy-status"
+              data-kind={copyStatus.kind}
+              data-method={copyStatus.method}
+              role="status"
+            >
+              {copyStatus.ok
+                ? `Copied ${copyStatus.kind} to clipboard (via ${copyStatus.method}).`
+                : `Copy ${copyStatus.kind} failed${copyStatus.reason ? `: ${copyStatus.reason}` : ''}.`}
+            </p>
+          ) : null}
         </div>
 
         {viewMode === 'tree' ? (

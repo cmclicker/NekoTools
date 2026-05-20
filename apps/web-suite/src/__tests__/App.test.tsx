@@ -1,12 +1,12 @@
-import { describe, expect, it } from 'vitest';
-import { fireEvent, render, screen } from '@testing-library/react';
+import { describe, expect, it, vi } from 'vitest';
+import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { App } from '../App.js';
 
 describe('App integration', () => {
   it('renders the manifest summary on first load', () => {
     render(<App initialInput="{}" />);
     expect(screen.getByRole('heading', { level: 1, name: /NekoTools/ })).toBeInTheDocument();
-    expect(screen.getByText(/Phase 1\.1g/)).toBeInTheDocument();
+    expect(screen.getByText(/Phase 1\.1h/)).toBeInTheDocument();
   });
 
   it('parses the initial input and shows the tree by default', () => {
@@ -130,5 +130,83 @@ describe('App integration', () => {
     expect(screen.getByRole('region', { name: /JSON table view/i })).toBeInTheDocument();
     expect(screen.getByText('"alice"')).toBeInTheDocument();
     expect(screen.queryByText('"bob"')).not.toBeInTheDocument();
+  });
+
+  it('Phase 1.1h: Copy path and Copy value are disabled until a tree node is selected', () => {
+    render(<App initialInput='{"a":1}' />);
+    expect(screen.getByTestId('copy-path')).toBeDisabled();
+    expect(screen.getByTestId('copy-value')).toBeDisabled();
+  });
+
+  it('Phase 1.1h: Copy path writes the active JSON Pointer via the injected clipboard', async () => {
+    const writes: string[] = [];
+    render(
+      <App
+        initialInput='{"a":{"b":1}}'
+        initialUiState={{ activePath: '/a/b' }}
+        clipboardDeps={{ apiWrite: async (t) => { writes.push(t); } }}
+      />,
+    );
+    const btn = screen.getByTestId('copy-path');
+    expect(btn).not.toBeDisabled();
+    fireEvent.click(btn);
+    await waitFor(() => {
+      expect(writes).toEqual(['/a/b']);
+    });
+    const status = await screen.findByTestId('copy-status');
+    expect(status).toHaveAttribute('data-kind', 'path');
+    expect(status).toHaveAttribute('data-method', 'clipboard-api');
+    expect(status.textContent).toMatch(/Copied path/);
+  });
+
+  it('Phase 1.1h: Copy value writes the JSON value at the active path', async () => {
+    const writes: string[] = [];
+    render(
+      <App
+        initialInput='{"a":{"b":1}}'
+        initialUiState={{ activePath: '/a' }}
+        clipboardDeps={{ apiWrite: async (t) => { writes.push(t); } }}
+      />,
+    );
+    fireEvent.click(screen.getByTestId('copy-value'));
+    await waitFor(() => {
+      expect(writes).toHaveLength(1);
+    });
+    expect(JSON.parse(writes[0]!)).toEqual({ b: 1 });
+    expect(await screen.findByTestId('copy-status')).toHaveAttribute('data-kind', 'value');
+  });
+
+  it('Phase 1.1h: Copy value surfaces a failure when the pointer is unresolved', async () => {
+    const writes: string[] = [];
+    render(
+      <App
+        initialInput='{"a":1}'
+        initialUiState={{ activePath: '/missing' }}
+        clipboardDeps={{ apiWrite: async (t) => { writes.push(t); } }}
+      />,
+    );
+    fireEvent.click(screen.getByTestId('copy-value'));
+    const status = await screen.findByTestId('copy-status');
+    expect(status).toHaveAttribute('data-kind', 'value');
+    expect(status.textContent).toMatch(/Copy value failed/);
+    expect(writes).toHaveLength(0);
+  });
+
+  it('Phase 1.1h: Copy path falls back to execCommand when the api rejects', async () => {
+    const apiWrite = vi.fn(async () => {
+      throw new Error('permission denied');
+    });
+    const fallbackWrite = vi.fn(() => true);
+    render(
+      <App
+        initialInput='{"a":1}'
+        initialUiState={{ activePath: '/a' }}
+        clipboardDeps={{ apiWrite, fallbackWrite }}
+      />,
+    );
+    fireEvent.click(screen.getByTestId('copy-path'));
+    const status = await screen.findByTestId('copy-status');
+    expect(status).toHaveAttribute('data-method', 'execCommand');
+    expect(fallbackWrite).toHaveBeenCalledWith('/a');
   });
 });

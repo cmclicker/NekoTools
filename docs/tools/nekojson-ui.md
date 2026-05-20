@@ -1,10 +1,10 @@
 # NekoJSON UI — Phase 1.1e charter
 
-> Status: **IMPLEMENTED through Phase 1.1g.** Shell (1.1e) + tree +
-> text views (1.1f) + table view + search across keys/values (1.1g)
-> all ship. Only copy.path / copy.value remain — Phase 1.1h. Those
-> will update `manifest.entitlements.free` in the same PR that adds
-> their implementation, per the open-core governance rule.
+> Status: **IMPLEMENTED through Phase 1.1h. Phase 1 free tier is
+> closed.** Shell (1.1e) + tree/text views (1.1f) + table view +
+> search (1.1g) + copy.path / copy.value (1.1h) all ship. Every
+> charter-declared free feature now has a working implementation
+> declared in `manifest.entitlements.free`.
 
 ## What `apps/web-suite` is
 
@@ -80,7 +80,7 @@ Specifically deferred:
 | Text view              | **Shipped — Phase 1.1f** ([`TextView.tsx`](../../apps/web-suite/src/TextView.tsx)) |
 | Table view             | **Shipped — Phase 1.1g** ([`TableView.tsx`](../../apps/web-suite/src/TableView.tsx)) |
 | Search across keys/values | **Shipped — Phase 1.1g** ([`search.ts`](../../apps/web-suite/src/search.ts)) |
-| Copy path / copy value | Phase 1.1h   |
+| Copy path / copy value | **Shipped — Phase 1.1h** ([`clipboard.ts`](../../apps/web-suite/src/clipboard.ts) + [`pointer-resolve.ts`](../../apps/web-suite/src/pointer-resolve.ts) + App buttons) |
 
 ## Reuse map
 
@@ -160,25 +160,25 @@ zero violations on this PR.
 - [x] No new entitlements in `jsonManifest.entitlements.free` — the
       shell does not yet implement any user-actionable feature.
 
-## Acceptance criteria for the *next* PR (Phase 1.1h, preview)
+## Phase 1 closeout (Phase 1.1h shipped)
 
-Tracked here for the implementation PR's checklist:
+All Phase 1.1h acceptance criteria are met:
 
-- [ ] "Copy path" affordance writes the current `uiState.activePath`
+- [x] "Copy path" affordance writes the current `uiState.activePath`
       (RFC 6901 JSON Pointer) to the user's clipboard via the local
       Clipboard API — no network, no telemetry, no auth.
-- [ ] "Copy value" affordance serializes the JSON value at the active
+- [x] "Copy value" affordance serializes the JSON value at the active
       path and writes it to the clipboard locally.
-- [ ] `manifest.entitlements.free` gains `copy.path` + `copy.value` in
+- [x] `manifest.entitlements.free` gains `copy.path` + `copy.value` in
       the same PR.
-- [ ] Clipboard path is purely local: `navigator.clipboard.writeText`
-      with a permissive in-page fallback (e.g. hidden `<textarea>` +
-      `document.execCommand`); no `fetch`, no remote helper, no
-      third-party clipboard library.
-- [ ] No new external runtime dependencies.
-- [ ] Pure-helper unit tests cover the pointer / value formatter.
-      Component-level tests use the testing-library `userEvent` /
-      `fireEvent` patterns from Phase 1.1f-g.
+- [x] Clipboard path is purely local: `navigator.clipboard.writeText`
+      with a permissive in-page fallback (hidden `<textarea>` +
+      `document.execCommand('copy')`). No `fetch`, no remote helper,
+      no third-party clipboard library.
+- [x] No new external runtime dependencies.
+- [x] Pure-helper unit tests cover the pointer resolver + clipboard
+      both paths. Component-level tests inject `clipboardDeps` and
+      exercise both success and failure flows.
 
-When this PR merges, Phase 1 is fully closed and the queue's next-up
-becomes Phase 2.0 (NekoEnv charter).
+**Phase 1 is fully closed.** The next default branch is the Phase 2.0
+NekoEnv charter (queue row #10).

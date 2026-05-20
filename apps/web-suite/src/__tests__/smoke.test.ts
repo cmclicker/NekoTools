@@ -22,7 +22,7 @@ describe('apps/web-suite scaffold', () => {
     expect(jsonManifest.offlinePolicy.networkPolicy).toBe('network-forbidden');
   });
 
-  it('manifest free entitlements include every feature shipped through Phase 1.1g', () => {
+  it('manifest free entitlements include every feature shipped through Phase 1.1h', () => {
     // Regression guard: confirms the shell sees the same manifest the
     // tests in lens-json see (no version drift, no stale bundle).
     expect(jsonManifest.entitlements.free).toContain('parse');
@@ -33,6 +33,9 @@ describe('apps/web-suite scaffold', () => {
     // Phase 1.1g — table view + search.
     expect(jsonManifest.entitlements.free).toContain('view.table');
     expect(jsonManifest.entitlements.free).toContain('search');
+    // Phase 1.1h — copy.path + copy.value; closes Phase 1's free tier.
+    expect(jsonManifest.entitlements.free).toContain('copy.path');
+    expect(jsonManifest.entitlements.free).toContain('copy.value');
     expect(jsonManifest.capabilities.canDiff).toBe(true);
   });
 

@@ -424,6 +424,67 @@ code {
   white-space: pre;
 }
 
+/* Phase 1.1h: copy affordances */
+
+.copy {
+  display: inline-flex;
+  gap: 0.375rem;
+}
+
+.copy__btn {
+  font: inherit;
+  font-size: 0.8125rem;
+  padding: 0.25rem 0.625rem;
+  border: 1px solid rgba(0, 0, 0, 0.15);
+  border-radius: 4px;
+  background: white;
+  color: inherit;
+  cursor: pointer;
+}
+
+.copy__btn:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+.copy__btn:not(:disabled):hover {
+  background: rgba(0, 0, 0, 0.04);
+}
+
+@media (prefers-color-scheme: dark) {
+  .copy__btn {
+    background: #0f0f0f;
+    border-color: rgba(255, 255, 255, 0.15);
+  }
+  .copy__btn:not(:disabled):hover {
+    background: rgba(255, 255, 255, 0.06);
+  }
+}
+
+.copy__status {
+  margin: 0;
+  font-size: 0.8125rem;
+  opacity: 0.85;
+  flex-basis: 100%;
+}
+
+.copy__status--ok {
+  color: #15803d;
+}
+
+.copy__status--fail {
+  color: #b91c1c;
+}
+
+@media (prefers-color-scheme: dark) {
+  .copy__status--ok {
+    color: #4ade80;
+  }
+  .copy__status--fail {
+    color: #f87171;
+  }
+}
+
 /* Phase 1.1g: search input + table view styles */
 
 .search {
