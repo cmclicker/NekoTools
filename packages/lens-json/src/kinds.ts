@@ -27,7 +27,34 @@ export const JSON_KIND_PATH_RESULT = 'json.path-result';
 export const JSON_KIND_SCHEMA = 'json.schema';
 export const JSON_KIND_DIFF = 'json.diff';
 
-export const FREE_JSON_KINDS = [
+/**
+ * Every NekoJSON artifact kind. Useful for "kind belongs to NekoJSON?"
+ * checks. **Not** appropriate as an exporter's `accepts` list — that
+ * must match what the exporter actually renders. See the
+ * `JSON_*_EXPORT_KINDS` lists below for the per-exporter accepts.
+ */
+export const ALL_JSON_KINDS = [
+  JSON_KIND_DOCUMENT,
+  JSON_KIND_PATH_RESULT,
+  JSON_KIND_SCHEMA,
+  JSON_KIND_DIFF,
+] as const;
+
+/**
+ * Per-exporter accept lists.
+ *
+ * The runtime's `runExporter` enforces `accepts.includes(artifact.kind)`
+ * as a hard boundary. The Phase 1.0 MVP used one wide `FREE_JSON_KINDS`
+ * list for the document exporters, but the PR #4 textual-diff audit
+ * caught that this made `json.export.json.pretty` silently accept
+ * `json.diff` artifacts and emit empty output — a bad contract.
+ *
+ * Each exporter now declares only the kinds it actually renders.
+ */
+export const JSON_DOCUMENT_EXPORT_KINDS = [JSON_KIND_DOCUMENT] as const;
+export const JSON_DIFF_EXPORT_KINDS = [JSON_KIND_DIFF] as const;
+/** Markdown summary explicitly handles every shipped artifact kind. */
+export const JSON_SUMMARY_EXPORT_KINDS = [
   JSON_KIND_DOCUMENT,
   JSON_KIND_PATH_RESULT,
   JSON_KIND_SCHEMA,

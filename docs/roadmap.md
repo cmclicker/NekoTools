@@ -78,7 +78,7 @@ tool.
 
 **Charter:** [docs/tools/nekojson.md](tools/nekojson.md).
 
-### Phase 1.0 — Engine MVP (this PR's scope)
+### Phase 1.0 — Engine MVP (shipped, PR #2)
 
 Engine-only, no UI. The features below are implementation-backed in
 `@nekotools/lens-json` and declared in `manifest.entitlements.free`:
@@ -90,21 +90,26 @@ Engine-only, no UI. The features below are implementation-backed in
   paths, basic JSON Schema
 - save / load local workspace via the existing serializer
 
-### Phase 1.1+ — Follow-ups (free, not in this PR)
+### Phase 1.1+ — Follow-ups
 
 Each lands in its own follow-up PR. Adding any of these requires also
 updating `manifest.entitlements.free` and the relevant `capabilities`
-flag in the same PR:
+flag in the same PR.
 
+**Shipped**
+
+- basic textual diff + `json.diff` artifact — Phase 1.1a (PR #4)
+
+**Remaining**
+
+- large-document soft threshold (`json.large_document`)
+- in-tree tokenizer for always-accurate spans
+- duplicate-key detection (`json.duplicate_key`)
+- trailing-comma support / non-strict mode (`json.trailing_comma`)
 - tree / table / text views (UI; needs `apps/web-suite` to grow past
   placeholder)
 - search across keys and values (UI)
 - copy path / copy value (UI)
-- basic textual diff + `json.diff` artifact
-- duplicate-key detection (`json.duplicate_key`)
-- trailing-comma support / non-strict mode (`json.trailing_comma`)
-- large-document soft threshold (`json.large_document`)
-- in-tree tokenizer for always-accurate spans
 
 ### Phase 1 Pro (future private package)
 

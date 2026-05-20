@@ -62,6 +62,28 @@ export function createDiffTextualParser(deps: ParserDeps): Parser<JsonArtifact> 
         };
       }
 
+      // Documents must be present as keys — but their *values* may be
+      // null / false / 0 / "" / [] / {} (all valid JSON roots). A
+      // truthy check would reject those legitimate values. Use a
+      // hasOwnProperty check instead. Without this, a missing
+      // leftDocument flows into JSON.stringify(undefined) which
+      // returns undefined, and the subsequent .split('\n') throws.
+      const hasLeft = Object.prototype.hasOwnProperty.call(hints, 'leftDocument');
+      const hasRight = Object.prototype.hasOwnProperty.call(hints, 'rightDocument');
+      if (!hasLeft || !hasRight) {
+        return {
+          artifacts: [],
+          diagnostics: [
+            makeDiagnostic(
+              diagIds(),
+              'error',
+              JSON_DIAGNOSTIC_CODES.diffMissingInput,
+              'textual diff requires hints.leftDocument and hints.rightDocument',
+            ),
+          ],
+        };
+      }
+
       const left = hints['leftDocument'];
       const right = hints['rightDocument'];
 

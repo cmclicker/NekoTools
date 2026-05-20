@@ -521,6 +521,52 @@ describe('NekoJSON: json.diff.textual parser', () => {
     expect(result.diagnostics[0]?.code).toBe('json.diff.missing_input');
   });
 
+  it('emits a diagnostic when leftDocument hint key is absent (does not throw)', () => {
+    const r = registry();
+    const call = () =>
+      runParser(r, 'json', 'json.diff.textual', {
+        raw: '',
+        source: { kind: 'derived', from: ['l', 'r'] },
+        hints: { leftArtifactId: 'l', rightArtifactId: 'r', rightDocument: { a: 1 } },
+      });
+    expect(call).not.toThrow();
+    const result = call();
+    expect(result.artifacts).toHaveLength(0);
+    expect(result.diagnostics[0]?.code).toBe('json.diff.missing_input');
+  });
+
+  it('emits a diagnostic when rightDocument hint key is absent (does not throw)', () => {
+    const r = registry();
+    const call = () =>
+      runParser(r, 'json', 'json.diff.textual', {
+        raw: '',
+        source: { kind: 'derived', from: ['l', 'r'] },
+        hints: { leftArtifactId: 'l', rightArtifactId: 'r', leftDocument: { a: 1 } },
+      });
+    expect(call).not.toThrow();
+    const result = call();
+    expect(result.artifacts).toHaveLength(0);
+    expect(result.diagnostics[0]?.code).toBe('json.diff.missing_input');
+  });
+
+  it('accepts null / 0 as legitimate JSON root values, not "missing"', () => {
+    // These are valid JSON roots. The hasOwnProperty presence check
+    // exists precisely so a truthy check does not reject them.
+    const r = registry();
+    const result = runParser(r, 'json', 'json.diff.textual', {
+      raw: '',
+      source: { kind: 'derived', from: ['l', 'r'] },
+      hints: {
+        leftArtifactId: 'l',
+        rightArtifactId: 'r',
+        leftDocument: null,
+        rightDocument: 0,
+      },
+    });
+    expect(result.diagnostics).toHaveLength(0);
+    expect(result.artifacts).toHaveLength(1);
+  });
+
   it('produced artifact validates against the artifact schema', () => {
     const art = diffArtifact({ a: 1 }, { a: 2 });
     const result = validate('artifact', art);
@@ -570,6 +616,74 @@ describe('NekoJSON: diff exporter', () => {
         diagnostics: [],
       }),
     ).toThrow(/does not accept artifact kind/);
+  });
+});
+
+describe('NekoJSON: exporter accept boundaries (PR #4 audit)', () => {
+  function diffArtifact(): JsonDiffArtifact {
+    const r = registry();
+    const result = runParser(r, 'json', 'json.diff.textual', {
+      raw: '',
+      source: { kind: 'derived', from: ['l', 'r'] },
+      hints: {
+        leftArtifactId: 'l',
+        leftDocument: { a: 1 },
+        rightArtifactId: 'r',
+        rightDocument: { a: 2 },
+      },
+    });
+    return result.artifacts[0] as JsonDiffArtifact;
+  }
+
+  it('json.export.json.pretty refuses json.diff artifacts', () => {
+    const r = registry();
+    expect(() =>
+      runExporter(r, 'json', 'json.export.json.pretty', {
+        artifacts: [diffArtifact()],
+        diagnostics: [],
+      }),
+    ).toThrow(/does not accept artifact kind/);
+  });
+
+  it('json.export.json.minified refuses json.diff artifacts', () => {
+    const r = registry();
+    expect(() =>
+      runExporter(r, 'json', 'json.export.json.minified', {
+        artifacts: [diffArtifact()],
+        diagnostics: [],
+      }),
+    ).toThrow(/does not accept artifact kind/);
+  });
+
+  it('json.export.plaintext.paths refuses json.diff artifacts', () => {
+    const r = registry();
+    expect(() =>
+      runExporter(r, 'json', 'json.export.plaintext.paths', {
+        artifacts: [diffArtifact()],
+        diagnostics: [],
+      }),
+    ).toThrow(/does not accept artifact kind/);
+  });
+
+  it('json.export.schema.json-schema refuses json.diff artifacts', () => {
+    const r = registry();
+    expect(() =>
+      runExporter(r, 'json', 'json.export.schema.json-schema', {
+        artifacts: [diffArtifact()],
+        diagnostics: [],
+      }),
+    ).toThrow(/does not accept artifact kind/);
+  });
+
+  it('json.export.markdown.summary accepts json.diff and renders a Diffs section', () => {
+    const r = registry();
+    const out = runExporter(r, 'json', 'json.export.markdown.summary', {
+      artifacts: [diffArtifact()],
+      diagnostics: [],
+    });
+    const body = String(out.body);
+    expect(body).toContain('## Diffs');
+    expect(body).toContain('`l` → `r`');
   });
 });
 
