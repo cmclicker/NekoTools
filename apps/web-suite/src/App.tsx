@@ -15,15 +15,22 @@ import { copyToClipboard, type ClipboardDeps } from './clipboard.js';
 import { resolveJsonPointer } from './pointer-resolve.js';
 
 /**
- * Phase 1.1g web-suite App.
+ * Phase 1.1h web-suite App.
  *
  * The user pastes JSON; the lens-json parser runs through the
  * tool-runtime registry; the result renders in one of three views
  * (tree, text, table). Active-path selection in the tree is exposed
- * via `uiState.activePath`. `uiState.viewMode` mirrors the toggle.
- * `uiState.searchQuery` filters tree and table rows.
+ * via `uiState.activePath` (a `string | null` — `null` means
+ * nothing is selected; `""` is the legitimate RFC 6901 root pointer).
+ * `uiState.viewMode` mirrors the toggle. `uiState.searchQuery` filters
+ * tree and table rows.
  *
- * Workspace save/load to disk is NOT in 1.1g scope — the `uiState`
+ * Phase 1.1h adds local copy.path / copy.value affordances backed by
+ * `clipboard.ts` and `pointer-resolve.ts`. With this PR, Phase 1's
+ * free tier is fully shipped — every charter-declared free feature
+ * is implementation-backed in `manifest.entitlements.free`.
+ *
+ * Workspace save/load to disk is NOT in 1.1h scope — the `uiState`
  * shape lives in component state, and the workspace serializer's
  * round-trip is exercised by tests in the conformance suite.
  */
@@ -32,7 +39,15 @@ export type ViewMode = 'tree' | 'text' | 'table';
 
 export interface NekoJsonUiState {
   readonly viewMode: ViewMode;
-  readonly activePath: string;
+  /**
+   * The currently selected JSON Pointer, or `null` when nothing is
+   * selected. The empty string `""` is **not** the no-selection
+   * sentinel — it is the RFC 6901 root pointer, and selecting the
+   * root row of the tree must be observable. PR #11 audit blocker
+   * 1: previously `""` was overloaded for both meanings, which made
+   * Copy path / Copy value on the root impossible.
+   */
+  readonly activePath: string | null;
   readonly searchQuery: string;
 }
 
@@ -62,7 +77,7 @@ interface CopyStatus {
 
 const DEFAULT_UI_STATE: NekoJsonUiState = {
   viewMode: 'tree',
-  activePath: '',
+  activePath: null,
   searchQuery: '',
 };
 
@@ -94,7 +109,7 @@ export function App({
   const [viewMode, setViewMode] = useState<ViewMode>(
     initialUiState?.viewMode ?? DEFAULT_UI_STATE.viewMode,
   );
-  const [activePath, setActivePath] = useState<string>(
+  const [activePath, setActivePath] = useState<string | null>(
     initialUiState?.activePath ?? DEFAULT_UI_STATE.activePath,
   );
   const [searchQuery, setSearchQuery] = useState<string>(
@@ -105,6 +120,7 @@ export function App({
   const parsed = useMemo(() => parseInput(registry, input), [input]);
 
   const handleCopyPath = useCallback(async () => {
+    if (activePath === null) return;
     const result = await copyToClipboard(activePath, clipboardDeps);
     setCopyStatus({
       kind: 'path',
@@ -115,7 +131,7 @@ export function App({
   }, [activePath, clipboardDeps]);
 
   const handleCopyValue = useCallback(async () => {
-    if (!parsed.hasDocument) return;
+    if (activePath === null || !parsed.hasDocument) return;
     const resolved = resolveJsonPointer(parsed.value, activePath);
     const text = resolved.ok ? JSON.stringify(resolved.value, null, 2) : '';
     if (!resolved.ok) {
@@ -136,10 +152,10 @@ export function App({
     });
   }, [parsed.hasDocument, parsed.value, activePath, clipboardDeps]);
 
-  // Active path is empty by default — copy buttons are disabled until
-  // the user selects a tree node.
-  const copyPathDisabled = activePath === '';
-  const copyValueDisabled = activePath === '' || !parsed.hasDocument;
+  // null = nothing selected. `''` (the RFC 6901 root pointer) is a
+  // legitimate selection and must keep the buttons enabled.
+  const copyPathDisabled = activePath === null;
+  const copyValueDisabled = activePath === null || !parsed.hasDocument;
 
   return (
     <main className="suite">
@@ -239,9 +255,9 @@ export function App({
             </button>
           </div>
 
-          {activePath ? (
+          {activePath !== null ? (
             <p className="results__path" data-testid="active-path">
-              Active path: <code>{activePath}</code>
+              Active path: <code>{activePath === '' ? '(root)' : activePath}</code>
             </p>
           ) : (
             <p className="results__path" data-testid="active-path">

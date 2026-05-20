@@ -209,4 +209,52 @@ describe('App integration', () => {
     expect(status).toHaveAttribute('data-method', 'execCommand');
     expect(fallbackWrite).toHaveBeenCalledWith('/a');
   });
+
+  it('PR #11 audit blocker 1: initial state has no path; copy buttons disabled, status reads "No path selected"', () => {
+    render(<App initialInput='{"a":1}' />);
+    expect(screen.getByTestId('copy-path')).toBeDisabled();
+    expect(screen.getByTestId('copy-value')).toBeDisabled();
+    expect(screen.getByTestId('active-path').textContent).toMatch(/No path selected/);
+  });
+
+  it('PR #11 audit blocker 1: selecting the root row enables Copy buttons and reads "(root)"', () => {
+    render(<App initialInput='{"a":1}' />);
+    // Click the "(root)" tree row — its pointer is the empty string.
+    fireEvent.click(screen.getByText('(root)'));
+    expect(screen.getByTestId('copy-path')).not.toBeDisabled();
+    expect(screen.getByTestId('copy-value')).not.toBeDisabled();
+    expect(screen.getByTestId('active-path').textContent).toMatch(/\(root\)/);
+  });
+
+  it('PR #11 audit blocker 1: Copy path on the root writes the empty string (RFC 6901 root pointer)', async () => {
+    const writes: string[] = [];
+    render(
+      <App
+        initialInput='{"a":1}'
+        initialUiState={{ activePath: '' }}
+        clipboardDeps={{ apiWrite: async (t) => { writes.push(t); } }}
+      />,
+    );
+    fireEvent.click(screen.getByTestId('copy-path'));
+    await waitFor(() => {
+      expect(writes).toEqual(['']);
+    });
+  });
+
+  it('PR #11 audit blocker 1: Copy value on the root writes the full JSON document', async () => {
+    const writes: string[] = [];
+    const doc = { a: 1, b: [2, 3] };
+    render(
+      <App
+        initialInput={JSON.stringify(doc)}
+        initialUiState={{ activePath: '' }}
+        clipboardDeps={{ apiWrite: async (t) => { writes.push(t); } }}
+      />,
+    );
+    fireEvent.click(screen.getByTestId('copy-value'));
+    await waitFor(() => {
+      expect(writes).toHaveLength(1);
+    });
+    expect(JSON.parse(writes[0]!)).toEqual(doc);
+  });
 });

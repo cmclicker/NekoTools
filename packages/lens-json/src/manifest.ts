@@ -68,10 +68,12 @@ export const jsonManifest: ToolManifest = {
     canProjectGraph: false,
   },
   entitlements: {
-    // Only features with a working free implementation in this build.
-    // Tree/table/text views, search, copy.path/copy.value are
-    // charter-declared but deferred; they will be added here in the
-    // same PR that adds their implementation.
+    // Every entry below has a working free implementation in this
+    // build. As of Phase 1.1h, no charter-declared free feature is
+    // deferred — Phase 1's free tier is fully shipped. Future free
+    // entitlements must be added only in the same PR that ships
+    // their implementation (per the open-core governance rule from
+    // the PR #2 audit).
     free: [
       'parse',
       'format',

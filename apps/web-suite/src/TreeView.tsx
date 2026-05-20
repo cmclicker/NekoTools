@@ -12,8 +12,14 @@ interface TreeViewProps {
    * value that actually came out of a `json.document` artifact.
    */
   readonly value: unknown;
-  /** Pointer to the currently highlighted node, or `''` for none. */
-  readonly activePath: string;
+  /**
+   * Pointer to the currently highlighted node, or `null` when no
+   * node is selected. The empty string `""` is NOT the no-selection
+   * value — it is the RFC 6901 root pointer, and selecting the root
+   * row must be observable so Copy path / Copy value work on it.
+   * (See App.tsx for the broader fix.)
+   */
+  readonly activePath: string | null;
   /** Called when the user clicks a node. The pointer is RFC 6901. */
   readonly onSelectPath: (pointer: string) => void;
   /**
@@ -109,7 +115,7 @@ export function TreeView({
         <TreeRow
           key={node.pointer || '__root__'}
           node={node}
-          isActive={node.pointer === activePath}
+          isActive={activePath !== null && node.pointer === activePath}
           isExpanded={effectiveExpanded.has(node.pointer)}
           onToggle={() => toggle(node.pointer)}
           onSelect={() => onSelectPath(node.pointer)}
