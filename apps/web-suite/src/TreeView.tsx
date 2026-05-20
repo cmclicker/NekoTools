@@ -2,7 +2,14 @@ import { useMemo, useState, type CSSProperties } from 'react';
 import { flattenForTree, type TreeNode } from './tree-model.js';
 
 interface TreeViewProps {
-  /** The parsed JSON value to render. Pass `null` to show an empty state. */
+  /**
+   * The parsed JSON value to render. `null` is rendered as a valid
+   * JSON `null` root (a leaf node), NOT as an empty state. The
+   * "no document available" state is the caller's responsibility —
+   * App.tsx checks `parseInput().hasDocument` and renders its own
+   * empty-state UI when parsing failed, so TreeView only ever sees a
+   * value that actually came out of a `json.document` artifact.
+   */
   readonly value: unknown;
   /** Pointer to the currently highlighted node, or `''` for none. */
   readonly activePath: string;

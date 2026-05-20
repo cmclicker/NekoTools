@@ -1,20 +1,15 @@
 import { useMemo, useState, type ChangeEvent } from 'react';
-import {
-  ToolRegistry,
-  runParser,
-  sortDiagnostics,
-} from '@nekotools/tool-runtime';
-import type { Diagnostic } from '@nekotools/contracts';
+import { ToolRegistry } from '@nekotools/tool-runtime';
 import {
   buildJsonRegistration,
   FIXED_CLOCK,
   jsonManifest,
-  type JsonDocumentArtifact,
 } from '@nekotools/lens-json';
 
 import { Diagnostics } from './Diagnostics.js';
 import { TreeView } from './TreeView.js';
 import { TextView } from './TextView.js';
+import { parseInput } from './parse-input.js';
 
 /**
  * Phase 1.1f web-suite App.
@@ -70,7 +65,7 @@ export function App({ initialInput, initialUiState }: AppProps = {}): JSX.Elemen
     initialUiState?.activePath ?? DEFAULT_UI_STATE.activePath,
   );
 
-  const parsed = useMemo(() => parseInput(input), [input]);
+  const parsed = useMemo(() => parseInput(registry, input), [input]);
 
   return (
     <main className="suite">
@@ -140,11 +135,24 @@ export function App({ initialInput, initialUiState }: AppProps = {}): JSX.Elemen
         </div>
 
         {viewMode === 'tree' ? (
-          <TreeView
-            value={parsed.value}
-            activePath={activePath}
-            onSelectPath={setActivePath}
-          />
+          parsed.hasDocument ? (
+            <TreeView
+              value={parsed.value}
+              activePath={activePath}
+              onSelectPath={setActivePath}
+            />
+          ) : (
+            // PR #9 audit blocker 1: do NOT render invalid input as a
+            // fake `null` tree document. `null` is a valid JSON root
+            // and must reach TreeView only when parsing actually
+            // produced a `json.document` artifact. The text view
+            // remains useful for fixing the issue and gets the raw
+            // input + diagnostics regardless.
+            <div role="status" className="empty-state" data-testid="no-document">
+              No valid JSON document yet. Fix the diagnostics below or
+              switch to the Text view to inspect the raw input.
+            </div>
+          )
         ) : (
           <TextView text={input} diagnostics={parsed.diagnostics} />
         )}
@@ -162,17 +170,3 @@ export function App({ initialInput, initialUiState }: AppProps = {}): JSX.Elemen
   );
 }
 
-interface ParsedInput {
-  readonly value: unknown;
-  readonly diagnostics: readonly Diagnostic[];
-}
-
-function parseInput(raw: string): ParsedInput {
-  const result = runParser(registry, 'json', 'json.text', {
-    raw,
-    source: { kind: 'paste', bytes: raw.length },
-  });
-  const sorted = sortDiagnostics(result.diagnostics);
-  const doc = (result.artifacts[0] as JsonDocumentArtifact | undefined)?.value ?? null;
-  return { value: doc, diagnostics: sorted };
-}

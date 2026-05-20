@@ -48,4 +48,33 @@ describe('App integration', () => {
     expect(screen.getByLabelText(/JSON text view/i)).toBeInTheDocument();
     expect(screen.getByTestId('active-path').textContent).toContain('/a/b');
   });
+
+  it('PR #9 audit blocker 1: invalid JSON does NOT render a null tree document', () => {
+    // The original fallback used `?? null`, which made invalid input
+    // appear as a legitimate JSON `null` tree root. The fix shows an
+    // empty-state UI in the tree view instead.
+    render(<App initialInput='{"oops":' />);
+    expect(screen.getByTestId('no-document')).toBeInTheDocument();
+    expect(screen.queryByRole('tree')).not.toBeInTheDocument();
+    // The diagnostic is still surfaced.
+    expect(screen.getByText(/json\.syntax_error/)).toBeInTheDocument();
+  });
+
+  it('valid literal `null` DOES render as a null leaf in the tree (regression guard)', () => {
+    // null is a valid JSON root. The fix must not over-trigger the
+    // empty-state branch and suppress real null roots.
+    render(<App initialInput="null" />);
+    expect(screen.queryByTestId('no-document')).not.toBeInTheDocument();
+    expect(screen.getByRole('tree')).toBeInTheDocument();
+    // (root): null
+    const tree = screen.getByRole('tree');
+    expect(tree.textContent).toContain('null');
+  });
+
+  it('invalid JSON in text view still renders raw input + diagnostics', () => {
+    render(<App initialInput='{"oops":' />);
+    fireEvent.click(screen.getByLabelText(/Text/));
+    expect(screen.getByLabelText(/JSON text view/i)).toBeInTheDocument();
+    expect(screen.getByText(/json\.syntax_error/)).toBeInTheDocument();
+  });
 });

@@ -424,6 +424,25 @@ code {
   white-space: pre;
 }
 
+/* Empty-state shown when invalid input has no parsed document */
+
+.empty-state {
+  border: 1px dashed rgba(0, 0, 0, 0.15);
+  border-radius: 4px;
+  padding: 1.25rem;
+  text-align: center;
+  font-size: 0.875rem;
+  opacity: 0.7;
+  background: rgba(0, 0, 0, 0.02);
+}
+
+@media (prefers-color-scheme: dark) {
+  .empty-state {
+    border-color: rgba(255, 255, 255, 0.15);
+    background: rgba(255, 255, 255, 0.03);
+  }
+}
+
 /* Diagnostics list */
 
 .diagnostics {
