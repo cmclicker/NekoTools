@@ -25,11 +25,21 @@ export function makeDiagnostic(
 }
 
 /**
- * Canonical NekoJSON diagnostic codes. Codes that are declared in the
- * charter but not yet implemented (duplicate_key, trailing_comma,
- * large_document) are kept here as documentation only — their
- * implementation is deferred. Their codes are reserved so a follow-up
- * PR cannot accidentally re-use the names with a different meaning.
+ * Canonical NekoJSON diagnostic codes.
+ *
+ * Implemented:
+ *   - json.syntax_error
+ *   - json.empty_input
+ *   - json.pointer.invalid
+ *   - json.pointer.unresolved
+ *   - json.diff.missing_input
+ *   - json.large_document       (Phase 1.1b)
+ *
+ * Reserved for future PRs (charter-declared, names locked in this file
+ * so a follow-up cannot accidentally re-use them with a different
+ * meaning):
+ *   - json.duplicate_key        (Phase 1.1d, depends on the tokenizer)
+ *   - json.trailing_comma       (Phase 1.1d, depends on the tokenizer)
  */
 export const JSON_DIAGNOSTIC_CODES = {
   syntaxError: 'json.syntax_error',
@@ -37,8 +47,26 @@ export const JSON_DIAGNOSTIC_CODES = {
   pointerUnresolved: 'json.pointer.unresolved',
   pointerInvalid: 'json.pointer.invalid',
   diffMissingInput: 'json.diff.missing_input',
-  // Reserved for future PRs (charter-declared, not yet implemented):
-  // - json.duplicate_key
-  // - json.trailing_comma
-  // - json.large_document
+  largeDocument: 'json.large_document',
 } as const;
+
+/**
+ * Default soft size threshold for `json.text` parser input, in **UTF-8
+ * bytes**.
+ *
+ * The parser measures input size with `TextEncoder.encode().byteLength`,
+ * not with `input.raw.length` (which would count UTF-16 code units and
+ * under-count non-ASCII payloads). The `*Bytes` naming throughout the
+ * lens is therefore honest at the boundary.
+ *
+ * Chosen at 10 MB — the conservative end of the 10–50 MB range the
+ * charter sketched. The diagnostic is informational only: nothing in
+ * Phase 1 is blocked above this size. The Pro graph view and other
+ * heavy projections (Phase 3) will consume the diagnostic to decide
+ * when to refuse a render; until then, this just gives the user a
+ * heads-up that subsequent operations may be slow.
+ *
+ * Per-registration override via
+ * `BuildJsonRegistrationOptions.largeDocumentBytes`.
+ */
+export const DEFAULT_LARGE_DOCUMENT_BYTES = 10 * 1024 * 1024;

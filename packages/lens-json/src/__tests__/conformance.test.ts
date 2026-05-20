@@ -194,6 +194,81 @@ describe('NekoJSON: json.text parser', () => {
   });
 });
 
+describe('NekoJSON: large-document soft threshold (Phase 1.1b)', () => {
+  function smallThresholdRegistry(threshold: number): ToolRegistry {
+    const r = new ToolRegistry();
+    r.register(buildJsonRegistration(clock, { largeDocumentBytes: threshold }));
+    return r;
+  }
+
+  it('does not emit json.large_document for inputs at or under the threshold', () => {
+    const r = smallThresholdRegistry(100);
+    const result = runParser(r, 'json', 'json.text', {
+      raw: '{"a":1}',
+      source: { kind: 'paste', bytes: 7 },
+    });
+    expect(result.diagnostics.find((d) => d.code === 'json.large_document')).toBeUndefined();
+  });
+
+  it('emits json.large_document at info severity for inputs above the threshold', () => {
+    const r = smallThresholdRegistry(10);
+    // 20-char input, threshold 10
+    const result = runParser(r, 'json', 'json.text', {
+      raw: '{"a":"hello world"}',
+      source: { kind: 'paste', bytes: 19 },
+    });
+    const diag = result.diagnostics.find((d) => d.code === 'json.large_document');
+    expect(diag).toBeDefined();
+    expect(diag?.severity).toBe('info');
+  });
+
+  it('still produces the parsed artifact when the threshold is exceeded (info, not error)', () => {
+    const r = smallThresholdRegistry(5);
+    const result = runParser(r, 'json', 'json.text', {
+      raw: '{"name":"cody"}',
+      source: { kind: 'paste', bytes: 15 },
+    });
+    expect(result.artifacts).toHaveLength(1);
+    expect((result.artifacts[0] as JsonDocumentArtifact).value).toEqual({ name: 'cody' });
+  });
+
+  it('the default registration uses the 10 MB threshold (no diagnostic on small input)', () => {
+    const r = registry(); // production default registration
+    const result = runParser(r, 'json', 'json.text', {
+      raw: '{"a":1}',
+      source: { kind: 'paste', bytes: 7 },
+    });
+    expect(result.diagnostics.find((d) => d.code === 'json.large_document')).toBeUndefined();
+  });
+
+  it('uses UTF-8 byte length, not JS UTF-16 string length, for non-ASCII input', () => {
+    // The raw input is `"é"` — three characters: `"`, `é`, `"`. That
+    // is 3 UTF-16 code units but 4 UTF-8 bytes (the `é` itself takes
+    // 2 bytes in UTF-8). With threshold = 3:
+    //   - JS string length 3 > 3 is FALSE (would not emit; the bug)
+    //   - UTF-8 byte length 4 > 3 is TRUE (must emit; the fix)
+    const r = smallThresholdRegistry(3);
+    const result = runParser(r, 'json', 'json.text', {
+      raw: '"é"',
+      source: { kind: 'paste', bytes: 4 },
+    });
+    const diag = result.diagnostics.find((d) => d.code === 'json.large_document');
+    expect(diag).toBeDefined();
+    expect(diag?.message).toContain('4 bytes');
+  });
+
+  it('non-ASCII input under the byte threshold does not emit the diagnostic', () => {
+    // Same input as above, but threshold raised to 4 — UTF-8 length
+    // 4 is NOT greater than 4. Confirms the boundary is strict `>`.
+    const r = smallThresholdRegistry(4);
+    const result = runParser(r, 'json', 'json.text', {
+      raw: '"é"',
+      source: { kind: 'paste', bytes: 4 },
+    });
+    expect(result.diagnostics.find((d) => d.code === 'json.large_document')).toBeUndefined();
+  });
+});
+
 describe('NekoJSON: json.pointer parser', () => {
   const document = { a: { b: [10, 20, { c: 'hit' }] } };
 

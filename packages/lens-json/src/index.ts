@@ -19,6 +19,20 @@ export * from './manifest.js';
 export { FIXED_CLOCK } from './util.js';
 
 /**
+ * Optional configuration for the NekoJSON registration. Defaults are
+ * production-safe; tests pass overrides (small thresholds, fixed
+ * clocks) to keep their inputs cheap and deterministic.
+ */
+export interface BuildJsonRegistrationOptions {
+  /**
+   * Soft size threshold in bytes for emitting `json.large_document`
+   * from the `json.text` parser. Defaults to
+   * `DEFAULT_LARGE_DOCUMENT_BYTES` (10 MB).
+   */
+  readonly largeDocumentBytes?: number;
+}
+
+/**
  * Build a NekoJSON registration for the runtime.
  *
  * The free build passes only the free parsers and exporters. Pro
@@ -27,11 +41,16 @@ export { FIXED_CLOCK } from './util.js';
  */
 export function buildJsonRegistration(
   clock: Clock = FIXED_CLOCK('1970-01-01T00:00:00.000Z'),
+  options: BuildJsonRegistrationOptions = {},
 ): ToolRegistration {
+  const textDeps =
+    options.largeDocumentBytes !== undefined
+      ? { clock, largeDocumentBytes: options.largeDocumentBytes }
+      : { clock };
   return {
     manifest: jsonManifest,
     parsers: [
-      createJsonTextParser({ clock }),
+      createJsonTextParser(textDeps),
       createJsonPointerParser({ clock }),
       createDiffTextualParser({ clock }),
     ],

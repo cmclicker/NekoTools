@@ -74,9 +74,10 @@ codes reserved for follow-up PRs:
 | `json.empty_input`            | shipped  | error    | Input was whitespace only. |
 | `json.pointer.invalid`        | shipped  | error    | Pointer text is syntactically invalid (RFC 6901). |
 | `json.pointer.unresolved`     | shipped  | error    | A JSON Pointer did not resolve. |
+| `json.diff.missing_input`     | shipped  | error    | Textual diff invoked without both document hints (or with `undefined`). |
+| `json.large_document`         | shipped (Phase 1.1b) | info | Input exceeds the soft size threshold. Informational only — heavy Pro projections will consume it to self-gate. |
 | `json.trailing_comma`         | reserved | warning  | Comma before `]` or `}` (non-strict mode). |
 | `json.duplicate_key`          | reserved | warning  | Object has the same key twice. |
-| `json.large_document`         | reserved | info     | Document exceeds a soft size threshold; some Pro views are gated. |
 
 "Reserved" codes appear in [`packages/lens-json/src/diagnostics.ts`](../../packages/lens-json/src/diagnostics.ts)
 as a comment so a follow-up PR cannot accidentally re-use the names
@@ -270,7 +271,7 @@ details. Decisions taken during implementation:
 | Question | Decision in MVP |
 | --- | --- |
 | Tokenizer choice (hand-written vs library, in-tree vs dependency)   | None of the above — MVP wraps `JSON.parse`. An in-tree tokenizer with always-accurate spans is a follow-up PR. |
-| Soft-size threshold value (~10–50 MB; benchmarked during impl)      | Not implemented in MVP. `json.large_document` code is reserved. |
+| Soft-size threshold value (~10–50 MB; benchmarked during impl)      | Phase 1.1b: set at the conservative end — **10 MB** (`DEFAULT_LARGE_DOCUMENT_BYTES = 10 * 1024 * 1024`). Configurable per-registration via `buildJsonRegistration(clock, { largeDocumentBytes })`. The diagnostic is `info` severity; nothing in the free build is blocked above it. |
 | Whether `json.graph.references` ships as a stub or only declared     | Declared in the manifest as Pro intent; not registered in the free build. The `canProjectGraph` capability is `false` in the current build. |
 | Strict vs non-strict parsing rules                                   | MVP is strict-only. Trailing-comma / comment / unquoted-key recovery deferred. |
 
@@ -299,7 +300,7 @@ explicit follow-up PRs, not silently:
 | Deferred item                                      | Status        | Notes |
 | -------------------------------------------------- | ------------- | ----- |
 | `json.diff` artifact + textual diff exporter       | **Shipped — Phase 1.1a** | Line-level diff against a canonical (key-sorted) pretty-print. Semantic diff is still Pro. |
-| Large-document threshold (`json.large_document`)   | Follow-up     | Diagnostic code reserved. Tracked as Phase 1.1b. |
+| Large-document threshold (`json.large_document`)   | **Shipped — Phase 1.1b** | `json.text` emits `info` diagnostic when input exceeds the soft threshold (default 10 MB). Configurable. |
 | In-tree tokenizer with accurate spans              | Follow-up     | Current spans are best-effort from `JSON.parse` error messages. Tracked as Phase 1.1c. |
 | Duplicate-key detection (`json.duplicate_key`)     | Follow-up     | Diagnostic code reserved. Tracked as Phase 1.1d, depends on the tokenizer. |
 | Trailing-comma support (`json.trailing_comma`)     | Follow-up     | Diagnostic code reserved. Default mode is strict. Tracked as Phase 1.1d. |
