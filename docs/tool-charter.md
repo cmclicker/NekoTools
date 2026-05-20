@@ -32,10 +32,12 @@ violates the rules.
 
 ## How to propose a new tool
 
-1. Open a PR adding `docs/tools/<id>.md` answering the 10 questions in prose.
-2. Add a draft `ToolManifest` (no implementation yet).
-3. Run `pnpm test` — the manifest schema must pass.
-4. Get charter review before implementation begins.
+1. Branch off `main` (see [governance.md](governance.md) for naming).
+2. Open a PR adding `docs/tools/<id>.md` answering the 10 questions in prose.
+3. Add a draft `ToolManifest` (no implementation yet).
+4. Run `pnpm test` — the manifest schema must pass.
+5. Get charter review before implementation begins. Implementation
+   lands in a separate PR after the charter is approved.
 
 ## What "reuse" means in practice
 

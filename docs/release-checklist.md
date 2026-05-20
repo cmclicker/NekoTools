@@ -105,15 +105,36 @@ Each acceptance criterion is mapped to the file or test that proves it.
 
 ## Verification log
 
-Most recent local run, recorded against commit `41a59bc` plus the Phase 0
-patch set on top:
+Most recent local verification, against the Phase 0 audit-patch commit
+`93efaa5` on `main`:
 
 ```
 pnpm install         ok (frozen lockfile)
 pnpm typecheck       ok (tsc -b)
 pnpm test            110 tests passed
+                       contracts:      6
+                       schemas:       58
+                       runtime:       20
+                       offline-guard:  6
+                       lens-binary:   20
 pnpm offline-guard   34 source files, 7 package.json, 0 violations
 ```
 
-When CI publishes a green run on the merge commit, replace this block
-with the workflow URL.
+When CI publishes a green run on `main` for `93efaa5`, replace this
+block with the workflow URL.
+
+## Process expectations going forward
+
+Phase 0 was approved by the auditor with one process exception: the
+audit-patch commit landed direct-to-main rather than through a PR.
+That will not recur. From Phase 1 onward, every change ships through
+the workflow documented in [governance.md](governance.md):
+
+- branch off `main`
+- commit on the branch
+- open a PR
+- CI must be green
+- auditor reviews the PR diff
+- merge only after explicit approval
+- no direct-to-main, no transcript-only approvals, no phase
+  advancement without a reviewable PR.
