@@ -80,6 +80,28 @@ A phase moves to "complete" when:
 A new phase does not start implementation work until the previous
 phase is complete and a charter PR for the new phase has been merged.
 
+## Post-merge default behavior
+
+After every merge into `main`, the assistant / dev agent **must**:
+
+1. `git checkout main && git pull --ff-only origin main`
+2. `git fetch --prune origin` to drop the merged branch locally.
+3. Read [`roadmap.md`](roadmap.md)'s **Active Next Queue**.
+4. Identify the row whose `Status` is `Next` (or the lowest-numbered
+   `Queued` row if `Next` was not advanced in the previous closeout).
+5. Propose the branch name and PR scope for that item directly.
+6. Begin the work — only ask the user for an override if the queue is
+   genuinely ambiguous (multiple equally-valid forks, a strategic
+   decision the queue doesn't capture, or a user message that
+   conflicts with the queue).
+
+Asking "what's next?" after a clean merge is a workflow bug. The
+roadmap queue is the answer. If the queue is stale, the *first*
+follow-up PR is always a small docs-only "roadmap closeout" PR that
+advances the queue, before any feature work begins.
+
+This applies across sessions. Treat it as the standing default.
+
 ## Enforcement
 
 This document is the rulebook. Branch protection on `main` is the
