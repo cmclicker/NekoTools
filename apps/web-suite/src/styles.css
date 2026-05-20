@@ -1,0 +1,147 @@
+/* Phase 1.1e shell — minimal, system-font-only styling.
+   No remote fonts, no CSS framework, no @import. Hand-written CSS.
+   The shell is intentionally plain; the views shipping in 1.1f+ will
+   bring proper layout and interaction styling. */
+
+:root {
+  color-scheme: light dark;
+  font-family: system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+  font-size: 16px;
+  line-height: 1.5;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  padding: 0;
+  background: #fafaf9;
+  color: #1a1a1a;
+}
+
+@media (prefers-color-scheme: dark) {
+  body {
+    background: #131313;
+    color: #e6e6e6;
+  }
+}
+
+.suite {
+  max-width: 720px;
+  margin: 0 auto;
+  padding: 2rem 1rem;
+}
+
+.suite__header h1 {
+  margin: 0 0 0.25rem;
+  font-size: 1.75rem;
+}
+
+.suite__tagline {
+  margin: 0 0 0.25rem;
+  opacity: 0.75;
+}
+
+.suite__phase {
+  margin: 0 0 1.5rem;
+  font-size: 0.875rem;
+  opacity: 0.6;
+}
+
+.card {
+  border: 1px solid rgba(0, 0, 0, 0.1);
+  border-radius: 8px;
+  background: white;
+  padding: 1.25rem 1.5rem;
+}
+
+@media (prefers-color-scheme: dark) {
+  .card {
+    background: #1d1d1d;
+    border-color: rgba(255, 255, 255, 0.08);
+  }
+}
+
+.card h2 {
+  margin: 0 0 0.5rem;
+}
+
+.card h3 {
+  margin: 1.25rem 0 0.5rem;
+  font-size: 0.95rem;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  opacity: 0.7;
+}
+
+.card__summary {
+  margin: 0 0 1rem;
+  opacity: 0.85;
+}
+
+.card__note {
+  margin: 0 0 0.5rem;
+  font-size: 0.875rem;
+  opacity: 0.6;
+}
+
+.kv {
+  display: grid;
+  grid-template-columns: max-content 1fr;
+  gap: 0.25rem 1rem;
+  margin: 0;
+}
+
+.kv dt {
+  font-weight: 600;
+  opacity: 0.7;
+}
+
+.kv dd {
+  margin: 0;
+}
+
+.caps,
+.entitlements {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+
+.caps li,
+.entitlements li {
+  font-size: 0.875rem;
+  padding: 0.125rem 0.5rem;
+  border-radius: 4px;
+  background: rgba(0, 0, 0, 0.05);
+}
+
+@media (prefers-color-scheme: dark) {
+  .caps li,
+  .entitlements li {
+    background: rgba(255, 255, 255, 0.07);
+  }
+}
+
+.caps__off {
+  opacity: 0.5;
+}
+
+.entitlements--pro li {
+  opacity: 0.7;
+}
+
+code {
+  font-family: ui-monospace, 'SF Mono', 'Cascadia Code', 'Roboto Mono', monospace;
+  font-size: 0.9em;
+}
+
+.suite__footer {
+  margin-top: 2rem;
+  opacity: 0.5;
+}

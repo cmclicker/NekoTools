@@ -10,6 +10,7 @@
     { "path": "./packages/tool-runtime" },
     { "path": "./packages/offline-guard" },
     { "path": "./packages/lens-binary" },
-    { "path": "./packages/lens-json" }
+    { "path": "./packages/lens-json" },
+    { "path": "./apps/web-suite" }
   ]
 }

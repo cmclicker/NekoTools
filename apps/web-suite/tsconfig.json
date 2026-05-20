@@ -1,0 +1,20 @@
+{
+  "extends": "../../tsconfig.base.json",
+  "compilerOptions": {
+    "outDir": "dist",
+    "rootDir": ".",
+    "jsx": "react-jsx",
+    "lib": ["ES2022", "DOM", "DOM.Iterable"],
+    "moduleResolution": "Bundler",
+    "module": "ESNext",
+    "noEmit": true,
+    "types": ["vite/client"]
+  },
+  "include": ["src/**/*", "vite.config.ts"],
+  "references": [
+    { "path": "../../packages/contracts" },
+    { "path": "../../packages/schemas" },
+    { "path": "../../packages/tool-runtime" },
+    { "path": "../../packages/lens-json" }
+  ]
+}
