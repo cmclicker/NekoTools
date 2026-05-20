@@ -86,10 +86,14 @@ codes reserved for follow-up PRs:
 as a comment so a follow-up PR cannot accidentally re-use the names
 with a different meaning. They are not emitted by the MVP.
 
-The MVP populates spans on a best-effort basis from `JSON.parse` error
-messages. An in-tree tokenizer that always produces accurate spans is
-deferred to a follow-up PR. No throwing; every malformed input produces
-diagnostics.
+Phase 1.1c made syntax-error spans **tokenizer-assisted**: the in-tree
+tokenizer (see Section 11) is consulted on `JSON.parse` failure to pick
+a multi-character span pointing at the offending token. `JSON.parse`
+still decides validity; the tokenizer only refines the diagnostic's
+location. Remaining span work is the Phase 1.1d duplicate-key and
+trailing-comma diagnostics, which walk the tokenizer's token stream
+directly. No throwing anywhere; every malformed input produces
+structured diagnostics.
 
 ### 4. Export contract
 

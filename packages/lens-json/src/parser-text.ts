@@ -32,14 +32,15 @@ interface ParserDeps {
 }
 
 /**
- * Phase 1 MVP: wraps `JSON.parse` and emits a structured diagnostic on
- * failure. When V8 / Node attaches a `at position N` to the error
- * message, we extract it into a span so the UI can highlight the
- * offending byte. When that information is absent (older Node, weird
- * messages), the diagnostic is still emitted — just without a span.
+ * Phase 1 parser. `JSON.parse` is the source of truth for value-tree
+ * construction and validity — that has not changed. What changed in
+ * Phase 1.1c is the diagnostic span resolution: on a parse failure,
+ * `resolveSyntaxErrorSpan` consults the in-tree tokenizer to pick a
+ * multi-character span pointing at the offending token, instead of
+ * just the single position the V8 error message reports.
  *
- * A real tokenizer that always produces accurate spans is deferred (see
- * docs/tools/nekojson.md "Deliberately undecided in Phase 1").
+ * All offsets in spans are JS string offsets into `input.raw`, not
+ * UTF-8 byte offsets.
  */
 export function createJsonTextParser(deps: ParserDeps): Parser<JsonArtifact> {
   return {

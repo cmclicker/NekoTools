@@ -222,6 +222,21 @@ describe('NekoJSON: json.text parser', () => {
     }
   });
 
+  it('PR #6 audit blocker 5: tokenizer-backed syntax_error diagnostics validate against the diagnostic schema', () => {
+    // The tokenizer emits spans with line/column fields, which the
+    // DiagnosticSpan schema permits. This test exercises that path
+    // end-to-end: the runtime-produced diagnostic must be a valid
+    // instance of diagnostic.schema.json.
+    const r = registry();
+    const result = runParser(r, 'json', 'json.text', {
+      raw: '"unterminated',
+      source: { kind: 'paste', bytes: 13 },
+    });
+    expect(result.diagnostics[0]?.code).toBe('json.syntax_error');
+    const validation = validate('diagnostic', result.diagnostics[0]);
+    expect(validation.ok, validation.errors.join('; ')).toBe(true);
+  });
+
   it('parses primitive root values too', () => {
     const r = registry();
     const result = runParser(r, 'json', 'json.text', {

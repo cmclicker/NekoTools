@@ -116,15 +116,16 @@ export function tokenize(source: string): readonly JsonToken[] {
       tokens.push(scanString(ctx, start));
     } else if (ch === 0x2d /* - */ || (ch >= 0x30 && ch <= 0x39) /* 0-9 */) {
       tokens.push(scanNumber(ctx, start));
-    } else if (matchKeyword(source, start, 'true')) {
-      ctx.pos = start + 4;
-      tokens.push({ kind: 'true', span: spanFromTo(ctx, start, ctx.pos) });
-    } else if (matchKeyword(source, start, 'false')) {
-      ctx.pos = start + 5;
-      tokens.push({ kind: 'false', span: spanFromTo(ctx, start, ctx.pos) });
-    } else if (matchKeyword(source, start, 'null')) {
-      ctx.pos = start + 4;
-      tokens.push({ kind: 'null', span: spanFromTo(ctx, start, ctx.pos) });
+    } else if (isKeywordStartChar(ch)) {
+      // PR #6 audit blocker 4: scan the maximal contiguous ASCII
+      // letter run, then check whether it *exactly* matches a JSON
+      // literal keyword. This avoids the previous greedy behavior
+      // where `truety` would emit `true` + error tokens, which would
+      // mislead Phase 1.1d's token-stream walkers into seeing a
+      // valid `true` literal at a position that is actually
+      // structurally bogus. Now the entire malformed identifier
+      // becomes one `tokenizer.invalid_keyword` error token.
+      tokens.push(scanKeywordOrInvalid(ctx, start));
     } else {
       // Unrecognized character. Emit an error token covering exactly
       // this character, advance past it, and continue. This keeps the
@@ -161,12 +162,48 @@ function skipWhitespace(ctx: Ctx): void {
   }
 }
 
-function matchKeyword(source: string, at: number, keyword: string): boolean {
-  if (at + keyword.length > source.length) return false;
-  for (let i = 0; i < keyword.length; i += 1) {
-    if (source.charCodeAt(at + i) !== keyword.charCodeAt(i)) return false;
+/**
+ * `t`, `f`, `n` — the only ASCII letters that begin a JSON keyword.
+ * Used as the dispatch cue from the main scanner before deciding
+ * whether the maximal letter run is a valid keyword.
+ */
+function isKeywordStartChar(ch: number): boolean {
+  return ch === 0x74 /* t */ || ch === 0x66 /* f */ || ch === 0x6e /* n */;
+}
+
+function isAsciiLetter(ch: number): boolean {
+  return (ch >= 0x41 && ch <= 0x5a) || (ch >= 0x61 && ch <= 0x7a);
+}
+
+/**
+ * Consumes the maximal contiguous ASCII letter run starting at
+ * `start` and either emits a JSON literal keyword token (when the run
+ * exactly matches `true` / `false` / `null`) or a single
+ * `tokenizer.invalid_keyword` error token spanning the whole word.
+ *
+ * The single-error-token contract is important for Phase 1.1d's
+ * token-stream walkers: a `kind: 'true' | 'false' | 'null'` token now
+ * unambiguously means "valid JSON literal at this position." A
+ * walker can stop checking for trailing identifier characters.
+ */
+function scanKeywordOrInvalid(ctx: Ctx, start: number): JsonToken {
+  const { source } = ctx;
+  let pos = start;
+  while (pos < source.length && isAsciiLetter(source.charCodeAt(pos))) {
+    pos += 1;
   }
-  return true;
+  const word = source.slice(start, pos);
+  ctx.pos = pos;
+  const span = spanFromTo(ctx, start, pos);
+  if (word === 'true') return { kind: 'true', span };
+  if (word === 'false') return { kind: 'false', span };
+  if (word === 'null') return { kind: 'null', span };
+  return {
+    kind: 'error',
+    code: 'tokenizer.invalid_keyword',
+    message: `invalid keyword "${word}" at offset ${start}; expected true / false / null`,
+    span,
+  };
 }
 
 function scanString(ctx: Ctx, start: number): JsonToken {
@@ -307,6 +344,29 @@ function scanNumber(ctx: Ctx, start: number): JsonToken {
   // Integer part: 0 OR (1-9)(0-9)*
   if (pos < source.length && source.charCodeAt(pos) === 0x30 /* 0 */) {
     pos += 1;
+    // PR #6 audit blocker 3: JSON forbids a leading zero followed by
+    // another digit (`01`, `-01`, `00`, etc.). Consume all trailing
+    // digits and emit ONE `invalid_number` error token spanning the
+    // whole malformed run. This matches the auditor's preferred fix
+    // and keeps the token stream unambiguous for Phase 1.1d walkers.
+    if (pos < source.length) {
+      const next = source.charCodeAt(pos);
+      if (next >= 0x30 && next <= 0x39) {
+        while (pos < source.length) {
+          const c = source.charCodeAt(pos);
+          if (c < 0x30 || c > 0x39) break;
+          pos += 1;
+        }
+        const span = spanFromTo(ctx, start, pos);
+        ctx.pos = pos;
+        return {
+          kind: 'error',
+          code: 'tokenizer.invalid_number',
+          message: `invalid number at offset ${start}: leading zero followed by digit ("${source.slice(start, pos)}")`,
+          span,
+        };
+      }
+    }
   } else if (pos < source.length && source.charCodeAt(pos) >= 0x31 && source.charCodeAt(pos) <= 0x39) {
     pos += 1;
     while (pos < source.length) {

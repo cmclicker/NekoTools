@@ -52,21 +52,34 @@ describe('tokenizer: literal tokens', () => {
     ]);
   });
 
-  it('matches true / false / null greedily; JSON.parse rejects misplaced trailing chars', () => {
-    // The tokenizer's contract is lexical, not structural. `truety`
-    // is tokenized as a `true` literal followed by error tokens for
-    // the trailing `ty`. JSON.parse (the structural authority in
-    // json.text) then rejects the input as invalid JSON. This
-    // mirrors how jq, JSON5, and most hand-written JSON tokenizers
-    // behave, and it's what Phase 1.1d's token-stream walkers will
-    // assume — `kind: 'true'` means "valid `true` literal here," and
-    // `error` tokens mark the lexical break.
-    const tokens = tokenize('truety');
-    expect(tokens[0]?.kind).toBe('true');
-    expect(tokens[0]?.span.endOffset).toBe(4);
-    const tail = tokens.slice(1);
-    expect(tail.length).toBeGreaterThan(0);
-    expect(tail.every((t) => t.kind === 'error')).toBe(true);
+  it('rejects malformed keywords as one invalid_keyword error token (PR #6 audit)', () => {
+    // The tokenizer scans the maximal contiguous ASCII letter run
+    // and only emits a literal keyword token when the run *exactly*
+    // matches `true` / `false` / `null`. Malformed identifiers
+    // produce a single `tokenizer.invalid_keyword` token spanning
+    // the whole word.
+    //
+    // Why this matters: Phase 1.1d's token-stream walkers
+    // (duplicate-key, trailing-comma) need `kind: 'true'` to
+    // unambiguously mean "valid literal at this position." A greedy
+    // approach (`truety` -> `true` + error) would have misled them.
+    const samples: Array<readonly [string, string]> = [
+      ['truety', 'truety'],
+      ['falsehood', 'falsehood'],
+      ['nulled', 'nulled'],
+      ['t', 't'],
+    ];
+    for (const [input, expectedWord] of samples) {
+      const tokens = tokenize(input);
+      expect(tokens, `input: ${input}`).toHaveLength(1);
+      const t = tokens[0]!;
+      expect(t.kind, `input: ${input}`).toBe('error');
+      const err = t as { kind: 'error'; code: string; message: string };
+      expect(err.code).toBe('tokenizer.invalid_keyword');
+      expect(err.message).toContain(expectedWord);
+      expect(t.span.startOffset).toBe(0);
+      expect(t.span.endOffset).toBe(expectedWord.length);
+    }
   });
 });
 
@@ -130,16 +143,34 @@ describe('tokenizer: numbers', () => {
     expect(numbers[1]!.raw).toBe('-42');
   });
 
-  it('emits an error token for "01" (leading zero in JSON is invalid)', () => {
+  it('emits one invalid_number error token covering "01" (PR #6 audit blocker 3)', () => {
+    // JSON forbids `0` followed by another digit. The tokenizer
+    // emits a single `tokenizer.invalid_number` token spanning the
+    // whole malformed run — not a `0` token + a `1` token, and not
+    // a `0` token + error tokens. This keeps the Phase 1.1d token
+    // walkers unambiguous.
     const tokens = tokenize('01');
-    // After scanning "0" as a number, "1" is an unexpected character.
-    expect(tokens.some((t) => t.kind === 'error' || t.kind === 'number')).toBe(true);
-    // At minimum: the tokenizer must not silently produce a single
-    // number token covering both digits.
-    const numberToken = tokens.find((t) => t.kind === 'number');
-    if (numberToken) {
-      expect(numberToken.span.endOffset).toBeLessThanOrEqual(1);
-    }
+    expect(tokens).toHaveLength(1);
+    expect(tokens[0]?.kind).toBe('error');
+    expect((tokens[0] as { code: string }).code).toBe('tokenizer.invalid_number');
+    expect(tokens[0]?.span.startOffset).toBe(0);
+    expect(tokens[0]?.span.endOffset).toBe(2);
+  });
+
+  it('emits one invalid_number error token covering "-01"', () => {
+    const tokens = tokenize('-01');
+    expect(tokens).toHaveLength(1);
+    expect(tokens[0]?.kind).toBe('error');
+    expect((tokens[0] as { code: string }).code).toBe('tokenizer.invalid_number');
+    expect(tokens[0]?.span.startOffset).toBe(0);
+    expect(tokens[0]?.span.endOffset).toBe(3);
+  });
+
+  it('still accepts a lone "0" as a valid number token', () => {
+    const tokens = tokenize('0');
+    expect(tokens).toHaveLength(1);
+    expect(tokens[0]?.kind).toBe('number');
+    expect((tokens[0] as { value: number }).value).toBe(0);
   });
 
   it('emits an error token for a trailing dot ("1.")', () => {
