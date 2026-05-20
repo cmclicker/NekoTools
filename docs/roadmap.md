@@ -28,9 +28,9 @@ previous row `Done`.
 
 | Order | Phase     | PR Type        | Scope                                                                                          | Status |
 | ----- | --------- | -------------- | ---------------------------------------------------------------------------------------------- | ------ |
-| 1     | Phase 1.0 Closeout | Docs       | Mark PR #2 / `324115c` as complete; add this Active Next Queue; set Phase 1.1a as next. | Next |
-| 2     | Phase 1.1a | Implementation | `json.diff` artifact + basic textual diff exporter. Still engine-only; validates the multi-document workspace assumptions. | Queued |
-| 3     | Phase 1.1b | Implementation | Large-document soft threshold + `json.large_document` diagnostic.                              | Queued |
+| 1     | Phase 1.0 Closeout | Docs       | Mark PR #2 / `324115c` as complete; add this Active Next Queue; set Phase 1.1a as next. | Done (PR #3 / `0f7c0a2`) |
+| 2     | Phase 1.1a | Implementation | `json.diff` artifact + basic textual diff exporter. Still engine-only; validates the multi-document workspace assumptions. | Done (this PR) |
+| 3     | Phase 1.1b | Implementation | Large-document soft threshold + `json.large_document` diagnostic.                              | **Next** |
 | 4     | Phase 1.1c | Planning + Implementation | In-tree tokenizer foundation (always-accurate spans).                              | Queued |
 | 5     | Phase 1.1d | Implementation | `json.duplicate_key` + `json.trailing_comma` diagnostics using the new tokenizer.              | Queued |
 | 6     | Phase 1.1e | UI Planning    | `apps/web-suite` shell for NekoJSON tree / text / table views, search, copy.path / copy.value. | Queued |

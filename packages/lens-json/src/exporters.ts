@@ -2,10 +2,12 @@ import type { Exporter } from '@nekotools/contracts';
 
 import {
   FREE_JSON_KINDS,
+  JSON_KIND_DIFF,
   JSON_KIND_DOCUMENT,
   JSON_KIND_PATH_RESULT,
   JSON_KIND_SCHEMA,
   type JsonArtifact,
+  type JsonDiffArtifact,
   type JsonDocumentArtifact,
   type JsonPathResult,
   type JsonSchemaValue,
@@ -148,6 +150,55 @@ export const basicSchemaExporter: Exporter<JsonArtifact> = {
   },
 };
 
+/**
+ * Renders a `json.diff` artifact as unified-diff-style plaintext.
+ *
+ *   "  " before equal lines
+ *   "+ " before added lines
+ *   "- " before removed lines
+ *
+ * Multiple diff artifacts are concatenated with a single blank line
+ * between them. Non-diff artifacts in the input are ignored.
+ */
+export const textualDiffExporter: Exporter<JsonArtifact> = {
+  version: 1,
+  id: 'json.export.diff.textual',
+  toolId: TOOL_ID,
+  target: 'plaintext',
+  accepts: [JSON_KIND_DIFF],
+  producesMimeType: 'text/plain',
+  producesExtension: 'diff',
+  export({ artifacts }) {
+    const diffs = artifacts.filter(
+      (a): a is JsonDiffArtifact => a.kind === JSON_KIND_DIFF,
+    );
+    const blocks: string[] = [];
+    for (const d of diffs) {
+      const { leftArtifactId, rightArtifactId, hunks } = d.value;
+      const lines: string[] = [`--- ${leftArtifactId}`, `+++ ${rightArtifactId}`];
+      for (const h of hunks) {
+        switch (h.kind) {
+          case 'equal':
+            lines.push(`  ${h.text}`);
+            break;
+          case 'add':
+            lines.push(`+ ${h.text}`);
+            break;
+          case 'remove':
+            lines.push(`- ${h.text}`);
+            break;
+        }
+      }
+      blocks.push(lines.join('\n'));
+    }
+    return {
+      mimeType: 'text/plain',
+      extension: 'diff',
+      body: blocks.join('\n\n'),
+    };
+  },
+};
+
 function pickDocuments(artifacts: readonly JsonArtifact[]): readonly JsonDocumentArtifact[] {
   return artifacts.filter(
     (a): a is JsonDocumentArtifact => a.kind === JSON_KIND_DOCUMENT,
@@ -170,4 +221,5 @@ export const freeExporters: readonly Exporter<JsonArtifact>[] = [
   markdownSummaryExporter,
   plaintextPathsExporter,
   basicSchemaExporter,
+  textualDiffExporter,
 ];

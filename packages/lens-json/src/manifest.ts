@@ -1,7 +1,12 @@
 import type { ToolManifest } from '@nekotools/contracts';
 import { DEFAULT_OFFLINE_POLICY } from '@nekotools/contracts';
 
-import { JSON_KIND_DOCUMENT, JSON_KIND_PATH_RESULT, JSON_KIND_SCHEMA } from './kinds.js';
+import {
+  JSON_KIND_DIFF,
+  JSON_KIND_DOCUMENT,
+  JSON_KIND_PATH_RESULT,
+  JSON_KIND_SCHEMA,
+} from './kinds.js';
 
 /**
  * The NekoJSON manifest.
@@ -36,14 +41,15 @@ export const jsonManifest: ToolManifest = {
   toolVersion: 1,
   summary:
     'Inspect, validate, navigate, and export local JSON documents. Phase 1 proof tool.',
-  artifactKinds: [JSON_KIND_DOCUMENT, JSON_KIND_PATH_RESULT, JSON_KIND_SCHEMA, 'json.diff'],
-  parsers: ['json.text', 'json.pointer'],
+  artifactKinds: [JSON_KIND_DOCUMENT, JSON_KIND_PATH_RESULT, JSON_KIND_SCHEMA, JSON_KIND_DIFF],
+  parsers: ['json.text', 'json.pointer', 'json.diff.textual'],
   exporters: [
     'json.export.json.pretty',
     'json.export.json.minified',
     'json.export.markdown.summary',
     'json.export.plaintext.paths',
     'json.export.schema.json-schema',
+    'json.export.diff.textual',
     'json.export.types.typescript',
     'json.export.types.zod',
     'json.export.docs.data-dictionary',
@@ -53,17 +59,19 @@ export const jsonManifest: ToolManifest = {
   capabilities: {
     canSaveWorkspace: true,
     canExport: true,
-    // Diff and graph projection are charter-approved but not in the
-    // MVP. These flip true when their implementations land in
-    // follow-up PRs (textual diff) or in the Pro build (graph).
-    canDiff: false,
+    // Phase 1.1a flipped canDiff from false to true with the arrival
+    // of the textual diff engine. Semantic diff (Pro) does not affect
+    // this flag — capabilities is current-build truth, and the Pro
+    // module ships separately when it ships.
+    canDiff: true,
+    // Still false: the graph projector is Pro and not in this binary.
     canProjectGraph: false,
   },
   entitlements: {
     // Only features with a working free implementation in this build.
-    // Tree/table/text views, search, copy.path/copy.value, and
-    // diff.textual are charter-declared but deferred; they will be
-    // added here in the same PR that adds their implementation.
+    // Tree/table/text views, search, copy.path/copy.value are
+    // charter-declared but deferred; they will be added here in the
+    // same PR that adds their implementation.
     free: [
       'parse',
       'format',
@@ -71,11 +79,13 @@ export const jsonManifest: ToolManifest = {
       'validate',
       'inspect.pointer',
       'schema.infer.basic',
+      'diff.textual',
       'export.json.pretty',
       'export.json.minified',
       'export.markdown.summary',
       'export.plaintext.paths',
       'export.schema.basic',
+      'export.diff.textual',
       'workspace.save',
     ],
     pro: [

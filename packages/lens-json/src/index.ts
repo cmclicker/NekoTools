@@ -1,5 +1,6 @@
 import type { ToolRegistration } from '@nekotools/tool-runtime';
 
+import { createDiffTextualParser } from './diff-textual.js';
 import { freeExporters } from './exporters.js';
 import { jsonManifest } from './manifest.js';
 import { createJsonPointerParser } from './parser-pointer.js';
@@ -12,6 +13,7 @@ export * from './schema-infer.js';
 export * from './paths.js';
 export * from './parser-text.js';
 export * from './parser-pointer.js';
+export * from './diff-textual.js';
 export * from './exporters.js';
 export * from './manifest.js';
 export { FIXED_CLOCK } from './util.js';
@@ -28,7 +30,11 @@ export function buildJsonRegistration(
 ): ToolRegistration {
   return {
     manifest: jsonManifest,
-    parsers: [createJsonTextParser({ clock }), createJsonPointerParser({ clock })],
+    parsers: [
+      createJsonTextParser({ clock }),
+      createJsonPointerParser({ clock }),
+      createDiffTextualParser({ clock }),
+    ],
     exporters: freeExporters,
   };
 }

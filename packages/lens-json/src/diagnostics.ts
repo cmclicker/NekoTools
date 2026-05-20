@@ -36,6 +36,7 @@ export const JSON_DIAGNOSTIC_CODES = {
   emptyInput: 'json.empty_input',
   pointerUnresolved: 'json.pointer.unresolved',
   pointerInvalid: 'json.pointer.invalid',
+  diffMissingInput: 'json.diff.missing_input',
   // Reserved for future PRs (charter-declared, not yet implemented):
   // - json.duplicate_key
   // - json.trailing_comma

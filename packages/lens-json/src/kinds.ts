@@ -1,29 +1,37 @@
 import type { Artifact } from '@nekotools/contracts';
 
 /**
- * NekoJSON artifact kinds (Phase 1 MVP).
+ * NekoJSON artifact kinds.
  *
  * - `json.document`    : a parsed JSON value (any RFC 8259 type at the root).
  * - `json.path-result` : the value found at a JSON Pointer (RFC 6901).
  * - `json.schema`      : an inferred JSON Schema document.
- *
- * `json.diff` is declared in the charter but is deferred to a follow-up
- * PR — see docs/tools/nekojson.md "Deliberately undecided in Phase 1".
+ * - `json.diff`        : a line-level textual diff between two documents.
+ *                        Phase 1.1a ships the textual (free) variant; the
+ *                        semantic (Pro) variant lives in a future private
+ *                        package and is declared as advertising only.
  */
 export type JsonDocumentArtifact = Artifact<'json.document', unknown>;
 export type JsonPathResultArtifact = Artifact<'json.path-result', JsonPathResult>;
 export type JsonSchemaArtifact = Artifact<'json.schema', JsonSchemaValue>;
+export type JsonDiffArtifact = Artifact<'json.diff', JsonDiff>;
 
-export type JsonArtifact = JsonDocumentArtifact | JsonPathResultArtifact | JsonSchemaArtifact;
+export type JsonArtifact =
+  | JsonDocumentArtifact
+  | JsonPathResultArtifact
+  | JsonSchemaArtifact
+  | JsonDiffArtifact;
 
 export const JSON_KIND_DOCUMENT = 'json.document';
 export const JSON_KIND_PATH_RESULT = 'json.path-result';
 export const JSON_KIND_SCHEMA = 'json.schema';
+export const JSON_KIND_DIFF = 'json.diff';
 
 export const FREE_JSON_KINDS = [
   JSON_KIND_DOCUMENT,
   JSON_KIND_PATH_RESULT,
   JSON_KIND_SCHEMA,
+  JSON_KIND_DIFF,
 ] as const;
 
 /**
@@ -61,3 +69,25 @@ export type JsonSchemaType =
   | 'integer'
   | 'boolean'
   | 'null';
+
+/**
+ * Phase 1.1a textual diff: a line-level diff between two `json.document`
+ * artifacts. The diff is computed against a canonical pretty-printed form
+ * (sorted keys, 2-space indent) so reordered keys do not produce noise.
+ *
+ * A "hunk" is a single line of output classified as equal / add / remove.
+ * Line numbers are 1-indexed (display convention).
+ *
+ * The semantic diff (object/property-level, structural moves, type-aware)
+ * is Pro and is declared in the manifest as advertising only.
+ */
+export interface JsonDiff {
+  readonly leftArtifactId: string;
+  readonly rightArtifactId: string;
+  readonly hunks: readonly JsonDiffHunk[];
+}
+
+export type JsonDiffHunk =
+  | { readonly kind: 'equal'; readonly text: string; readonly leftLine: number; readonly rightLine: number }
+  | { readonly kind: 'add'; readonly text: string; readonly rightLine: number }
+  | { readonly kind: 'remove'; readonly text: string; readonly leftLine: number };

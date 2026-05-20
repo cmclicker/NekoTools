@@ -32,12 +32,12 @@ and exports a result. No network. No account. No sync.
 
 NekoJSON introduces:
 
-| Kind                 | Value                                                       | Status in MVP |
+| Kind                 | Value                                                       | Status        |
 | -------------------- | ----------------------------------------------------------- | ------------- |
 | `json.document`      | The parsed root value of a JSON document.                   | Shipped, free. |
 | `json.path-result`   | The value(s) at a JSON Pointer / structural path.           | Shipped, free. |
 | `json.schema`        | An inferred or imported JSON Schema document.               | Basic inference shipped (free). Advanced inference is Pro, deferred. |
-| `json.diff`          | A structural diff between two `json.document` artifacts.    | Kind name **reserved** in `manifest.artifactKinds`. No diff parser or exporter ships in the MVP — textual diff lands in a Phase 1.1+ PR; semantic diff is Pro and depends on the Phase 3 diff engine. |
+| `json.diff`          | A line-level textual diff between two `json.document` artifacts (Phase 1.1a) or a structural / semantic diff (Pro). | Textual diff shipped, free (Phase 1.1a). Semantic diff is Pro and depends on the Phase 3 diff engine. |
 
 Every kind is namespaced under `json.*`. None of them have any meaning
 outside NekoJSON.
@@ -98,6 +98,7 @@ Reuses the `Exporter<TArtifact>` interface. Targets:
 | `json.export.markdown.summary`    | markdown    | A summary table of top-level keys + diagnostics. | Free |
 | `json.export.plaintext.paths`     | plaintext   | TSV of every JSON Pointer path + value type. | Free |
 | `json.export.schema.json-schema`  | json        | Inferred JSON Schema. Basic inference free; advanced inference (`oneOf`, enum collapse, format detection) is Pro. | Mixed |
+| `json.export.diff.textual`        | plaintext   | Unified-diff plaintext of a `json.diff` artifact. (Phase 1.1a.) | Free |
 | `json.export.types.typescript`    | plaintext   | Generated TypeScript interfaces. | Pro |
 | `json.export.types.zod`           | plaintext   | Generated Zod schema. | Pro |
 | `json.export.docs.data-dictionary`| markdown    | Multi-document data dictionary with examples. | Pro |
@@ -187,11 +188,13 @@ follow references.
 
 ### 9. Entitlements
 
-Free **shipped in the MVP** (also the exact set in `manifest.entitlements.free`):
+Free **shipped** (also the exact set in `manifest.entitlements.free`):
 
 - Parse / format / minify / validate
 - JSON Pointer path inspector
 - Basic schema inference (types, required-ness)
+- Textual diff (Phase 1.1a — `json.diff.textual` parser +
+  `json.export.diff.textual` exporter)
 - JSON pretty / minified, Markdown summary, plaintext paths, basic
   JSON Schema exports
 - Save / load local workspace
@@ -204,7 +207,6 @@ misleading advertising):
 - Tree / table / text views (UI; `apps/web-suite` is still placeholder)
 - Search across keys and values (UI)
 - Copy path / copy value (UI)
-- Basic textual diff (engine; the `json.diff` artifact is also deferred)
 
 Pro:
 
@@ -294,15 +296,15 @@ The implementation PR landed the **tight engine MVP** (user-chosen
 scope). The following items remain charter-approved and will land in
 explicit follow-up PRs, not silently:
 
-| Deferred item                                      | Status      | Notes |
-| -------------------------------------------------- | ----------- | ----- |
-| `json.diff` artifact + textual diff exporter       | Follow-up   | Charter-approved. Reserve the kind name; no impl yet. |
-| Duplicate-key detection (`json.duplicate_key`)     | Follow-up   | Diagnostic code reserved in `diagnostics.ts`. |
-| Trailing-comma support (`json.trailing_comma`)     | Follow-up   | Diagnostic code reserved. Default mode is strict. |
-| Large-document threshold (`json.large_document`)   | Follow-up   | Diagnostic code reserved. |
-| In-tree tokenizer with accurate spans              | Follow-up   | Current spans are best-effort from `JSON.parse` error messages. |
-| TS / Zod / data-dictionary exports                 | Pro (future) | Declared in manifest. Implementation lives in a future private package. |
-| Graph projector (`json.graph.references`)          | Pro (future) | Declared in manifest. Phase 3 graph engine prerequisite. |
-| Semantic diff, migration studio, batch transforms  | Pro (future) | Declared in manifest. Phase 3 dependencies. |
-| Advanced schema inference                          | Pro (future) | `oneOf`, format detection, enum collapse, sample unification. |
-| UI views (tree / table / text, search)             | Follow-up   | Engine-only PR. `apps/web-suite` is still a placeholder. |
+| Deferred item                                      | Status        | Notes |
+| -------------------------------------------------- | ------------- | ----- |
+| `json.diff` artifact + textual diff exporter       | **Shipped — Phase 1.1a** | Line-level diff against a canonical (key-sorted) pretty-print. Semantic diff is still Pro. |
+| Large-document threshold (`json.large_document`)   | Follow-up     | Diagnostic code reserved. Tracked as Phase 1.1b. |
+| In-tree tokenizer with accurate spans              | Follow-up     | Current spans are best-effort from `JSON.parse` error messages. Tracked as Phase 1.1c. |
+| Duplicate-key detection (`json.duplicate_key`)     | Follow-up     | Diagnostic code reserved. Tracked as Phase 1.1d, depends on the tokenizer. |
+| Trailing-comma support (`json.trailing_comma`)     | Follow-up     | Diagnostic code reserved. Default mode is strict. Tracked as Phase 1.1d. |
+| TS / Zod / data-dictionary exports                 | Pro (future)  | Declared in manifest. Implementation lives in a future private package. |
+| Graph projector (`json.graph.references`)          | Pro (future)  | Declared in manifest. Phase 3 graph engine prerequisite. |
+| Semantic diff, migration studio, batch transforms  | Pro (future)  | Declared in manifest. Phase 3 dependencies. |
+| Advanced schema inference                          | Pro (future)  | `oneOf`, format detection, enum collapse, sample unification. |
+| UI views (tree / table / text, search)             | Follow-up     | Tracked as Phase 1.1e. `apps/web-suite` is still a placeholder. |
