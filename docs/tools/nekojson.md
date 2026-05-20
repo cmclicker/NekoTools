@@ -60,9 +60,14 @@ Reuses `@nekotools/contracts`'s `Parser<TArtifact>`. New parsers:
   parser, not a runtime, because it converts user input (the pointer)
   into a structured artifact.
 
-Non-strict parsing (trailing commas, comments, partial-artifact
-recovery) is still deferred to Phase 1.1d — see the "Deferred from
-this PR" table.
+Non-strict parsing — trailing commas, comments, partial-artifact
+recovery — **remains out of scope** for Phase 1. Phase 1.1d shipped
+strict-mode *diagnostics* for the two most common offenders (duplicate
+keys and trailing commas), not strict-mode parser relaxation:
+`JSON.parse` still rejects trailing commas with a `json.syntax_error`;
+the new `json.trailing_comma` warning rides alongside it. If
+non-strict parsing is ever pursued, it will be a separate charter, not
+a Phase 1 follow-up.
 
 No `json.url` parser. NekoJSON never fetches.
 
@@ -82,9 +87,10 @@ codes reserved for follow-up PRs:
 | `json.trailing_comma`         | shipped (Phase 1.1d) | warning | A `,` token sits immediately before `]` or `}`. JSON.parse will also surface a `json.syntax_error`; this code points at the exact comma. |
 | `json.duplicate_key`          | shipped (Phase 1.1d) | warning | An object has the same key twice. JSON.parse silently keeps the last value; this warning points at the second (and any later) occurrence and references the first occurrence's line/column. |
 
-"Reserved" codes appear in [`packages/lens-json/src/diagnostics.ts`](../../packages/lens-json/src/diagnostics.ts)
-as a comment so a follow-up PR cannot accidentally re-use the names
-with a different meaning. They are not emitted by the MVP.
+All Phase 1.1 diagnostic codes are now implemented — the reserved-only
+list is empty. Any future diagnostic must be added through a PR that
+updates [`diagnostics.ts`](../../packages/lens-json/src/diagnostics.ts),
+the relevant tests, and this table in the same PR.
 
 Phase 1.1c made syntax-error spans **tokenizer-assisted**: the in-tree
 tokenizer (see Section 11) is consulted on `JSON.parse` failure to pick
