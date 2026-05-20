@@ -7,12 +7,37 @@
 
 | Phase   | State                       | Notes |
 | ------- | --------------------------- | ----- |
-| Phase 0 | **Complete** (commit `93efaa5`) | Platform spine + audit patches landed. |
-| Phase 1.0 | **Engine MVP in review** | Charter merged (PR #1). Engine implementation PR #2 in review. No UI, no diff, no search — those land in Phase 1.1+ follow-up PRs. |
-| Phase 2 | Not started                 | Fast adjacent tools. |
-| Phase 3 | Not started                 | Premium engines (graph, semantic diff, migration). |
-| Phase 4 | Not started                 | Heavier tools (YAML, API Lens, Headers, Types, RBAC). |
-| Phase 5 | Not started                 | Expansion packs. |
+| Phase 0   | **Complete** (commit `93efaa5`) | Platform spine + audit patches landed. |
+| Phase 1.0 | **Complete** (PR #2, commit `324115c`) | Engine MVP merged. No UI, no diff, no search — those land in Phase 1.1+ follow-up PRs. |
+| Phase 1.1 | **Active**                  | Follow-up engine + UI capabilities. See **Active Next Queue** below. |
+| Phase 2   | Not started                 | Fast adjacent tools. |
+| Phase 3   | Not started                 | Premium engines (graph, semantic diff, migration). |
+| Phase 4   | Not started                 | Heavier tools (YAML, API Lens, Headers, Types, RBAC). |
+| Phase 5   | Not started                 | Expansion packs. |
+
+## Active Next Queue
+
+The next PR is **always** the lowest-numbered row whose Status is `Next`
+or `Queued`. The assistant/dev agent reads this table after every merge,
+proposes the branch + PR scope, and starts work without asking — see
+[`governance.md`](governance.md) and the "Post-merge default" rule.
+
+A row moves to `Done` when its PR merges. The next-up row's Status
+flips from `Queued` to `Next` in the same closeout PR that marks the
+previous row `Done`.
+
+| Order | Phase     | PR Type        | Scope                                                                                          | Status |
+| ----- | --------- | -------------- | ---------------------------------------------------------------------------------------------- | ------ |
+| 1     | Phase 1.0 Closeout | Docs       | Mark PR #2 / `324115c` as complete; add this Active Next Queue; set Phase 1.1a as next. | Next |
+| 2     | Phase 1.1a | Implementation | `json.diff` artifact + basic textual diff exporter. Still engine-only; validates the multi-document workspace assumptions. | Queued |
+| 3     | Phase 1.1b | Implementation | Large-document soft threshold + `json.large_document` diagnostic.                              | Queued |
+| 4     | Phase 1.1c | Planning + Implementation | In-tree tokenizer foundation (always-accurate spans).                              | Queued |
+| 5     | Phase 1.1d | Implementation | `json.duplicate_key` + `json.trailing_comma` diagnostics using the new tokenizer.              | Queued |
+| 6     | Phase 1.1e | UI Planning    | `apps/web-suite` shell for NekoJSON tree / text / table views, search, copy.path / copy.value. | Queued |
+| 7     | Phase 2.0  | Charter        | NekoEnv charter PR (10-question reuse gate).                                                   | Later  |
+
+`Later` rows are intentionally not in the queue order — they are
+candidates for promotion to `Queued` after Phase 1 is fully closed.
 
 ## Phase 0 — Platform spine — COMPLETE
 
