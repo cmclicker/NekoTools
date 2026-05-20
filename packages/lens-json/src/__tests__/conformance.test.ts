@@ -455,6 +455,17 @@ describe('NekoJSON: textual diff (Phase 1.1a)', () => {
     expect(a).toBe(b);
   });
 
+  it('canonicalize throws TypeError on non-JSON roots (undefined, function, symbol)', () => {
+    // Defense-in-depth: the parser is the primary fail-closed
+    // boundary, but if a future direct caller hands us a non-JSON
+    // value, the function must throw rather than silently return
+    // undefined (which it would do if we just returned
+    // JSON.stringify's result unchecked).
+    expect(() => canonicalize(undefined)).toThrow(TypeError);
+    expect(() => canonicalize(() => 1)).toThrow(TypeError);
+    expect(() => canonicalize(Symbol('x'))).toThrow(TypeError);
+  });
+
   it('diffLines returns all-equal hunks for identical inputs', () => {
     const hunks = diffLines(['x', 'y'], ['x', 'y']);
     expect(hunks.every((h) => h.kind === 'equal')).toBe(true);
@@ -542,6 +553,44 @@ describe('NekoJSON: json.diff.textual parser', () => {
         raw: '',
         source: { kind: 'derived', from: ['l', 'r'] },
         hints: { leftArtifactId: 'l', rightArtifactId: 'r', leftDocument: { a: 1 } },
+      });
+    expect(call).not.toThrow();
+    const result = call();
+    expect(result.artifacts).toHaveLength(0);
+    expect(result.diagnostics[0]?.code).toBe('json.diff.missing_input');
+  });
+
+  it('emits a diagnostic when leftDocument is explicitly undefined (does not throw)', () => {
+    const r = registry();
+    const call = () =>
+      runParser(r, 'json', 'json.diff.textual', {
+        raw: '',
+        source: { kind: 'derived', from: ['l', 'r'] },
+        hints: {
+          leftArtifactId: 'l',
+          rightArtifactId: 'r',
+          leftDocument: undefined,
+          rightDocument: { a: 1 },
+        },
+      });
+    expect(call).not.toThrow();
+    const result = call();
+    expect(result.artifacts).toHaveLength(0);
+    expect(result.diagnostics[0]?.code).toBe('json.diff.missing_input');
+  });
+
+  it('emits a diagnostic when rightDocument is explicitly undefined (does not throw)', () => {
+    const r = registry();
+    const call = () =>
+      runParser(r, 'json', 'json.diff.textual', {
+        raw: '',
+        source: { kind: 'derived', from: ['l', 'r'] },
+        hints: {
+          leftArtifactId: 'l',
+          rightArtifactId: 'r',
+          leftDocument: { a: 1 },
+          rightDocument: undefined,
+        },
       });
     expect(call).not.toThrow();
     const result = call();

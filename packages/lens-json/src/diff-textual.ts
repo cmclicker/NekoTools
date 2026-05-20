@@ -65,9 +65,12 @@ export function createDiffTextualParser(deps: ParserDeps): Parser<JsonArtifact> 
       // Documents must be present as keys — but their *values* may be
       // null / false / 0 / "" / [] / {} (all valid JSON roots). A
       // truthy check would reject those legitimate values. Use a
-      // hasOwnProperty check instead. Without this, a missing
-      // leftDocument flows into JSON.stringify(undefined) which
-      // returns undefined, and the subsequent .split('\n') throws.
+      // hasOwnProperty presence check, then explicitly reject the
+      // `undefined` value — which is not a valid JSON root and would
+      // otherwise flow into JSON.stringify(undefined) -> undefined and
+      // throw on .split('\n'). Both layers are required: the
+      // presence check catches missing keys, the undefined check
+      // catches `{ leftDocument: undefined }`.
       const hasLeft = Object.prototype.hasOwnProperty.call(hints, 'leftDocument');
       const hasRight = Object.prototype.hasOwnProperty.call(hints, 'rightDocument');
       if (!hasLeft || !hasRight) {
@@ -86,6 +89,20 @@ export function createDiffTextualParser(deps: ParserDeps): Parser<JsonArtifact> 
 
       const left = hints['leftDocument'];
       const right = hints['rightDocument'];
+
+      if (left === undefined || right === undefined) {
+        return {
+          artifacts: [],
+          diagnostics: [
+            makeDiagnostic(
+              diagIds(),
+              'error',
+              JSON_DIAGNOSTIC_CODES.diffMissingInput,
+              'textual diff requires hints.leftDocument and hints.rightDocument to be valid JSON values (undefined is not a valid JSON root)',
+            ),
+          ],
+        };
+      }
 
       const diff: JsonDiff = computeTextualDiff(leftId, rightId, left, right);
 
@@ -130,9 +147,21 @@ export function computeTextualDiff(
 /**
  * Pretty-print a JSON value with recursively sorted object keys. Used
  * to define the canonical comparison form for textual diff.
+ *
+ * `JSON.stringify` returns `undefined` (not a string) for the values
+ * `undefined`, functions, and symbols — none of which are valid JSON
+ * roots. The function signature promises a string, so we throw a
+ * `TypeError` if we are given such a value. The parser-side validation
+ * in `createDiffTextualParser` is the primary fail-closed boundary;
+ * this throw exists as defense in depth so a future caller cannot
+ * silently produce a malformed artifact.
  */
 export function canonicalize(value: unknown): string {
-  return JSON.stringify(sortKeys(value), null, 2);
+  const serialized = JSON.stringify(sortKeys(value), null, 2);
+  if (serialized === undefined) {
+    throw new TypeError('cannot canonicalize: value is not a valid JSON root');
+  }
+  return serialized;
 }
 
 function sortKeys(value: unknown): unknown {
