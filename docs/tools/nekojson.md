@@ -1,8 +1,9 @@
 # NekoJSON — Phase 1 charter
 
-> Status: **PROPOSED.** This document is the charter pass required by
-> [`tool-charter.md`](../tool-charter.md). No NekoJSON implementation
-> code may land until this charter is approved.
+> Status: **IMPLEMENTED (free tier MVP).** The charter was approved in
+> [PR #1](https://github.com/cmclicker/NekoTools/pull/1). The MVP
+> implementation landed in the Phase 1 implementation PR. Features
+> deferred from this PR are listed under "Deferred from this PR" below.
 
 NekoJSON is the Phase 1 proof tool. The point of Phase 1 is to validate
 that the platform spine generalizes from the trivial NekoBinary
@@ -31,12 +32,12 @@ and exports a result. No network. No account. No sync.
 
 NekoJSON introduces:
 
-| Kind                 | Value                                                       | Notes |
-| -------------------- | ----------------------------------------------------------- | ----- |
-| `json.document`      | The parsed root value of a JSON document.                   | Free. |
-| `json.path-result`   | The value(s) at a JSON Pointer / structural path.           | Free. |
-| `json.schema`        | An inferred or imported JSON Schema document.               | Free (basic inference) / Pro (advanced). |
-| `json.diff`          | A structural diff between two `json.document` artifacts.    | Pro (semantic diff); basic textual diff is free. |
+| Kind                 | Value                                                       | Status in MVP |
+| -------------------- | ----------------------------------------------------------- | ------------- |
+| `json.document`      | The parsed root value of a JSON document.                   | Shipped, free. |
+| `json.path-result`   | The value(s) at a JSON Pointer / structural path.           | Shipped, free. |
+| `json.schema`        | An inferred or imported JSON Schema document.               | Basic inference shipped (free). Advanced inference is Pro, deferred. |
+| `json.diff`          | A structural diff between two `json.document` artifacts.    | Kind name **reserved** in `manifest.artifactKinds`. No diff parser or exporter ships in the MVP — textual diff lands in a Phase 1.1+ PR; semantic diff is Pro and depends on the Phase 3 diff engine. |
 
 Every kind is namespaced under `json.*`. None of them have any meaning
 outside NekoJSON.
@@ -45,32 +46,45 @@ outside NekoJSON.
 
 Reuses `@nekotools/contracts`'s `Parser<TArtifact>`. New parsers:
 
-- `json.text` — accepts raw JSON text, produces `json.document`. Emits
-  spanned diagnostics for syntax errors. Best-effort: a single trailing
-  comma produces a warning + a partial artifact instead of an empty
-  result.
+- `json.text` — accepts raw JSON text, produces `json.document`. **MVP
+  is strict mode only.** Backed by `JSON.parse`; on failure, the
+  diagnostic carries a best-effort `startOffset` extracted from the V8
+  error message when it reports `position N` (older Node / non-V8
+  runtimes may report no position, in which case the span is omitted —
+  the diagnostic still ships).
 - `json.pointer` — accepts a JSON Pointer (`/foo/bar/0`) against a
   loaded `json.document`, produces `json.path-result`. This is a
   parser, not a runtime, because it converts user input (the pointer)
   into a structured artifact.
 
+Non-strict parsing (trailing commas, comments, partial-artifact
+recovery) and an in-tree tokenizer with always-accurate spans are
+deferred to follow-up PRs — see the "Deferred from this PR" table.
+
 No `json.url` parser. NekoJSON never fetches.
 
 ### 3. Diagnostic contract
 
-Reuses the existing `Diagnostic` shape. New codes (non-exhaustive):
+Reuses the existing `Diagnostic` shape. Codes shipping in the MVP and
+codes reserved for follow-up PRs:
 
-| Code                          | Severity | Meaning |
-| ----------------------------- | -------- | ------- |
-| `json.syntax_error`           | error    | The text is not valid JSON. |
-| `json.trailing_comma`         | warning  | Comma before `]` or `}` (non-strict mode). |
-| `json.duplicate_key`          | warning  | Object has the same key twice. |
-| `json.empty_input`            | error    | Input was whitespace only. |
-| `json.large_document`         | info     | Document exceeds a soft size threshold; some Pro views are gated. |
-| `json.pointer.unresolved`     | error    | A JSON Pointer did not resolve. |
+| Code                          | Status   | Severity | Meaning |
+| ----------------------------- | -------- | -------- | ------- |
+| `json.syntax_error`           | shipped  | error    | The text is not valid JSON. |
+| `json.empty_input`            | shipped  | error    | Input was whitespace only. |
+| `json.pointer.invalid`        | shipped  | error    | Pointer text is syntactically invalid (RFC 6901). |
+| `json.pointer.unresolved`     | shipped  | error    | A JSON Pointer did not resolve. |
+| `json.trailing_comma`         | reserved | warning  | Comma before `]` or `}` (non-strict mode). |
+| `json.duplicate_key`          | reserved | warning  | Object has the same key twice. |
+| `json.large_document`         | reserved | info     | Document exceeds a soft size threshold; some Pro views are gated. |
 
-Spans are populated from a tracking tokenizer so the UI can highlight
-the offending byte range. No throwing; every malformed input produces
+"Reserved" codes appear in [`packages/lens-json/src/diagnostics.ts`](../../packages/lens-json/src/diagnostics.ts)
+as a comment so a follow-up PR cannot accidentally re-use the names
+with a different meaning. They are not emitted by the MVP.
+
+The MVP populates spans on a best-effort basis from `JSON.parse` error
+messages. An in-tree tokenizer that always produces accurate spans is
+deferred to a follow-up PR. No throwing; every malformed input produces
 diagnostics.
 
 ### 4. Export contract
@@ -92,31 +106,54 @@ All exports run locally. None of them ship the data anywhere.
 
 ### 5. Graph / table / matrix primitive
 
-Free: a **table** projection over object arrays — flatten `arr[*]` into
-a row-per-element view. Implemented using the existing artifact model
-(no new contract).
+**MVP ships neither.** This section is intent for Phase 1.1+ and later.
 
-Pro: a **graph** projection (`GraphProjector`) that maps object
-references (by id, by `$ref`, by user-configured key) into nodes and
-edges. Pro because it depends on the Phase 3 graph engine, which is
-where the actual rendering and layout work lives. The charter declares
-the projector so the manifest is honest, but the implementation only
-ships in the Pro build.
+- Phase 1.1+ free: a **table** projection over object arrays — flatten
+  `arr[*]` into a row-per-element view. UI work; will be implemented
+  in the same follow-up PR that wires `apps/web-suite` to consume
+  artifacts. No new contract required.
+- Phase 1.1+ free: **tree / text** views are similarly UI-only and
+  ship in the same family of follow-up PRs.
+- Pro: a **graph** projection (`GraphProjector`) that maps object
+  references (by id, by `$ref`, by user-configured key) into nodes
+  and edges. Pro because it depends on the Phase 3 graph engine. The
+  manifest declares the projector id (`json.graph.references`) as
+  honest advertising; the implementation is not in the free build —
+  see the monetization-safety tests in
+  [`packages/lens-json/src/__tests__/conformance.test.ts`](../../packages/lens-json/src/__tests__/conformance.test.ts).
+
+Current-build truth in the manifest: `capabilities.canProjectGraph =
+false`. It flips to `true` when the Pro build's registration includes
+the projector.
 
 ### 6. Workspace
 
-Reuses the existing `Workspace` shape. Persists:
+Reuses the existing Phase 0 `Workspace` shape and the
+`jsonWorkspaceSerializer` exported from `@nekotools/tool-runtime`. The
+MVP introduces no new workspace contract — it only proves that the
+generic Phase 0 serializer round-trips losslessly for `json.document`
+artifacts. This is asserted by the workspace round-trip test in
+[`conformance.test.ts`](../../packages/lens-json/src/__tests__/conformance.test.ts).
 
-- The loaded `json.document` artifact(s) (typically one, but two for a
-  diff session).
-- Diagnostics produced during the session.
+**Shipped in MVP**
+
+| Field                   | What ships now |
+| ----------------------- | -------------- |
+| `artifacts`             | The loaded `json.document` artifact(s) — including the test case with two documents for a future diff session. |
+| `diagnostics`           | Diagnostics produced during the session. |
+| `uiState` (passthrough) | The workspace serializer accepts any `uiState` object and round-trips it. The MVP test passes `{ activePath, viewMode }` to prove passthrough; the MVP does not yet *consume* those fields anywhere because no UI exists. |
+
+**Intent for Phase 1.1+** (UI follow-up PRs will *consume* these fields;
+adding consumption goes in the same PR as the UI that needs it):
+
 - `uiState.activePath` — last selected JSON Pointer.
 - `uiState.viewMode` — `tree | table | text`.
 - `uiState.searchQuery` — the most recent search.
 - `notes` — free-text user notes.
 
-A NekoJSON workspace is portable: it round-trips losslessly through the
-`jsonWorkspaceSerializer` shipped in Phase 0.
+A NekoJSON workspace is portable: it round-trips losslessly today and
+will continue to do so as fields are added, per the workspace contract
+versioning rule in [`contract-versioning.md`](../contract-versioning.md).
 
 ### 7. Reuse
 
@@ -140,26 +177,34 @@ NekoJSON does **not**:
 
 `networkPolicy: 'network-forbidden'`.
 
-NekoJSON does not fetch `$ref` URLs. If a document references an
-external schema, the diagnostic explains how to *import* it locally
-instead. The "explain how to import" UI text is part of Phase 1.
+NekoJSON does not fetch `$ref` URLs. A future "explain how to import
+this `$ref` locally" diagnostic and the UI affordance that surfaces it
+both live in Phase 1.1+ when the UI lands; the MVP simply does not
+follow references.
 
 `dataCollection: 'none'`, `requiresAccount: false`,
 `requiresInternetForCoreFeatures: false`, `offlineSupported: true`.
 
 ### 9. Entitlements
 
-Free:
+Free **shipped in the MVP** (also the exact set in `manifest.entitlements.free`):
 
 - Parse / format / minify / validate
-- Tree / table / text views
 - JSON Pointer path inspector
-- Search across keys and values
-- Copy path / copy value
 - Basic schema inference (types, required-ness)
-- Basic textual diff
-- JSON, Markdown summary, plaintext path exports
+- JSON pretty / minified, Markdown summary, plaintext paths, basic
+  JSON Schema exports
 - Save / load local workspace
+
+Free **deferred to follow-up PRs** (will be added to
+`manifest.entitlements.free` when their implementations land — they are
+*not* declared there today, because unimplemented free features are
+misleading advertising):
+
+- Tree / table / text views (UI; `apps/web-suite` is still placeholder)
+- Search across keys and values (UI)
+- Copy path / copy value (UI)
+- Basic textual diff (engine; the `json.diff` artifact is also deferred)
 
 Pro:
 
@@ -185,111 +230,79 @@ Free is genuinely useful on its own.
   above it, Pro views are gated and certain operations are disabled.
 - Anything that requires a server.
 
-## Draft `ToolManifest`
+## `ToolManifest`
 
-Illustrative. Not yet registered. The final shape is finalized in the
-implementation PR, not this charter PR.
+The canonical NekoJSON manifest lives at
+[`packages/lens-json/src/manifest.ts`](../../packages/lens-json/src/manifest.ts).
+It is the source of truth — this doc does not duplicate it, because
+duplicated manifests drift.
 
-```ts
-import type { ToolManifest } from '@nekotools/contracts';
-import { DEFAULT_OFFLINE_POLICY } from '@nekotools/contracts';
+The header comment in that file documents the reading model that the
+PR #2 audit enforced:
 
-export const jsonManifestDraft: ToolManifest = {
-  version: 1,
-  id: 'json',
-  name: 'NekoJSON',
-  toolVersion: 1,
-  summary:
-    'Inspect, validate, navigate, diff, and export local JSON documents. Phase 1 proof tool.',
-  artifactKinds: ['json.document', 'json.path-result', 'json.schema', 'json.diff'],
-  parsers: ['json.text', 'json.pointer'],
-  exporters: [
-    'json.export.json.pretty',
-    'json.export.json.minified',
-    'json.export.markdown.summary',
-    'json.export.plaintext.paths',
-    'json.export.schema.json-schema',
-    'json.export.types.typescript',
-    'json.export.types.zod',
-    'json.export.docs.data-dictionary',
-  ],
-  graphProjectors: ['json.graph.references'],
-  offlinePolicy: DEFAULT_OFFLINE_POLICY,
-  capabilities: {
-    canSaveWorkspace: true,
-    canExport: true,
-    canDiff: true,
-    canProjectGraph: true,
-  },
-  entitlements: {
-    free: [
-      'parse',
-      'format',
-      'minify',
-      'validate',
-      'view.tree',
-      'view.table',
-      'view.text',
-      'inspect.pointer',
-      'search',
-      'copy.path',
-      'copy.value',
-      'schema.infer.basic',
-      'diff.textual',
-      'export.json.pretty',
-      'export.json.minified',
-      'export.markdown.summary',
-      'export.plaintext.paths',
-      'export.schema.basic',
-      'workspace.save',
-    ],
-    pro: [
-      'view.graph',
-      'diff.semantic',
-      'migration.studio',
-      'batch.transform',
-      'schema.infer.advanced',
-      'export.types.typescript',
-      'export.types.zod',
-      'export.docs.data-dictionary',
-      'references.broken',
-      'references.duplicate',
-    ],
-  },
-  outOfScope: [
-    'fetching $ref URLs or any remote schemas',
-    'executing JSON-Logic / JSONata / JMESPath or any other programmable query language',
-    'acting as a remote schema registry',
-    'streaming gigantic JSON beyond the local size threshold',
-  ],
-};
-```
+- `entitlements.free` lists features this build ships with a working
+  implementation. Unimplemented free features must not appear.
+- `entitlements.pro` lists features a future paid build will ship via
+  a private `@nekotools-pro/*` package. They appear here as honest
+  advertising; the free build does not link any Pro implementation,
+  so a free user cannot invoke them.
+- `capabilities.*` reflect what this build can do right now, not
+  lifetime promises of the tool family.
+- `parsers` / `exporters` / `graphProjectors` may list ids that are
+  Pro intent. The runtime registry only validates the forward direction
+  (every *registered* implementation must be declared); it does not
+  require every declared id to be registered.
 
-## What's deliberately undecided in Phase 1
+The current MVP values are asserted by the monetization-safety tests
+in [`conformance.test.ts`](../../packages/lens-json/src/__tests__/conformance.test.ts):
+free entitlements match the exact MVP-backed set, deferred free
+features are absent, Pro exporters are declared but not registered, no
+graph projector is registered, and `runExporter` rejects every Pro
+exporter id.
 
-These are noted up front so reviewers do not block the charter on
-implementation details:
+## What was deliberately undecided in Phase 1
 
-- Tokenizer choice (hand-written vs library, in-tree vs dependency).
-- Soft-size threshold value (likely ~10–50 MB; benchmarked during
-  implementation).
-- Whether `json.graph.references` ships as a stub in Phase 1 or only
-  declares its existence in the manifest.
-- The exact set of error recovery rules for non-strict parsing
-  (trailing commas, comments, unquoted keys). The default mode is
-  strict; non-strict toggles are scoped per-document.
+Captured here before implementation so reviewers do not block on these
+details. Decisions taken during implementation:
 
-## Acceptance for the Phase 1 *implementation* PR (preview)
+| Question | Decision in MVP |
+| --- | --- |
+| Tokenizer choice (hand-written vs library, in-tree vs dependency)   | None of the above — MVP wraps `JSON.parse`. An in-tree tokenizer with always-accurate spans is a follow-up PR. |
+| Soft-size threshold value (~10–50 MB; benchmarked during impl)      | Not implemented in MVP. `json.large_document` code is reserved. |
+| Whether `json.graph.references` ships as a stub or only declared     | Declared in the manifest as Pro intent; not registered in the free build. The `canProjectGraph` capability is `false` in the current build. |
+| Strict vs non-strict parsing rules                                   | MVP is strict-only. Trailing-comma / comment / unquoted-key recovery deferred. |
 
-Tracked here so the implementation PR has a checklist to point at, not
-to gate this charter PR:
+## Acceptance for the Phase 1 implementation PR
 
-- [ ] `@nekotools/lens-json` package exists, registered via
-      `ToolRegistry`.
-- [ ] Manifest passes `validateManifest`.
-- [ ] All declared parsers and exporters exist and pass tests.
-- [ ] Conformance test parallel to `lens-binary` covers parser →
+- [x] `@nekotools/lens-json` package exists, registered via
+      `buildJsonRegistration` + `ToolRegistry`.
+- [x] Manifest passes `validateManifest`.
+- [x] Free-tier parsers and exporters exist and pass tests
+      (`json.text`, `json.pointer`; pretty, minified, markdown summary,
+      plaintext paths, basic JSON Schema).
+- [x] Conformance test parallel to `lens-binary` covers parser →
       diagnostic → export → workspace round-trip.
-- [ ] Offline guard sees no new violations.
-- [ ] Charter doc updated from "PROPOSED" to "IMPLEMENTED" and linked
-      from `docs/roadmap.md`.
+- [x] Offline guard sees no new violations.
+- [x] Charter doc updated from "PROPOSED" to "IMPLEMENTED".
+- [x] Pro-tier parsers/exporters declared in the manifest as honest
+      advertising, with no implementation present in the public/free
+      package set.
+
+## Deferred from this PR (scope contract)
+
+The implementation PR landed the **tight engine MVP** (user-chosen
+scope). The following items remain charter-approved and will land in
+explicit follow-up PRs, not silently:
+
+| Deferred item                                      | Status      | Notes |
+| -------------------------------------------------- | ----------- | ----- |
+| `json.diff` artifact + textual diff exporter       | Follow-up   | Charter-approved. Reserve the kind name; no impl yet. |
+| Duplicate-key detection (`json.duplicate_key`)     | Follow-up   | Diagnostic code reserved in `diagnostics.ts`. |
+| Trailing-comma support (`json.trailing_comma`)     | Follow-up   | Diagnostic code reserved. Default mode is strict. |
+| Large-document threshold (`json.large_document`)   | Follow-up   | Diagnostic code reserved. |
+| In-tree tokenizer with accurate spans              | Follow-up   | Current spans are best-effort from `JSON.parse` error messages. |
+| TS / Zod / data-dictionary exports                 | Pro (future) | Declared in manifest. Implementation lives in a future private package. |
+| Graph projector (`json.graph.references`)          | Pro (future) | Declared in manifest. Phase 3 graph engine prerequisite. |
+| Semantic diff, migration studio, batch transforms  | Pro (future) | Declared in manifest. Phase 3 dependencies. |
+| Advanced schema inference                          | Pro (future) | `oneOf`, format detection, enum collapse, sample unification. |
+| UI views (tree / table / text, search)             | Follow-up   | Engine-only PR. `apps/web-suite` is still a placeholder. |

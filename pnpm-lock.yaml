@@ -69,6 +69,28 @@ importers:
         specifier: ^1.4.0
         version: 1.6.1(@types/node@20.19.41)
 
+  packages/lens-json:
+    dependencies:
+      '@nekotools/contracts':
+        specifier: workspace:*
+        version: link:../contracts
+      '@nekotools/schemas':
+        specifier: workspace:*
+        version: link:../schemas
+      '@nekotools/tool-runtime':
+        specifier: workspace:*
+        version: link:../tool-runtime
+    devDependencies:
+      eslint:
+        specifier: ^8.57.0
+        version: 8.57.1
+      typescript:
+        specifier: ^5.4.0
+        version: 5.9.3
+      vitest:
+        specifier: ^1.4.0
+        version: 1.6.1(@types/node@20.19.41)
+
   packages/offline-guard:
     devDependencies:
       eslint:
