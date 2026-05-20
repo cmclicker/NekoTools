@@ -1,0 +1,12 @@
+{
+  "name": "@nekotools/web-suite",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "build": "echo 'web-suite: Phase 1 placeholder (no build yet)'",
+    "test": "echo 'web-suite: no tests in Phase 0'",
+    "typecheck": "echo 'web-suite: no typecheck in Phase 0'",
+    "lint": "echo 'web-suite: no lint in Phase 0'"
+  }
+}

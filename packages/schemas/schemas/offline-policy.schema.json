@@ -1,0 +1,26 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://schemas.nekotools.local/offline-policy.schema.json",
+  "title": "NekoTools Offline Policy",
+  "type": "object",
+  "required": [
+    "version",
+    "networkPolicy",
+    "dataCollection",
+    "requiresAccount",
+    "requiresInternetForCoreFeatures",
+    "offlineSupported"
+  ],
+  "additionalProperties": false,
+  "properties": {
+    "version": { "const": 1 },
+    "networkPolicy": {
+      "enum": ["network-forbidden", "explicit-import-only"]
+    },
+    "dataCollection": { "const": "none" },
+    "requiresAccount": { "const": false },
+    "requiresInternetForCoreFeatures": { "const": false },
+    "offlineSupported": { "const": true },
+    "notes": { "type": "string" }
+  }
+}

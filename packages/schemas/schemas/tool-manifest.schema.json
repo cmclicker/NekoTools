@@ -1,0 +1,71 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://schemas.nekotools.local/tool-manifest.schema.json",
+  "title": "NekoTools Tool Manifest",
+  "type": "object",
+  "required": [
+    "version",
+    "id",
+    "name",
+    "toolVersion",
+    "summary",
+    "artifactKinds",
+    "parsers",
+    "exporters",
+    "offlinePolicy",
+    "capabilities",
+    "entitlements",
+    "outOfScope"
+  ],
+  "additionalProperties": false,
+  "properties": {
+    "version": { "const": 1 },
+    "id": { "type": "string", "minLength": 1 },
+    "name": { "type": "string", "minLength": 1 },
+    "toolVersion": { "type": "integer", "minimum": 1 },
+    "summary": { "type": "string", "minLength": 1 },
+    "artifactKinds": {
+      "type": "array",
+      "items": { "type": "string", "minLength": 1 },
+      "minItems": 1
+    },
+    "parsers": {
+      "type": "array",
+      "items": { "type": "string", "minLength": 1 },
+      "minItems": 1
+    },
+    "exporters": {
+      "type": "array",
+      "items": { "type": "string", "minLength": 1 }
+    },
+    "graphProjectors": {
+      "type": "array",
+      "items": { "type": "string", "minLength": 1 }
+    },
+    "offlinePolicy": { "$ref": "offline-policy.schema.json" },
+    "capabilities": {
+      "type": "object",
+      "required": ["canSaveWorkspace", "canExport", "canDiff", "canProjectGraph"],
+      "additionalProperties": false,
+      "properties": {
+        "canSaveWorkspace": { "type": "boolean" },
+        "canExport": { "type": "boolean" },
+        "canDiff": { "type": "boolean" },
+        "canProjectGraph": { "type": "boolean" }
+      }
+    },
+    "entitlements": {
+      "type": "object",
+      "required": ["free", "pro"],
+      "additionalProperties": false,
+      "properties": {
+        "free": { "type": "array", "items": { "type": "string" } },
+        "pro": { "type": "array", "items": { "type": "string" } }
+      }
+    },
+    "outOfScope": {
+      "type": "array",
+      "items": { "type": "string", "minLength": 1 }
+    }
+  }
+}

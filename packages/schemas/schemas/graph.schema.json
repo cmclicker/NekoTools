@@ -1,0 +1,49 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://schemas.nekotools.local/graph.schema.json",
+  "title": "NekoTools Graph Projection",
+  "type": "object",
+  "required": ["version", "id", "toolId", "fromArtifactIds", "nodes", "edges"],
+  "additionalProperties": false,
+  "properties": {
+    "version": { "const": 1 },
+    "id": { "type": "string", "minLength": 1 },
+    "toolId": { "type": "string", "minLength": 1 },
+    "fromArtifactIds": {
+      "type": "array",
+      "items": { "type": "string", "minLength": 1 }
+    },
+    "nodes": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["id", "label", "kind"],
+        "additionalProperties": false,
+        "properties": {
+          "id": { "type": "string", "minLength": 1 },
+          "label": { "type": "string" },
+          "kind": { "type": "string", "minLength": 1 },
+          "artifactId": { "type": "string" },
+          "data": { "type": "object" }
+        }
+      }
+    },
+    "edges": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["id", "from", "to", "kind"],
+        "additionalProperties": false,
+        "properties": {
+          "id": { "type": "string", "minLength": 1 },
+          "from": { "type": "string", "minLength": 1 },
+          "to": { "type": "string", "minLength": 1 },
+          "kind": { "type": "string", "minLength": 1 },
+          "label": { "type": "string" },
+          "data": { "type": "object" }
+        }
+      }
+    },
+    "meta": { "type": "object" }
+  }
+}

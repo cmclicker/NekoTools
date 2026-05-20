@@ -1,0 +1,68 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://schemas.nekotools.local/artifact.schema.json",
+  "title": "NekoTools Artifact",
+  "type": "object",
+  "required": ["version", "kind", "id", "producedBy", "producedAt", "source", "value"],
+  "additionalProperties": false,
+  "properties": {
+    "version": { "const": 1 },
+    "kind": { "type": "string", "minLength": 1 },
+    "id": { "type": "string", "minLength": 1 },
+    "producedBy": {
+      "type": "object",
+      "required": ["toolId", "parserId", "parserVersion"],
+      "additionalProperties": false,
+      "properties": {
+        "toolId": { "type": "string", "minLength": 1 },
+        "parserId": { "type": "string", "minLength": 1 },
+        "parserVersion": { "type": "integer", "minimum": 1 }
+      }
+    },
+    "producedAt": { "type": "string", "format": "date-time" },
+    "source": {
+      "oneOf": [
+        {
+          "type": "object",
+          "required": ["kind", "bytes"],
+          "additionalProperties": false,
+          "properties": {
+            "kind": { "const": "paste" },
+            "bytes": { "type": "integer", "minimum": 0 }
+          }
+        },
+        {
+          "type": "object",
+          "required": ["kind", "bytes"],
+          "additionalProperties": false,
+          "properties": {
+            "kind": { "const": "file" },
+            "bytes": { "type": "integer", "minimum": 0 },
+            "filename": { "type": "string" }
+          }
+        },
+        {
+          "type": "object",
+          "required": ["kind", "bytes", "format"],
+          "additionalProperties": false,
+          "properties": {
+            "kind": { "const": "import" },
+            "bytes": { "type": "integer", "minimum": 0 },
+            "format": { "type": "string", "minLength": 1 }
+          }
+        },
+        {
+          "type": "object",
+          "required": ["kind", "from"],
+          "additionalProperties": false,
+          "properties": {
+            "kind": { "const": "derived" },
+            "from": { "type": "array", "items": { "type": "string" }, "minItems": 1 }
+          }
+        }
+      ]
+    },
+    "value": {},
+    "meta": { "type": "object" }
+  }
+}

@@ -1,0 +1,29 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://schemas.nekotools.local/entitlement.schema.json",
+  "title": "NekoTools Entitlement",
+  "type": "object",
+  "required": [
+    "version",
+    "licenseId",
+    "licensee",
+    "tier",
+    "features",
+    "issuedAt",
+    "expiresAt",
+    "signature"
+  ],
+  "additionalProperties": false,
+  "properties": {
+    "version": { "const": 1 },
+    "licenseId": { "type": "string", "minLength": 1 },
+    "licensee": { "type": "string", "minLength": 1 },
+    "tier": { "enum": ["free", "pro", "commercial"] },
+    "features": { "type": "array", "items": { "type": "string", "minLength": 1 } },
+    "issuedAt": { "type": "string", "format": "date-time" },
+    "expiresAt": {
+      "oneOf": [{ "type": "string", "format": "date-time" }, { "type": "null" }]
+    },
+    "signature": { "type": "string" }
+  }
+}

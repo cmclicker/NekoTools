@@ -1,0 +1,23 @@
+NekoTools Phase 0 Source License
+
+Copyright (c) 2026 NekoTools contributors
+
+The public/core packages in this repository are made available under the
+following terms. Pro modules (when introduced) live in a separate private
+repository and are not covered by this license.
+
+Permission is hereby granted, free of charge, to any person obtaining a
+copy of this software and associated documentation files (the "Software"),
+to use, copy, modify, merge, publish, and distribute copies of the Software
+for non-commercial purposes, subject to the following conditions:
+
+1. The above copyright notice and this permission notice shall be included
+   in all copies or substantial portions of the Software.
+
+2. The "NekoTools" name and associated marks are trademarks of the project
+   maintainer and are not licensed under these terms. Forks must rename.
+
+3. Commercial use, redistribution as a paid product, or use as part of a
+   competing product requires a separate commercial license.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND.

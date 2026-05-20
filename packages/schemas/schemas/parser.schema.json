@@ -1,0 +1,20 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://schemas.nekotools.local/parser.schema.json",
+  "title": "NekoTools Parser Descriptor",
+  "type": "object",
+  "required": ["version", "id", "parserVersion", "toolId", "accepts", "produces"],
+  "additionalProperties": false,
+  "properties": {
+    "version": { "const": 1 },
+    "id": { "type": "string", "minLength": 1 },
+    "parserVersion": { "type": "integer", "minimum": 1 },
+    "toolId": { "type": "string", "minLength": 1 },
+    "accepts": { "type": "array", "items": { "type": "string", "minLength": 1 } },
+    "produces": {
+      "type": "array",
+      "items": { "type": "string", "minLength": 1 },
+      "minItems": 1
+    }
+  }
+}

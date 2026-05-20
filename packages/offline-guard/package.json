@@ -1,0 +1,27 @@
+{
+  "name": "@nekotools/offline-guard",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "main": "./src/index.ts",
+  "types": "./src/index.ts",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "bin": {
+    "offline-guard": "./bin/offline-guard.js"
+  },
+  "scripts": {
+    "build": "tsc -b",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run",
+    "lint": "eslint src",
+    "scan": "tsx bin/offline-guard.js"
+  },
+  "devDependencies": {
+    "typescript": "^5.4.0",
+    "tsx": "^4.7.0",
+    "vitest": "^1.4.0",
+    "eslint": "^8.57.0"
+  }
+}

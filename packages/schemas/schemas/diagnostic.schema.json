@@ -1,0 +1,31 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://schemas.nekotools.local/diagnostic.schema.json",
+  "title": "NekoTools Diagnostic",
+  "type": "object",
+  "required": ["version", "id", "severity", "code", "message"],
+  "additionalProperties": false,
+  "properties": {
+    "version": { "const": 1 },
+    "id": { "type": "string", "minLength": 1 },
+    "severity": { "enum": ["error", "warning", "info", "hint"] },
+    "code": { "type": "string", "minLength": 1 },
+    "message": { "type": "string", "minLength": 1 },
+    "span": {
+      "type": "object",
+      "required": ["startOffset", "endOffset"],
+      "additionalProperties": false,
+      "properties": {
+        "startOffset": { "type": "integer", "minimum": 0 },
+        "endOffset": { "type": "integer", "minimum": 0 },
+        "startLine": { "type": "integer", "minimum": 1 },
+        "startColumn": { "type": "integer", "minimum": 1 },
+        "endLine": { "type": "integer", "minimum": 1 },
+        "endColumn": { "type": "integer", "minimum": 1 }
+      }
+    },
+    "artifactId": { "type": "string", "minLength": 1 },
+    "hint": { "type": "string" },
+    "tags": { "type": "array", "items": { "type": "string" } }
+  }
+}
