@@ -95,15 +95,22 @@ export function createJsonTextParser(deps: ParserDeps): Parser<JsonArtifact> {
       // artifact — large input is not an error, just a heads-up that
       // downstream operations may be slow. Heavy Pro projections in
       // Phase 3 will read this diagnostic to gate themselves.
+      //
+      // Size is measured as the UTF-8 *byte* length of `input.raw`,
+      // not its UTF-16 code-unit length. The public name of the
+      // threshold (`*Bytes`, "10 MB") is then accurate for non-ASCII
+      // payloads. `TextEncoder` is a global in Node 16+ and modern
+      // browsers — no new dependency.
       const diagnostics: Diagnostic[] = [];
       const threshold = deps.largeDocumentBytes ?? DEFAULT_LARGE_DOCUMENT_BYTES;
-      if (input.raw.length > threshold) {
+      const actualBytes = utf8ByteLength(input.raw);
+      if (actualBytes > threshold) {
         diagnostics.push(
           makeDiagnostic(
             diagIds(),
             'info',
             JSON_DIAGNOSTIC_CODES.largeDocument,
-            `document is ${input.raw.length} bytes; exceeds soft threshold of ${threshold} bytes — some heavy operations may be gated`,
+            `document is ${actualBytes} bytes; exceeds soft threshold of ${threshold} bytes — some heavy operations may be gated`,
           ),
         );
       }
@@ -111,6 +118,19 @@ export function createJsonTextParser(deps: ParserDeps): Parser<JsonArtifact> {
       return { artifacts: [artifact], diagnostics };
     },
   };
+}
+
+/**
+ * UTF-8 byte length of a string. Used by the large-document threshold
+ * so the "*Bytes" naming is honest for non-ASCII payloads (a `é`
+ * contributes 2 bytes but only 1 UTF-16 code unit).
+ *
+ * `TextEncoder` is a global in Node 16+ and every modern browser; no
+ * new dependency. A single shared encoder avoids per-call allocation.
+ */
+const SHARED_UTF8_ENCODER = new TextEncoder();
+function utf8ByteLength(s: string): number {
+  return SHARED_UTF8_ENCODER.encode(s).byteLength;
 }
 
 /**

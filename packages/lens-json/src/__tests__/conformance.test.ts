@@ -240,6 +240,33 @@ describe('NekoJSON: large-document soft threshold (Phase 1.1b)', () => {
     });
     expect(result.diagnostics.find((d) => d.code === 'json.large_document')).toBeUndefined();
   });
+
+  it('uses UTF-8 byte length, not JS UTF-16 string length, for non-ASCII input', () => {
+    // The raw input is `"é"` — three characters: `"`, `é`, `"`. That
+    // is 3 UTF-16 code units but 4 UTF-8 bytes (the `é` itself takes
+    // 2 bytes in UTF-8). With threshold = 3:
+    //   - JS string length 3 > 3 is FALSE (would not emit; the bug)
+    //   - UTF-8 byte length 4 > 3 is TRUE (must emit; the fix)
+    const r = smallThresholdRegistry(3);
+    const result = runParser(r, 'json', 'json.text', {
+      raw: '"é"',
+      source: { kind: 'paste', bytes: 4 },
+    });
+    const diag = result.diagnostics.find((d) => d.code === 'json.large_document');
+    expect(diag).toBeDefined();
+    expect(diag?.message).toContain('4 bytes');
+  });
+
+  it('non-ASCII input under the byte threshold does not emit the diagnostic', () => {
+    // Same input as above, but threshold raised to 4 — UTF-8 length
+    // 4 is NOT greater than 4. Confirms the boundary is strict `>`.
+    const r = smallThresholdRegistry(4);
+    const result = runParser(r, 'json', 'json.text', {
+      raw: '"é"',
+      source: { kind: 'paste', bytes: 4 },
+    });
+    expect(result.diagnostics.find((d) => d.code === 'json.large_document')).toBeUndefined();
+  });
 });
 
 describe('NekoJSON: json.pointer parser', () => {

@@ -25,11 +25,21 @@ export function makeDiagnostic(
 }
 
 /**
- * Canonical NekoJSON diagnostic codes. Codes that are declared in the
- * charter but not yet implemented (duplicate_key, trailing_comma,
- * large_document) are kept here as documentation only — their
- * implementation is deferred. Their codes are reserved so a follow-up
- * PR cannot accidentally re-use the names with a different meaning.
+ * Canonical NekoJSON diagnostic codes.
+ *
+ * Implemented:
+ *   - json.syntax_error
+ *   - json.empty_input
+ *   - json.pointer.invalid
+ *   - json.pointer.unresolved
+ *   - json.diff.missing_input
+ *   - json.large_document       (Phase 1.1b)
+ *
+ * Reserved for future PRs (charter-declared, names locked in this file
+ * so a follow-up cannot accidentally re-use them with a different
+ * meaning):
+ *   - json.duplicate_key        (Phase 1.1d, depends on the tokenizer)
+ *   - json.trailing_comma       (Phase 1.1d, depends on the tokenizer)
  */
 export const JSON_DIAGNOSTIC_CODES = {
   syntaxError: 'json.syntax_error',
@@ -38,9 +48,6 @@ export const JSON_DIAGNOSTIC_CODES = {
   pointerInvalid: 'json.pointer.invalid',
   diffMissingInput: 'json.diff.missing_input',
   largeDocument: 'json.large_document',
-  // Reserved for future PRs (charter-declared, not yet implemented):
-  // - json.duplicate_key   (Phase 1.1d, depends on tokenizer)
-  // - json.trailing_comma  (Phase 1.1d, depends on tokenizer)
 } as const;
 
 /**
