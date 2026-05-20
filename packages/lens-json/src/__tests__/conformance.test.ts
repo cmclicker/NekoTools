@@ -130,17 +130,19 @@ describe('NekoJSON: monetization safety', () => {
       // Phase 1.1f
       'view.tree',
       'view.text',
+      // Phase 1.1g
+      'view.table',
+      'search',
     ]);
     const declared = new Set(jsonManifest.entitlements.free);
     expect(declared).toEqual(expectedFree);
 
     // Deferred free features must NOT be declared in the manifest
     // until the implementation lands in the same PR. Phase 1.1a
-    // shipped textual diff; Phase 1.1f shipped tree + text views,
-    // so those came out of this list.
+    // shipped textual diff; Phase 1.1f shipped tree + text views;
+    // Phase 1.1g shipped the table view + search. Only copy.* remains
+    // deferred — those are Phase 1.1h.
     const deferredFree = [
-      'view.table',
-      'search',
       'copy.path',
       'copy.value',
     ];
@@ -639,6 +641,27 @@ describe('NekoJSON: workspace uiState round-trip (Phase 1.1f)', () => {
     };
     const back = jsonWorkspaceSerializer.deserialize(jsonWorkspaceSerializer.serialize(ws));
     expect((back.uiState as { viewMode: string }).viewMode).toBe('text');
+  });
+
+  it('Phase 1.1g: preserves uiState.viewMode "table" and uiState.searchQuery losslessly', () => {
+    const r = registry();
+    const parsed = runParser(r, 'json', 'json.text', {
+      raw: '[{"a":1},{"a":2}]',
+      source: { kind: 'paste', bytes: 17 },
+    });
+    const ws: Workspace = {
+      version: 1,
+      id: 'ws_uistate_search',
+      toolId: 'json',
+      toolVersion: 1,
+      createdAt: '2026-05-20T00:00:00.000Z',
+      updatedAt: '2026-05-20T00:00:00.000Z',
+      artifacts: parsed.artifacts,
+      diagnostics: parsed.diagnostics,
+      uiState: { viewMode: 'table', activePath: '', searchQuery: 'a' },
+    };
+    const back = jsonWorkspaceSerializer.deserialize(jsonWorkspaceSerializer.serialize(ws));
+    expect(back.uiState).toEqual({ viewMode: 'table', activePath: '', searchQuery: 'a' });
   });
 });
 

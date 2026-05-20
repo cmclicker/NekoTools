@@ -34,9 +34,9 @@ previous row `Done`.
 | 4     | Phase 1.1c | Planning + Implementation | In-tree tokenizer foundation (always-accurate spans).                              | Done (PR #6 / `4089554`) |
 | 5     | Phase 1.1d | Implementation | `json.duplicate_key` + `json.trailing_comma` diagnostics using the new tokenizer.              | Done (PR #7 / `6a230f0`) |
 | 6     | Phase 1.1e | UI Planning + Shell | `apps/web-suite` shell scaffold + UI charter; manifest-summary panel. Views/search/copy queued as 1.1f–h. | Done (PR #8 / `50ab36c`) |
-| 7     | Phase 1.1f | Implementation | NekoJSON **tree view** + **text view** + flip `view.tree` / `view.text` into `entitlements.free`. | Done (this PR) |
-| 8     | Phase 1.1g | Implementation | NekoJSON **table view** + **search** across keys/values + flip `view.table` / `search` into `entitlements.free`. | **Next** |
-| 9     | Phase 1.1h | Implementation | **Copy.path** + **copy.value** affordances + flip both into `entitlements.free`.               | Queued |
+| 7     | Phase 1.1f | Implementation | NekoJSON **tree view** + **text view** + flip `view.tree` / `view.text` into `entitlements.free`. | Done (PR #9 / `87293eb`) |
+| 8     | Phase 1.1g | Implementation | NekoJSON **table view** + **search** across keys/values + flip `view.table` / `search` into `entitlements.free`. | Done (this PR) |
+| 9     | Phase 1.1h | Implementation | **Copy.path** + **copy.value** affordances + flip both into `entitlements.free`.               | **Next** |
 | 10    | Phase 2.0  | Charter        | NekoEnv charter PR (10-question reuse gate).                                                   | Later  |
 
 `Later` rows are intentionally not in the queue order — they are
@@ -107,11 +107,11 @@ flag in the same PR.
 - duplicate-key detection (`json.duplicate_key`) — Phase 1.1d (PR #7)
 - trailing-comma detection (`json.trailing_comma`) — Phase 1.1d (PR #7)
 - `apps/web-suite` shell + UI charter ([`docs/tools/nekojson-ui.md`](tools/nekojson-ui.md)) — Phase 1.1e (PR #8)
-- tree view + text view (`view.tree`, `view.text`) — Phase 1.1f (this PR)
+- tree view + text view (`view.tree`, `view.text`) — Phase 1.1f (PR #9)
+- table view + search (`view.table`, `search`) — Phase 1.1g (this PR)
 
 **Remaining** (each PR adds its entitlement(s) to `manifest.entitlements.free` in the same commit):
 
-- table view + search across keys/values — Phase 1.1g
 - copy path + copy value — Phase 1.1h
 
 ### Phase 1 Pro (future private package)

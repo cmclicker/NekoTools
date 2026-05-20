@@ -213,18 +213,21 @@ Free **shipped** (also the exact set in `manifest.entitlements.free`):
   JSON Schema exports
 - Save / load local workspace
 
-Free **shipped Phase 1.1f** (new, in `manifest.entitlements.free`):
+Free **shipped Phase 1.1f** (in `manifest.entitlements.free`):
 
 - Tree view (`view.tree`) — [`apps/web-suite/src/TreeView.tsx`](../../apps/web-suite/src/TreeView.tsx)
 - Text view (`view.text`) — [`apps/web-suite/src/TextView.tsx`](../../apps/web-suite/src/TextView.tsx)
+
+Free **shipped Phase 1.1g** (in `manifest.entitlements.free`):
+
+- Table view (`view.table`) — [`apps/web-suite/src/TableView.tsx`](../../apps/web-suite/src/TableView.tsx)
+- Search across keys and values (`search`) — [`apps/web-suite/src/search.ts`](../../apps/web-suite/src/search.ts) (wired into TreeView + TableView through App.tsx)
 
 Free **deferred to follow-up PRs** (will be added to
 `manifest.entitlements.free` when their implementations land — they are
 *not* declared there today, because unimplemented free features are
 misleading advertising):
 
-- Table view (`view.table`) — Phase 1.1g
-- Search across keys and values — Phase 1.1g
 - Copy path / copy value — Phase 1.1h
 
 Pro:
@@ -369,4 +372,7 @@ explicit follow-up PRs, not silently:
 | Graph projector (`json.graph.references`)          | Pro (future)  | Declared in manifest. Phase 3 graph engine prerequisite. |
 | Semantic diff, migration studio, batch transforms  | Pro (future)  | Declared in manifest. Phase 3 dependencies. |
 | Advanced schema inference                          | Pro (future)  | `oneOf`, format detection, enum collapse, sample unification. |
-| UI views (tree / table / text, search)             | Follow-up     | Tracked as Phase 1.1e. `apps/web-suite` is still a placeholder. |
+| UI shell + manifest panel                          | **Shipped — Phase 1.1e** | `apps/web-suite` scaffold + UI charter at [`docs/tools/nekojson-ui.md`](nekojson-ui.md). |
+| Tree view + Text view                              | **Shipped — Phase 1.1f** | [`TreeView.tsx`](../../apps/web-suite/src/TreeView.tsx) + [`TextView.tsx`](../../apps/web-suite/src/TextView.tsx). |
+| Table view + Search across keys/values             | **Shipped — Phase 1.1g** | [`TableView.tsx`](../../apps/web-suite/src/TableView.tsx) + [`search.ts`](../../apps/web-suite/src/search.ts). |
+| Copy path + Copy value                             | Follow-up — Phase 1.1h | Last remaining free UI affordances; manifest entitlements added in the same PR that ships them. |

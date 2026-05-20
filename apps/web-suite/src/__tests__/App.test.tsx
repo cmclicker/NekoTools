@@ -6,7 +6,7 @@ describe('App integration', () => {
   it('renders the manifest summary on first load', () => {
     render(<App initialInput="{}" />);
     expect(screen.getByRole('heading', { level: 1, name: /NekoTools/ })).toBeInTheDocument();
-    expect(screen.getByText(/Phase 1.1f/)).toBeInTheDocument();
+    expect(screen.getByText(/Phase 1\.1g/)).toBeInTheDocument();
   });
 
   it('parses the initial input and shows the tree by default', () => {
@@ -76,5 +76,59 @@ describe('App integration', () => {
     fireEvent.click(screen.getByLabelText(/Text/));
     expect(screen.getByLabelText(/JSON text view/i)).toBeInTheDocument();
     expect(screen.getByText(/json\.syntax_error/)).toBeInTheDocument();
+  });
+
+  it('Phase 1.1g: switches to the table view when the user picks "Table"', () => {
+    render(<App initialInput='[{"a":1},{"a":2}]' />);
+    fireEvent.click(screen.getByLabelText(/Table/));
+    expect(screen.getByRole('region', { name: /JSON table view/i })).toBeInTheDocument();
+    expect(screen.queryByRole('tree')).not.toBeInTheDocument();
+  });
+
+  it('Phase 1.1g: table view shows the not-applicable hint for non-array roots', () => {
+    render(<App initialInput='{"a":1}' />);
+    fireEvent.click(screen.getByLabelText(/Table/));
+    expect(screen.getByTestId('table-not-applicable')).toBeInTheDocument();
+  });
+
+  it('Phase 1.1g: search input filters tree rows', () => {
+    render(
+      <App initialInput='{"outer":{"needle":1,"other":2}}' />,
+    );
+    const search = screen.getByTestId('search-input');
+    fireEvent.change(search, { target: { value: 'needle' } });
+    const tree = screen.getByRole('tree');
+    // "needle" + ancestors visible; "other" filtered out.
+    expect(tree.textContent).toContain('needle');
+    expect(tree.textContent).toContain('outer');
+    expect(tree.textContent).not.toContain('other');
+  });
+
+  it('Phase 1.1g: search input filters table rows', () => {
+    render(<App initialInput='[{"name":"alice"},{"name":"bob"}]' />);
+    fireEvent.click(screen.getByLabelText(/Table/));
+    const search = screen.getByTestId('search-input');
+    fireEvent.change(search, { target: { value: 'alice' } });
+    expect(screen.getByText('"alice"')).toBeInTheDocument();
+    expect(screen.queryByText('"bob"')).not.toBeInTheDocument();
+  });
+
+  it('Phase 1.1g: tree shows the no-matches hint when search excludes everything', () => {
+    render(<App initialInput='{"a":1}' />);
+    const search = screen.getByTestId('search-input');
+    fireEvent.change(search, { target: { value: 'zzz-nothing-matches' } });
+    expect(screen.getByTestId('tree-no-matches')).toBeInTheDocument();
+  });
+
+  it('Phase 1.1g: honors initialUiState.searchQuery + viewMode "table"', () => {
+    render(
+      <App
+        initialInput='[{"name":"alice"},{"name":"bob"}]'
+        initialUiState={{ viewMode: 'table', searchQuery: 'alice' }}
+      />,
+    );
+    expect(screen.getByRole('region', { name: /JSON table view/i })).toBeInTheDocument();
+    expect(screen.getByText('"alice"')).toBeInTheDocument();
+    expect(screen.queryByText('"bob"')).not.toBeInTheDocument();
   });
 });
