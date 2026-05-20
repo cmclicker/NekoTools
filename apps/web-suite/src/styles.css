@@ -145,3 +145,371 @@ code {
   margin-top: 2rem;
   opacity: 0.5;
 }
+
+/* ------------------------------------------------------------------ */
+/* Phase 1.1f additions: paste / view-mode toolbar / tree / text view */
+/* ------------------------------------------------------------------ */
+
+.visually-hidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+.paste {
+  margin-top: 1.5rem;
+}
+
+.paste__label {
+  display: block;
+  font-weight: 600;
+  margin-bottom: 0.5rem;
+}
+
+.paste__textarea {
+  width: 100%;
+  font-family: ui-monospace, 'SF Mono', 'Cascadia Code', 'Roboto Mono', monospace;
+  font-size: 0.875rem;
+  border: 1px solid rgba(0, 0, 0, 0.15);
+  border-radius: 4px;
+  padding: 0.5rem;
+  background: white;
+  color: inherit;
+  resize: vertical;
+}
+
+@media (prefers-color-scheme: dark) {
+  .paste__textarea {
+    background: #0f0f0f;
+    border-color: rgba(255, 255, 255, 0.12);
+  }
+}
+
+.paste__hint {
+  margin: 0.5rem 0 0;
+  font-size: 0.8125rem;
+  opacity: 0.55;
+}
+
+.results {
+  margin-top: 1rem;
+}
+
+.results__toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  margin-bottom: 1rem;
+  flex-wrap: wrap;
+}
+
+.viewmode {
+  border: 0;
+  margin: 0;
+  padding: 0;
+  display: inline-flex;
+  gap: 0.5rem;
+}
+
+.viewmode label {
+  padding: 0.25rem 0.625rem;
+  border: 1px solid rgba(0, 0, 0, 0.15);
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 0.875rem;
+}
+
+.viewmode label.viewmode--active {
+  background: rgba(0, 0, 0, 0.07);
+  font-weight: 600;
+}
+
+@media (prefers-color-scheme: dark) {
+  .viewmode label {
+    border-color: rgba(255, 255, 255, 0.12);
+  }
+  .viewmode label.viewmode--active {
+    background: rgba(255, 255, 255, 0.08);
+  }
+}
+
+.viewmode input[type='radio'] {
+  margin-right: 0.25rem;
+}
+
+.results__path {
+  margin: 0;
+  font-size: 0.8125rem;
+  opacity: 0.7;
+}
+
+/* Tree view */
+
+.tree {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  font-family: ui-monospace, 'SF Mono', 'Cascadia Code', 'Roboto Mono', monospace;
+  font-size: 0.875rem;
+  border: 1px solid rgba(0, 0, 0, 0.08);
+  border-radius: 4px;
+  max-height: 360px;
+  overflow: auto;
+}
+
+.tree--empty {
+  border: 1px dashed rgba(0, 0, 0, 0.15);
+  padding: 1.25rem;
+  text-align: center;
+  font-size: 0.875rem;
+  opacity: 0.6;
+}
+
+@media (prefers-color-scheme: dark) {
+  .tree {
+    border-color: rgba(255, 255, 255, 0.08);
+  }
+  .tree--empty {
+    border-color: rgba(255, 255, 255, 0.15);
+  }
+}
+
+.tree__row {
+  display: flex;
+  align-items: baseline;
+  gap: 0.25rem;
+  padding: 0.125rem 0.5rem;
+}
+
+.tree__row--active {
+  background: rgba(0, 122, 204, 0.12);
+}
+
+.tree__chevron {
+  background: none;
+  border: 0;
+  cursor: pointer;
+  width: 1rem;
+  text-align: center;
+  font-size: 0.75rem;
+  color: inherit;
+  padding: 0;
+}
+
+.tree__chevron--placeholder {
+  visibility: hidden;
+}
+
+.tree__label {
+  background: none;
+  border: 0;
+  cursor: pointer;
+  text-align: left;
+  font: inherit;
+  color: inherit;
+  padding: 0;
+  flex: 1;
+}
+
+.tree__key {
+  color: #006edb;
+}
+
+@media (prefers-color-scheme: dark) {
+  .tree__key {
+    color: #6cb6ff;
+  }
+}
+
+.tree__row--string .tree__summary {
+  color: #b56918;
+}
+
+.tree__row--number .tree__summary,
+.tree__row--boolean .tree__summary,
+.tree__row--null .tree__summary {
+  color: #5c2e9e;
+}
+
+@media (prefers-color-scheme: dark) {
+  .tree__row--string .tree__summary {
+    color: #d6a064;
+  }
+  .tree__row--number .tree__summary,
+  .tree__row--boolean .tree__summary,
+  .tree__row--null .tree__summary {
+    color: #c098f0;
+  }
+}
+
+.tree__sep {
+  opacity: 0.5;
+}
+
+/* Text view */
+
+.textview {
+  border: 1px solid rgba(0, 0, 0, 0.08);
+  border-radius: 4px;
+  max-height: 360px;
+  overflow: auto;
+  font-family: ui-monospace, 'SF Mono', 'Cascadia Code', 'Roboto Mono', monospace;
+  font-size: 0.875rem;
+  background: white;
+}
+
+@media (prefers-color-scheme: dark) {
+  .textview {
+    background: #0f0f0f;
+    border-color: rgba(255, 255, 255, 0.08);
+  }
+}
+
+.textview__lines {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.textview__line {
+  display: grid;
+  grid-template-columns: 1.25rem 3ch 1fr;
+  gap: 0.25rem;
+  padding: 0 0.5rem;
+  line-height: 1.6;
+}
+
+.textview__line--error {
+  background: rgba(220, 38, 38, 0.08);
+}
+
+.textview__line--warning {
+  background: rgba(217, 119, 6, 0.08);
+}
+
+.textview__line--info {
+  background: rgba(37, 99, 235, 0.06);
+}
+
+.textview__gutter {
+  text-align: center;
+  font-weight: 700;
+}
+
+.textview__line--error .textview__gutter {
+  color: #dc2626;
+}
+
+.textview__line--warning .textview__gutter {
+  color: #d97706;
+}
+
+.textview__line--info .textview__gutter {
+  color: #2563eb;
+}
+
+.textview__number {
+  opacity: 0.45;
+  text-align: right;
+}
+
+.textview__content {
+  white-space: pre;
+}
+
+/* Empty-state shown when invalid input has no parsed document */
+
+.empty-state {
+  border: 1px dashed rgba(0, 0, 0, 0.15);
+  border-radius: 4px;
+  padding: 1.25rem;
+  text-align: center;
+  font-size: 0.875rem;
+  opacity: 0.7;
+  background: rgba(0, 0, 0, 0.02);
+}
+
+@media (prefers-color-scheme: dark) {
+  .empty-state {
+    border-color: rgba(255, 255, 255, 0.15);
+    background: rgba(255, 255, 255, 0.03);
+  }
+}
+
+/* Diagnostics list */
+
+.diagnostics {
+  margin-top: 1rem;
+}
+
+.diagnostics__heading {
+  margin: 0 0 0.5rem;
+  font-size: 0.95rem;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  opacity: 0.7;
+}
+
+.diagnostics__list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+}
+
+.diagnostics__item {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  font-size: 0.875rem;
+  padding: 0.25rem 0.5rem;
+  border-left: 3px solid transparent;
+  background: rgba(0, 0, 0, 0.03);
+}
+
+@media (prefers-color-scheme: dark) {
+  .diagnostics__item {
+    background: rgba(255, 255, 255, 0.04);
+  }
+}
+
+.diagnostics__item--error {
+  border-left-color: #dc2626;
+}
+
+.diagnostics__item--warning {
+  border-left-color: #d97706;
+}
+
+.diagnostics__item--info {
+  border-left-color: #2563eb;
+}
+
+.diagnostics__item--hint {
+  border-left-color: #6b7280;
+}
+
+.diagnostics__severity {
+  font-weight: 700;
+  font-size: 0.75rem;
+  letter-spacing: 0.05em;
+}
+
+.diagnostics__code {
+  opacity: 0.75;
+}
+
+.diagnostics__location {
+  margin-left: auto;
+  opacity: 0.6;
+  font-size: 0.8125rem;
+}

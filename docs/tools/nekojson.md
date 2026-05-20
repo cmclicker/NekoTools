@@ -213,14 +213,19 @@ Free **shipped** (also the exact set in `manifest.entitlements.free`):
   JSON Schema exports
 - Save / load local workspace
 
+Free **shipped Phase 1.1f** (new, in `manifest.entitlements.free`):
+
+- Tree view (`view.tree`) — [`apps/web-suite/src/TreeView.tsx`](../../apps/web-suite/src/TreeView.tsx)
+- Text view (`view.text`) — [`apps/web-suite/src/TextView.tsx`](../../apps/web-suite/src/TextView.tsx)
+
 Free **deferred to follow-up PRs** (will be added to
 `manifest.entitlements.free` when their implementations land — they are
 *not* declared there today, because unimplemented free features are
 misleading advertising):
 
-- Tree / table / text views (UI; `apps/web-suite` is still placeholder)
-- Search across keys and values (UI)
-- Copy path / copy value (UI)
+- Table view (`view.table`) — Phase 1.1g
+- Search across keys and values — Phase 1.1g
+- Copy path / copy value — Phase 1.1h
 
 Pro:
 

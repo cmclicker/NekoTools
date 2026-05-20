@@ -19,7 +19,9 @@ export default defineConfig({
     strictPort: false,
   },
   test: {
-    environment: 'node',
-    include: ['src/**/__tests__/**/*.test.ts'],
+    environment: 'jsdom',
+    globals: false,
+    setupFiles: ['src/test-setup.ts'],
+    include: ['src/**/__tests__/**/*.test.{ts,tsx}'],
   },
 });
