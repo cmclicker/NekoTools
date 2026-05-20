@@ -16,6 +16,7 @@ export * from './parser-pointer.js';
 export * from './diff-textual.js';
 export * from './exporters.js';
 export * from './manifest.js';
+export * from './tokenizer.js';
 export { FIXED_CLOCK } from './util.js';
 
 /**
