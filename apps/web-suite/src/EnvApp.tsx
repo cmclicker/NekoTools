@@ -1,20 +1,11 @@
 import { useCallback, useMemo, useState, type ChangeEvent } from 'react';
-import { ToolRegistry, runParser } from '@nekotools/tool-runtime';
-import {
-  buildEnvRegistration,
-  FIXED_CLOCK,
-  type EnvDiff,
-  type EnvDiffArtifact,
-  type EnvDocument,
-  type EnvDocumentArtifact,
-} from '@nekotools/lens-env';
-import type { Diagnostic } from '@nekotools/contracts';
 
 import { Diagnostics } from './Diagnostics.js';
 import { EnvDiffView } from './EnvDiffView.js';
 import { EnvTableView, mask } from './EnvTableView.js';
 import { EnvTextView } from './EnvTextView.js';
 import { copyToClipboard, type ClipboardDeps } from './clipboard.js';
+import { computeEnvDiff, parseEnvText } from './env-parse.js';
 
 /**
  * NekoEnv sub-app — Phase 2.2 UI. Wires `@nekotools/lens-env` into
@@ -71,52 +62,6 @@ DEBUG=false
 FEATURE_FLAG=enabled
 `;
 
-const registry = (() => {
-  const r = new ToolRegistry();
-  r.register(buildEnvRegistration(FIXED_CLOCK(new Date().toISOString())));
-  return r;
-})();
-
-interface ParsedEnv {
-  readonly hasDocument: boolean;
-  readonly artifact: EnvDocumentArtifact | null;
-  readonly document: EnvDocument | null;
-  readonly diagnostics: readonly Diagnostic[];
-}
-
-function parseEnvText(raw: string): ParsedEnv {
-  const result = runParser(registry, 'env', 'env.text', {
-    raw,
-    source: { kind: 'paste', bytes: raw.length },
-  });
-  const artifact = (result.artifacts[0] as EnvDocumentArtifact | undefined) ?? null;
-  return {
-    hasDocument: artifact !== null,
-    artifact,
-    document: artifact?.value ?? null,
-    diagnostics: result.diagnostics,
-  };
-}
-
-function computeDiff(
-  left: EnvDocumentArtifact | null,
-  right: EnvDocumentArtifact | null,
-): EnvDiff | null {
-  if (!left || !right) return null;
-  const result = runParser(registry, 'env', 'env.diff.textual', {
-    raw: '',
-    source: { kind: 'derived', from: [left.id, right.id] },
-    hints: {
-      leftArtifactId: left.id,
-      leftDocument: left.value,
-      rightArtifactId: right.id,
-      rightDocument: right.value,
-    },
-  });
-  const artifact = result.artifacts[0] as EnvDiffArtifact | undefined;
-  return artifact?.value ?? null;
-}
-
 export function EnvApp({
   initialInput,
   initialCompareInput,
@@ -144,7 +89,7 @@ export function EnvApp({
   const parsed = useMemo(() => parseEnvText(input), [input]);
   const parsedCompare = useMemo(() => parseEnvText(compareInput), [compareInput]);
   const diff = useMemo(
-    () => computeDiff(parsed.artifact, parsedCompare.artifact),
+    () => computeEnvDiff(parsed.artifact, parsedCompare.artifact),
     [parsed.artifact, parsedCompare.artifact],
   );
 

@@ -1,6 +1,14 @@
 import { describe, expect, it, vi } from 'vitest';
-import { fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { App } from '../App.js';
+
+// PR #14 audit blocker 1: both tool panels stay mounted (the inactive
+// one is `hidden`). Label text like "Table" / "Text" is now present in
+// both the JSON and Env view-mode fieldsets, so JSON-panel assertions
+// must be scoped to the JSON panel to stay unambiguous.
+function jsonPanel(): HTMLElement {
+  return screen.getByTestId('tool-panel-json');
+}
 
 describe('App integration', () => {
   it('renders the manifest summary on first load (defaults to the NekoJSON tab)', () => {
@@ -9,10 +17,10 @@ describe('App integration', () => {
     const phase = document.querySelector('.suite__phase');
     expect(phase?.textContent).toMatch(/Phase 2\.2/);
     expect(phase?.textContent).toMatch(/Hosting/);
-    // The active tool tab is JSON by default — the JSON paste textarea
-    // is in the DOM, the env one isn't.
-    expect(screen.getByLabelText(/Paste JSON here/i)).toBeInTheDocument();
-    expect(screen.queryByTestId('env-input')).not.toBeInTheDocument();
+    // PR #14 audit blocker 1: both sub-apps stay mounted; only one
+    // panel is visible at a time. JSON is visible by default.
+    expect(screen.getByTestId('tool-panel-json')).toBeVisible();
+    expect(screen.getByTestId('tool-panel-env')).not.toBeVisible();
   });
 
   it('parses the initial input and shows the tree by default', () => {
@@ -23,7 +31,7 @@ describe('App integration', () => {
 
   it('switches to the text view when the user picks "Text"', () => {
     render(<App initialInput='{"hello":1}' />);
-    fireEvent.click(screen.getByLabelText(/Text/));
+    fireEvent.click(within(jsonPanel()).getByLabelText(/Text/));
     expect(screen.getByLabelText(/JSON text view/i)).toBeInTheDocument();
     expect(screen.queryByRole('tree')).not.toBeInTheDocument();
   });
@@ -79,21 +87,21 @@ describe('App integration', () => {
 
   it('invalid JSON in text view still renders raw input + diagnostics', () => {
     render(<App initialInput='{"oops":' />);
-    fireEvent.click(screen.getByLabelText(/Text/));
+    fireEvent.click(within(jsonPanel()).getByLabelText(/Text/));
     expect(screen.getByLabelText(/JSON text view/i)).toBeInTheDocument();
     expect(screen.getByText(/json\.syntax_error/)).toBeInTheDocument();
   });
 
   it('Phase 1.1g: switches to the table view when the user picks "Table"', () => {
     render(<App initialInput='[{"a":1},{"a":2}]' />);
-    fireEvent.click(screen.getByLabelText(/Table/));
+    fireEvent.click(within(jsonPanel()).getByLabelText(/Table/));
     expect(screen.getByRole('region', { name: /JSON table view/i })).toBeInTheDocument();
     expect(screen.queryByRole('tree')).not.toBeInTheDocument();
   });
 
   it('Phase 1.1g: table view shows the not-applicable hint for non-array roots', () => {
     render(<App initialInput='{"a":1}' />);
-    fireEvent.click(screen.getByLabelText(/Table/));
+    fireEvent.click(within(jsonPanel()).getByLabelText(/Table/));
     expect(screen.getByTestId('table-not-applicable')).toBeInTheDocument();
   });
 
@@ -112,7 +120,7 @@ describe('App integration', () => {
 
   it('Phase 1.1g: search input filters table rows', () => {
     render(<App initialInput='[{"name":"alice"},{"name":"bob"}]' />);
-    fireEvent.click(screen.getByLabelText(/Table/));
+    fireEvent.click(within(jsonPanel()).getByLabelText(/Table/));
     const search = screen.getByTestId('search-input');
     fireEvent.change(search, { target: { value: 'alice' } });
     expect(screen.getByText('"alice"')).toBeInTheDocument();
@@ -264,28 +272,60 @@ describe('App integration', () => {
     expect(JSON.parse(writes[0]!)).toEqual(doc);
   });
 
-  it('Phase 2.2: tool tabs switch between NekoJSON and NekoEnv', () => {
+  it('Phase 2.2: tool tabs switch panel visibility (both stay mounted)', () => {
     render(<App initialInput='{"a":1}' />);
-    // JSON is default.
     expect(screen.getByTestId('tool-tab-json')).toHaveAttribute('aria-pressed', 'true');
     expect(screen.getByTestId('tool-tab-env')).toHaveAttribute('aria-pressed', 'false');
-    expect(screen.getByLabelText(/Paste JSON here/i)).toBeInTheDocument();
+    expect(screen.getByTestId('tool-panel-json')).toBeVisible();
+    expect(screen.getByTestId('tool-panel-env')).not.toBeVisible();
 
-    // Switch to env.
     fireEvent.click(screen.getByTestId('tool-tab-env'));
     expect(screen.getByTestId('tool-tab-env')).toHaveAttribute('aria-pressed', 'true');
-    expect(screen.getByTestId('env-input')).toBeInTheDocument();
-    expect(screen.queryByLabelText(/Paste JSON here/i)).not.toBeInTheDocument();
-    // "Hosting <strong>NekoEnv</strong>" — text spans two nodes, so we
-    // assert via the suite__phase element's full textContent.
+    expect(screen.getByTestId('tool-panel-env')).toBeVisible();
+    expect(screen.getByTestId('tool-panel-json')).not.toBeVisible();
     const phase = document.querySelector('.suite__phase');
     expect(phase?.textContent).toMatch(/Hosting\s+NekoEnv/);
   });
 
   it('Phase 2.2: initialTool="env" mounts the NekoEnv UI on first render', () => {
     render(<App initialTool="env" />);
-    expect(screen.getByTestId('env-input')).toBeInTheDocument();
+    expect(screen.getByTestId('tool-panel-env')).toBeVisible();
+    expect(screen.getByTestId('tool-panel-json')).not.toBeVisible();
     const phase = document.querySelector('.suite__phase');
     expect(phase?.textContent).toMatch(/Hosting\s+NekoEnv/);
+  });
+
+  it('PR #14 audit blocker 1: edits to the JSON textarea survive a switch to NekoEnv and back', () => {
+    render(<App initialInput='{"start":"value"}' />);
+    const jsonTextarea = screen.getByLabelText(/Paste JSON here/i) as HTMLTextAreaElement;
+    fireEvent.change(jsonTextarea, { target: { value: '{"edited":"yes"}' } });
+    expect(jsonTextarea.value).toBe('{"edited":"yes"}');
+
+    // Switch away to env.
+    fireEvent.click(screen.getByTestId('tool-tab-env'));
+    expect(screen.getByTestId('tool-panel-env')).toBeVisible();
+    // Switch back to JSON.
+    fireEvent.click(screen.getByTestId('tool-tab-json'));
+    expect(screen.getByTestId('tool-panel-json')).toBeVisible();
+
+    // The JSON textarea — same node, both mounted across the switch —
+    // still has the edited content.
+    const jsonAfter = screen.getByLabelText(/Paste JSON here/i) as HTMLTextAreaElement;
+    expect(jsonAfter.value).toBe('{"edited":"yes"}');
+  });
+
+  it('PR #14 audit blocker 1: edits to the NekoEnv textarea survive a switch to NekoJSON and back', () => {
+    render(<App initialTool="env" envApp={{ initialInput: 'A=1\n' }} />);
+    const envTextarea = screen.getByTestId('env-input') as HTMLTextAreaElement;
+    fireEvent.change(envTextarea, { target: { value: 'B=changed\n' } });
+    expect(envTextarea.value).toBe('B=changed\n');
+
+    fireEvent.click(screen.getByTestId('tool-tab-json'));
+    expect(screen.getByTestId('tool-panel-json')).toBeVisible();
+    fireEvent.click(screen.getByTestId('tool-tab-env'));
+    expect(screen.getByTestId('tool-panel-env')).toBeVisible();
+
+    const envAfter = screen.getByTestId('env-input') as HTMLTextAreaElement;
+    expect(envAfter.value).toBe('B=changed\n');
   });
 });

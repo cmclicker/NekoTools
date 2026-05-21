@@ -24,12 +24,13 @@ export interface AppProps extends JsonAppProps {
 /**
  * Phase 2.2 web-suite shell.
  *
- * The shell hosts one tool at a time, selected by the top-of-screen
- * tool tab. NekoJSON and NekoEnv share the shell's header, footer,
- * doctrine copy, and styling primitives (paste card, results card,
- * toolbar, view-mode fieldset, copy buttons, mask checkbox), but each
- * tool owns its own state (input, view mode, active key/path, search
- * query, etc.) so switching tabs does not lose work.
+ * The shell hosts NekoJSON and NekoEnv as siblings; switching tabs
+ * toggles which one is visible but **does not unmount the other**.
+ * That preserves pasted text, view mode, active selection, search
+ * query, and mask state across tab switches — a local-only dev tool
+ * should never discard the user's pasted work behind their back.
+ * The PR #14 audit blocker 1 fix replaced the conditional-render
+ * pattern with `hidden`-toggled wrappers around both children.
  *
  * The props shape is backward-compatible with the Phase 1.1h `<App>`:
  * `initialInput`, `initialUiState`, and `clipboardDeps` are forwarded
@@ -78,7 +79,18 @@ export function App({
         </nav>
       </header>
 
-      {activeTool === 'json' ? <JsonApp {...jsonAppProps} /> : <EnvApp {...envApp} />}
+      {/*
+        Both sub-apps stay mounted. The inactive one is `hidden` so
+        screen readers + visual users see exactly one tool at a time,
+        but React state — including the textarea contents — is
+        preserved across tab toggles. PR #14 audit blocker 1.
+      */}
+      <div hidden={activeTool !== 'json'} data-testid="tool-panel-json">
+        <JsonApp {...jsonAppProps} />
+      </div>
+      <div hidden={activeTool !== 'env'} data-testid="tool-panel-env">
+        <EnvApp {...envApp} />
+      </div>
 
       <footer className="suite__footer">
         <small>

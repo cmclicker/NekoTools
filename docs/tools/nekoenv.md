@@ -371,12 +371,14 @@ is current-build truth, `entitlements.pro` is honest intent
 advertising, and `capabilities.*` is current-build truth — not
 lifetime promises of the tool family.
 
-## What this PR does *not* include
+## What the engine MVP PR did *not* include
 
-(Engine MVP scope — Phase 2.1.)
+(Historical, frozen at PR #13 — the Phase 2.1 engine MVP. The
+Phase 2.2 UI PR shipped the UI items called out here.)
 
-- No `apps/web-suite` UI integration. (Phase 2.2.)
+- No `apps/web-suite` UI integration. (Shipped in Phase 2.2.)
 - No Phase 2.2 UI entitlements in `manifest.entitlements.free`.
+  (Added in Phase 2.2.)
 - No Pro implementation under `@nekotools-pro/*`.
 - No change to `@nekotools/contracts`, `@nekotools/schemas`,
   `@nekotools/tool-runtime`, `@nekotools/offline-guard`,
@@ -385,7 +387,7 @@ lifetime promises of the tool family.
 
 ## Acceptance for the Phase 2.1 implementation PR
 
-All gates met in this PR:
+All gates met in PR #13:
 
 - [x] `@nekotools/lens-env` package exists, registered via
       `buildEnvRegistration(clock, options?)` + the existing

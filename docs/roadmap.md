@@ -112,7 +112,7 @@ flag in the same PR.
 - `apps/web-suite` shell + UI charter ([`docs/tools/nekojson-ui.md`](tools/nekojson-ui.md)) — Phase 1.1e (PR #8)
 - tree view + text view (`view.tree`, `view.text`) — Phase 1.1f (PR #9)
 - table view + search (`view.table`, `search`) — Phase 1.1g (PR #10)
-- copy.path + copy.value (`copy.path`, `copy.value`) — Phase 1.1h (this PR)
+- copy.path + copy.value (`copy.path`, `copy.value`) — Phase 1.1h (PR #11)
 
 **Phase 1 free tier is closed.** Every charter-declared free feature
 ships and is declared in `manifest.entitlements.free`. The Phase 1 Pro
