@@ -294,6 +294,41 @@ describe('NekoEnv: env.text parser', () => {
     expect(doc.entries[1]?.startLine).toBe(4);
   });
 
+  it('PR #13 audit blocker 1: double-quoted value with trailing non-comment text emits env.syntax_error', () => {
+    const result = parse('A="value" garbage\n');
+    const diag = result.diagnostics.find((d) => d.code === 'env.syntax_error');
+    expect(diag).toBeDefined();
+    expect(diag?.message).toContain('garbage');
+    // Best-effort: the entry is still produced so the user can see
+    // what was parsed before fixing the line.
+    const doc = (result.artifacts[0] as EnvDocumentArtifact).value;
+    expect(doc.entries[0]?.value).toBe('value');
+  });
+
+  it("PR #13 audit blocker 1: single-quoted value with trailing non-comment text emits env.syntax_error", () => {
+    const result = parse("A='value' garbage\n");
+    const diag = result.diagnostics.find((d) => d.code === 'env.syntax_error');
+    expect(diag).toBeDefined();
+    expect(diag?.message).toContain('garbage');
+    const doc = (result.artifacts[0] as EnvDocumentArtifact).value;
+    expect(doc.entries[0]?.value).toBe('value');
+  });
+
+  it('PR #13 audit blocker 1: double-quoted value with trailing whitespace remains valid (no syntax error)', () => {
+    const result = parse('A="value"   \n');
+    expect(result.diagnostics.find((d) => d.code === 'env.syntax_error')).toBeUndefined();
+    const doc = (result.artifacts[0] as EnvDocumentArtifact).value;
+    expect(doc.entries[0]?.value).toBe('value');
+  });
+
+  it('PR #13 audit blocker 1: quoted value with trailing # comment remains valid and captures the comment', () => {
+    const result = parse('A="value" # explains A\n');
+    expect(result.diagnostics.find((d) => d.code === 'env.syntax_error')).toBeUndefined();
+    const doc = (result.artifacts[0] as EnvDocumentArtifact).value;
+    expect(doc.entries[0]?.value).toBe('value');
+    expect(doc.entries[0]?.trailingComment).toBe('explains A');
+  });
+
   it('emits env.unterminated_quote (error) when a quoted value never closes', () => {
     const result = parse('A="open and never closed\nB=should also fail\n');
     const diag = result.diagnostics.find((d) => d.code === 'env.unterminated_quote');

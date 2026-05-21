@@ -76,15 +76,24 @@ Reuses `@nekotools/contracts`'s `Parser<TArtifact>`. New parsers:
   marker). Parallel to `json.pointer` from NekoJSON.
 - `env.diff.textual` — accepts two `env.document` artifacts through
   parser hints (a `from` document and a `to` document), produces an
-  `env.diff` artifact carrying a line-level textual diff against a
-  canonical re-emit of each document (the same canonical form
-  `env.export.env.canonical` produces, so the diff is stable across
-  insignificant ordering / quoting differences). Local-only; requires
-  both document inputs; emits `env.diff.missing_input` when either
-  side is absent or `undefined`; does **not** perform structural or
-  key-level semantic diffing — that is Pro (`diff.structural`) and
-  depends on the Phase 3 semantic-diff engine. Parallel to
-  `json.diff.textual` from NekoJSON's Phase 1.1a.
+  `env.diff` artifact carrying a line-level textual diff against an
+  **internal sorted canonical comparison form** of each document.
+  The sorted comparison form drops comments and blank lines, sorts
+  entries by key, applies last-occurrence-wins for duplicate keys,
+  and uses the canonical quoting normalization — so that reordering
+  keys, inconsistent quoting, or duplicate-key edits do not produce
+  diff noise. This is **deliberately different** from the human-
+  facing `env.export.env.canonical` exporter, which preserves source
+  order, comments, and blank lines for round-trip editing. Two
+  distinct modes share the same `canonicalize()` helper
+  (`'sorted'` vs `'preserved'`) and are intentional — see
+  [`packages/lens-env/src/canonical.ts`](../../packages/lens-env/src/canonical.ts).
+  Local-only; requires both document inputs; emits
+  `env.diff.missing_input` when either side is absent or
+  `undefined`; does **not** perform structural or key-level semantic
+  diffing — that is Pro (`diff.structural`) and depends on the Phase 3
+  semantic-diff engine. Parallel to `json.diff.textual` from
+  NekoJSON's Phase 1.1a.
 
 Non-strict behaviors that are **out of scope** for Phase 2:
 
@@ -332,96 +341,45 @@ dotenv document with the free build alone.
   (`env.large_document` is informational; very large files are an
   unusual dotenv shape and the Pro views may gate above it).
 
-## Draft `ToolManifest` (illustrative)
+## `ToolManifest` implementation
 
-The TS object will land in the Phase 2.1 implementation PR — under
-`packages/lens-env/src/manifest.ts` — and will be schema-validated by
-`validateManifest`. The shape below is illustrative for the auditor.
-The strings here are the source of truth for the Phase 2.1
-implementation's free/Pro identifier set.
+The canonical NekoEnv manifest lives at
+[`packages/lens-env/src/manifest.ts`](../../packages/lens-env/src/manifest.ts).
+It is the source of truth — this doc does not duplicate it, because
+duplicated manifests drift. (The PR #12 charter PR carried an
+illustrative draft block here; once the implementation landed in
+PR #13 the draft was replaced by this pointer.)
 
-```ts
-// packages/lens-env/src/manifest.ts (preview only, not committed here)
-export const envManifest: ToolManifest = {
-  version: 1,
-  id: 'env',
-  name: 'NekoEnv',
-  toolVersion: 1,
-  summary:
-    'Inspect, validate, diff, and export local dotenv files. Phase 2 reuse-gate tool.',
-  artifactKinds: ['env.document', 'env.key-result', 'env.diff', 'env.schema'],
-  parsers: ['env.text', 'env.key', 'env.diff.textual'],
-  exporters: [
-    'env.export.env.canonical',
-    'env.export.env.example',
-    'env.export.markdown.summary',
-    'env.export.plaintext.keys',
-    'env.export.schema.json-schema',
-    'env.export.diff.textual',
-    'env.export.types.typescript',     // Pro intent
-    'env.export.types.zod',            // Pro intent
-    'env.export.docs.data-dictionary', // Pro intent
-    'env.export.compose.dotenv-stack', // Pro intent
-  ],
-  graphProjectors: ['env.graph.references'], // Pro intent
-  offlinePolicy: DEFAULT_OFFLINE_POLICY,
-  capabilities: {
-    canSaveWorkspace: true,
-    canExport: true,
-    canDiff: true,
-    canProjectGraph: false,
-  },
-  entitlements: {
-    free: [
-      'parse',
-      'format',
-      'validate',
-      'inspect.key',
-      'schema.infer.basic',
-      'diff.textual',
-      'export.env.canonical',
-      'export.env.example',
-      'export.markdown.summary',
-      'export.plaintext.keys',
-      'export.schema.basic',
-      'export.diff.textual',
-      'workspace.save',
-      // Phase 2.2 UI free entitlements add view.table, view.text,
-      // view.diff, search, copy.key, copy.value, mask.value — they
-      // land in the Phase 2.2 implementation PR, not 2.1.
-    ],
-    pro: [
-      'schema.infer.advanced',
-      'secrets.scan',
-      'diff.structural',
-      'graph.references',
-      'export.types.typescript',
-      'export.types.zod',
-      'export.docs.data-dictionary',
-      'export.compose.dotenv-stack',
-      'multi-env.compare',
-    ],
-  },
-  outOfScope: [
-    'fetching from remote secret stores',
-    'variable interpolation or expansion of any kind',
-    'encryption or decryption of dotenv files',
-    'executing scripts with --env-file',
-    'acting as a remote schema or secret registry',
-    'streaming gigantic dotenv documents beyond the local soft threshold',
-  ],
-};
-```
+The manifest is schema-validated by `validateManifest` in
+[`packages/lens-env/src/__tests__/conformance.test.ts`](../../packages/lens-env/src/__tests__/conformance.test.ts),
+which also pins:
+
+- the exact Phase 2.1 free-entitlement set (Phase 2.2 UI
+  entitlements are deliberately absent until the UI PR ships them),
+- the Pro exporters declared in the manifest but **not** registered
+  in the free build,
+- the absence of `env.graph.references` from the registered graph
+  projectors, and
+- `runExporter` rejecting every Pro exporter id with
+  `unknown exporter`.
+
+The header comment in `manifest.ts` documents the same reading
+model that the PR #2 audit enforced for NekoJSON: `entitlements.free`
+is current-build truth, `entitlements.pro` is honest intent
+advertising, and `capabilities.*` is current-build truth — not
+lifetime promises of the tool family.
 
 ## What this PR does *not* include
 
-- Any code under `packages/lens-env/`. The package directory does
-  not exist yet; it lands in Phase 2.1.
-- Any change to contracts, schemas, runtime, offline guard, or
-  NekoJSON.
-- Any change to `apps/web-suite`.
-- Any change to CI workflows.
-- A merged manifest registration.
+(Engine MVP scope — Phase 2.1.)
+
+- No `apps/web-suite` UI integration. (Phase 2.2.)
+- No Phase 2.2 UI entitlements in `manifest.entitlements.free`.
+- No Pro implementation under `@nekotools-pro/*`.
+- No change to `@nekotools/contracts`, `@nekotools/schemas`,
+  `@nekotools/tool-runtime`, `@nekotools/offline-guard`,
+  `@nekotools/lens-binary`, or `@nekotools/lens-json`.
+- No change to CI workflows.
 
 ## Acceptance for the Phase 2.1 implementation PR
 

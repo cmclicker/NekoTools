@@ -168,6 +168,38 @@ function parseEnvText(
       raw.length,
     );
 
+    if (parsedValue.kind === 'trailing-garbage') {
+      // Best-effort: produce the entry with the decoded value so the
+      // user can see what was parsed, but surface a syntax error
+      // pointing at the garbage. Per PR #13 audit blocker 1: silently
+      // dropping trailing text violates the charter's strict-parser
+      // posture.
+      diagnostics.push(
+        makeDiagnostic(
+          diagIds(),
+          'error',
+          ENV_DIAGNOSTIC_CODES.syntaxError,
+          `unexpected text after ${parsedValue.quoting === 'double' ? 'double' : 'single'}-quoted value for "${key}" on line ${parsedValue.endLine}: ${JSON.stringify(parsedValue.garbage)}`,
+          spanForLine(
+            lineStarts[parsedValue.endLine - 1] ?? lineOffset,
+            sourceLines[parsedValue.endLine - 1]?.length ?? 0,
+            parsedValue.endLine,
+          ),
+        ),
+      );
+      const entry: EnvEntry = {
+        key,
+        value: parsedValue.value,
+        quoting: parsedValue.quoting,
+        exportPrefix,
+        startLine: lineNo,
+        endLine: parsedValue.endLine,
+      };
+      recordEntry(entry, entries, lines, seenKeys, diagnostics, diagIds, lineNo);
+      i = parsedValue.endLine;
+      continue;
+    }
+
     if (parsedValue.kind === 'unterminated') {
       diagnostics.push(
         makeDiagnostic(
@@ -299,7 +331,17 @@ interface ValueParseUnterminated {
   readonly kind: 'unterminated';
   readonly quote: '"' | "'";
 }
-type ValueParseResult = ValueParseOk | ValueParseUnterminated;
+interface ValueParseTrailingGarbage {
+  readonly kind: 'trailing-garbage';
+  readonly value: string;
+  readonly quoting: 'single' | 'double';
+  readonly endLine: number;
+  readonly garbage: string;
+}
+type ValueParseResult =
+  | ValueParseOk
+  | ValueParseUnterminated
+  | ValueParseTrailingGarbage;
 
 /**
  * Parse the value portion of an entry line. Handles three shapes:
@@ -377,8 +419,10 @@ function parseQuotedValue(
         continue;
       }
       if (ch === quote) {
-        // Closing quote. Anything after may be whitespace + `#
-        // comment`.
+        // Closing quote. Anything after must be whitespace and/or a
+        // `# comment`. Trailing non-comment text is malformed —
+        // silently dropping it would be a strict-parser failure
+        // (per the PR #13 audit blocker 1).
         const remainder = current.slice(j + 1);
         const trailComment = /^\s+#\s?(.*)$/.exec(remainder);
         if (trailComment) {
@@ -390,11 +434,24 @@ function parseQuotedValue(
             endLine: lineIdx + 1,
           };
         }
+        if (remainder === '' || /^\s*$/.test(remainder)) {
+          return {
+            kind: 'ok',
+            value: out,
+            quoting: quote === '"' ? 'double' : 'single',
+            endLine: lineIdx + 1,
+          };
+        }
+        // Anything else is trailing garbage — surface it so the
+        // caller can emit `env.syntax_error`. We still return the
+        // decoded value as a best-effort artifact so the user can
+        // see what was parsed before fixing the line.
         return {
-          kind: 'ok',
+          kind: 'trailing-garbage',
           value: out,
           quoting: quote === '"' ? 'double' : 'single',
           endLine: lineIdx + 1,
+          garbage: remainder,
         };
       }
       out += ch;
