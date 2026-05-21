@@ -50,7 +50,15 @@ export function createLogFilterParser(deps: ParserDeps): Parser<LogArtifact> {
           ? (input.hints['documentArtifactId'] as string)
           : 'unknown';
       const document = input.hints?.['document'] as LogDocument | undefined;
-      const filter = (input.hints?.['filter'] ?? {}) as LogFilter;
+      // Distinguish "filter hint absent" (default to match-all `{}`)
+      // from "filter hint present but null/garbage" (invalid). Using
+      // `?? {}` would collapse an explicit `null` into match-all, which
+      // would hide a malformed input — so check presence explicitly.
+      const hints = input.hints;
+      const rawFilter: unknown =
+        hints !== undefined && Object.prototype.hasOwnProperty.call(hints, 'filter')
+          ? hints['filter']
+          : {};
 
       if (!document || !Array.isArray(document.entries)) {
         return {
@@ -66,8 +74,12 @@ export function createLogFilterParser(deps: ParserDeps): Parser<LogArtifact> {
         };
       }
 
-      const validationError = validateFilter(filter);
-      if (validationError !== null) {
+      // Fully validate the untrusted filter before touching any field.
+      // `validateFilter` accepts `unknown` and never throws — malformed
+      // hints become a `log.filter.invalid` diagnostic, never an
+      // exception (PR #16 audit blocker).
+      const validation = validateFilter(rawFilter);
+      if (!validation.ok) {
         return {
           artifacts: [],
           diagnostics: [
@@ -75,12 +87,13 @@ export function createLogFilterParser(deps: ParserDeps): Parser<LogArtifact> {
               diagIds(),
               'error',
               LOG_DIAGNOSTIC_CODES.filterInvalid,
-              validationError,
+              validation.error,
             ),
           ],
         };
       }
 
+      const filter = validation.filter;
       const predicate = compileFilter(filter);
       const matched = document.entries.filter(predicate);
 
@@ -108,28 +121,80 @@ function isLevel(v: unknown): v is LogLevel {
   return typeof v === 'string' && (LOG_LEVELS as readonly string[]).includes(v);
 }
 
-function validateFilter(filter: LogFilter): string | null {
-  if (filter.minLevel !== undefined && !isLevel(filter.minLevel)) {
-    return `minLevel "${String(filter.minLevel)}" is not a known level (${LOG_LEVELS.join(', ')})`;
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return value !== null && typeof value === 'object' && !Array.isArray(value);
+}
+
+type FilterValidation =
+  | { readonly ok: true; readonly filter: LogFilter }
+  | { readonly ok: false; readonly error: string };
+
+/**
+ * Validate an **untrusted** filter object coming from `input.hints`.
+ * Accepts `unknown` and never throws — every malformed shape returns a
+ * descriptive error instead. On success, returns a normalized
+ * `LogFilter` containing only the recognized, type-checked fields
+ * (unknown keys are dropped). `compileFilter` may only run on a
+ * value this function approved.
+ */
+function validateFilter(raw: unknown): FilterValidation {
+  if (!isRecord(raw)) {
+    return { ok: false, error: 'filter must be a non-null object' };
   }
-  if (filter.levelIn !== undefined) {
-    if (!Array.isArray(filter.levelIn) || filter.levelIn.some((l) => !isLevel(l))) {
-      return `levelIn must be an array of known levels (${LOG_LEVELS.join(', ')})`;
+
+  const out: { -readonly [K in keyof LogFilter]?: LogFilter[K] } = {};
+
+  if (raw['minLevel'] !== undefined) {
+    if (!isLevel(raw['minLevel'])) {
+      return {
+        ok: false,
+        error: `minLevel "${String(raw['minLevel'])}" is not a known level (${LOG_LEVELS.join(', ')})`,
+      };
     }
+    out.minLevel = raw['minLevel'];
   }
-  if (filter.since !== undefined && parseTimestamp(filter.since) === null) {
-    return `since "${filter.since}" is not a parseable timestamp`;
+
+  if (raw['levelIn'] !== undefined) {
+    const lvls = raw['levelIn'];
+    if (!Array.isArray(lvls) || lvls.some((l) => !isLevel(l))) {
+      return {
+        ok: false,
+        error: `levelIn must be an array of known levels (${LOG_LEVELS.join(', ')})`,
+      };
+    }
+    out.levelIn = lvls as LogLevel[];
   }
-  if (filter.until !== undefined && parseTimestamp(filter.until) === null) {
-    return `until "${filter.until}" is not a parseable timestamp`;
+
+  if (raw['messageContains'] !== undefined) {
+    if (typeof raw['messageContains'] !== 'string') {
+      return { ok: false, error: 'messageContains must be a string' };
+    }
+    out.messageContains = raw['messageContains'];
   }
-  if (
-    filter.fieldEquals !== undefined &&
-    (typeof filter.fieldEquals.key !== 'string' || typeof filter.fieldEquals.value !== 'string')
-  ) {
-    return 'fieldEquals must be { key: string, value: string }';
+
+  if (raw['fieldEquals'] !== undefined) {
+    const fe = raw['fieldEquals'];
+    if (!isRecord(fe) || typeof fe['key'] !== 'string' || typeof fe['value'] !== 'string') {
+      return { ok: false, error: 'fieldEquals must be { key: string, value: string }' };
+    }
+    out.fieldEquals = { key: fe['key'], value: fe['value'] };
   }
-  return null;
+
+  if (raw['since'] !== undefined) {
+    if (typeof raw['since'] !== 'string' || parseTimestamp(raw['since']) === null) {
+      return { ok: false, error: `since "${String(raw['since'])}" is not a parseable timestamp` };
+    }
+    out.since = raw['since'];
+  }
+
+  if (raw['until'] !== undefined) {
+    if (typeof raw['until'] !== 'string' || parseTimestamp(raw['until']) === null) {
+      return { ok: false, error: `until "${String(raw['until'])}" is not a parseable timestamp` };
+    }
+    out.until = raw['until'];
+  }
+
+  return { ok: true, filter: out as LogFilter };
 }
 
 function compileFilter(filter: LogFilter): (e: LogEntry) => boolean {

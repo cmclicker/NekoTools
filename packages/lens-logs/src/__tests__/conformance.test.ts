@@ -325,6 +325,62 @@ describe('NekoLogs: log.filter parser', () => {
     expect(call).not.toThrow();
     expect(call().diagnostics[0]?.code).toBe('log.filter.invalid');
   });
+
+  describe('PR #16 audit blocker: malformed filters fail closed (never throw)', () => {
+    function runWithFilter(filter: unknown) {
+      const doc = docArtifact(sample);
+      const call = () =>
+        runParser(registry(), 'logs', 'log.filter', {
+          raw: '',
+          source: { kind: 'derived', from: [doc.id] },
+          hints: { document: doc.value, documentArtifactId: doc.id, filter },
+        });
+      expect(call).not.toThrow();
+      return call();
+    }
+
+    const cases: { name: string; filter: unknown }[] = [
+      { name: 'filter: null', filter: null },
+      { name: 'filter: "bad"', filter: 'bad' },
+      { name: 'filter: 123', filter: 123 },
+      { name: 'filter: []', filter: [] },
+      { name: 'fieldEquals: null', filter: { fieldEquals: null } },
+      { name: 'fieldEquals missing value', filter: { fieldEquals: { key: 'svc' } } },
+      { name: 'fieldEquals non-string value', filter: { fieldEquals: { key: 'svc', value: 5 } } },
+      { name: 'since: 123', filter: { since: 123 } },
+      { name: 'until: {}', filter: { until: {} } },
+      { name: 'messageContains: 123', filter: { messageContains: 123 } },
+      { name: 'levelIn: "info"', filter: { levelIn: 'info' } },
+      { name: 'levelIn: ["bogus"]', filter: { levelIn: ['bogus'] } },
+    ];
+
+    for (const c of cases) {
+      it(`${c.name} -> log.filter.invalid, no artifact`, () => {
+        const result = runWithFilter(c.filter);
+        expect(result.artifacts).toHaveLength(0);
+        expect(result.diagnostics[0]?.code).toBe('log.filter.invalid');
+      });
+    }
+
+    it('filter: null is treated as "missing" via ?? {} only when undefined — null is rejected', () => {
+      // Guard against a regression where `null ?? {}` would silently
+      // pass an empty filter. `null` must be an explicit invalid.
+      const result = runWithFilter(null);
+      expect(result.diagnostics[0]?.code).toBe('log.filter.invalid');
+    });
+
+    it('an entirely absent filter hint defaults to match-all (valid, not invalid)', () => {
+      const doc = docArtifact(sample);
+      const result = runParser(registry(), 'logs', 'log.filter', {
+        raw: '',
+        source: { kind: 'derived', from: [doc.id] },
+        hints: { document: doc.value, documentArtifactId: doc.id },
+      });
+      expect(result.diagnostics).toHaveLength(0);
+      const v = result.artifacts[0]!.value as LogFilterResult;
+      expect(v.matchedCount).toBe(v.totalCount);
+    });
+  });
 });
 
 describe('NekoLogs: exporters', () => {
