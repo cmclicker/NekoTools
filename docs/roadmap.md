@@ -37,7 +37,7 @@ previous row `Done`.
 | 7     | Phase 1.1f | Implementation | NekoJSON **tree view** + **text view** + flip `view.tree` / `view.text` into `entitlements.free`. | Done (PR #9 / `87293eb`) |
 | 8     | Phase 1.1g | Implementation | NekoJSON **table view** + **search** across keys/values + flip `view.table` / `search` into `entitlements.free`. | Done (PR #10 / `337a05d`) |
 | 9     | Phase 1.1h | Implementation | **Copy.path** + **copy.value** affordances + flip both into `entitlements.free`. **Phase 1 free tier closes here.** | Done (PR #11 / `248761c`) |
-| 10    | Phase 2.0  | Charter        | NekoEnv charter PR (10-question reuse gate). Charter doc only — no implementation. | Done (this PR) |
+| 10    | Phase 2.0  | Charter        | NekoEnv charter PR (10-question reuse gate). Charter doc only — no implementation. | In review (this PR) |
 | 11    | Phase 2.1  | Implementation | `@nekotools/lens-env` engine MVP: parser, diagnostics, exporters, schema inference, textual diff, workspace round-trip + conformance tests. No UI yet. | **Next** |
 
 `Later` rows are intentionally not in the queue order — they are

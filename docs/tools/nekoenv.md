@@ -70,6 +70,17 @@ Reuses `@nekotools/contracts`'s `Parser<TArtifact>`. New parsers:
   not a runtime, because it converts user input (the key) into a
   structured artifact (the entry, or a deliberate "key absent"
   marker). Parallel to `json.pointer` from NekoJSON.
+- `env.diff.textual` — accepts two `env.document` artifacts through
+  parser hints (a `from` document and a `to` document), produces an
+  `env.diff` artifact carrying a line-level textual diff against a
+  canonical re-emit of each document (the same canonical form
+  `env.export.env.canonical` produces, so the diff is stable across
+  insignificant ordering / quoting differences). Local-only; requires
+  both document inputs; emits `env.diff.missing_input` when either
+  side is absent or `undefined`; does **not** perform structural or
+  key-level semantic diffing — that is Pro (`diff.structural`) and
+  depends on the Phase 3 semantic-diff engine. Parallel to
+  `json.diff.textual` from NekoJSON's Phase 1.1a.
 
 Non-strict behaviors that are **out of scope** for Phase 2:
 
@@ -91,7 +102,7 @@ Codes shipping in the Phase 2.1 engine MVP:
 | Code                              | Severity | Meaning |
 | --------------------------------- | -------- | ------- |
 | `env.syntax_error`                | error    | A non-blank, non-comment line is not parseable as `KEY=VALUE`. |
-| `env.empty_input`                 | error    | Input is whitespace and/or comments only. (Mirror of `json.empty_input`.) |
+| `env.empty_input`                 | info     | Input is whitespace only, **or** input contains only comments and blank lines (zero entries). See the artifact-emission rule below — this is informational, not an error. |
 | `env.invalid_key`                 | error    | Key does not match `[A-Za-z_][A-Za-z0-9_]*` (the shell-portable subset). Surfaces with the exact offending span. |
 | `env.duplicate_key`               | warning  | Same key appears more than once. Most dotenv loaders keep the last occurrence; the warning points at every occurrence after the first and references the first occurrence's line/column. (Mirror of `json.duplicate_key`.) |
 | `env.unterminated_quote`          | error    | `KEY="..` or `KEY='..` reaches EOF without a matching closing quote. |
@@ -113,6 +124,21 @@ must each land in a follow-up PR that updates this table):
 All malformed inputs produce structured diagnostics. The parsers do
 not throw; missing-key / not-found surface as diagnostics tied to a
 deliberate empty artifact.
+
+**Comments-only / empty-input artifact policy.** A document that
+contains only comments and/or blank lines is **syntactically valid
+dotenv** and is treated as a no-entry document. `env.text` produces
+an `env.document` artifact carrying the preserved comments and blank
+lines in source order with zero entries, and emits `env.empty_input`
+at `info` severity to flag that there are no environment keys.
+Whitespace-only input (no comments either) also produces an empty
+`env.document` artifact with the same `info` diagnostic. The
+distinction matters for the workbench: a developer using NekoEnv to
+draft an `.env.example` skeleton with comments-as-documentation
+should not see their work flagged as an error. `env.empty_input` is
+never an `error`-severity diagnostic — earlier versions of this
+charter mistakenly described it as such; the rule above is
+authoritative.
 
 ### 4. Export contract
 
@@ -403,8 +429,8 @@ charter PR.)
       `ToolRegistry`.
 - [ ] Manifest passes `validateManifest`.
 - [ ] Free-tier parsers and exporters exist and pass tests
-      (`env.text`, `env.key`, plus every free exporter from Section
-      4).
+      (`env.text`, `env.key`, `env.diff.textual`, plus every free
+      exporter from Section 4).
 - [ ] Conformance test parallel to `lens-binary` / `lens-json`
       covers parser → diagnostic → export → workspace round-trip,
       including the multi-document case.
