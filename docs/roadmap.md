@@ -9,8 +9,8 @@
 | ------- | --------------------------- | ----- |
 | Phase 0   | **Complete** (commit `93efaa5`) | Platform spine + audit patches landed. |
 | Phase 1.0 | **Complete** (PR #2, commit `324115c`) | Engine MVP merged. No UI, no diff, no search — those land in Phase 1.1+ follow-up PRs. |
-| Phase 1.1 | **Complete** (closes at this PR) | All charter-declared free engine + UI capabilities shipped: diff (1.1a), large-doc threshold (1.1b), tokenizer (1.1c), duplicate-key + trailing-comma (1.1d), UI shell (1.1e), tree + text (1.1f), table + search (1.1g), copy.path + copy.value (1.1h). |
-| Phase 2   | **Active next**             | Phase 2.0 NekoEnv charter PR is the next-up queue row. |
+| Phase 1.1 | **Complete** (PR #11, commit `248761c`) | All charter-declared free engine + UI capabilities shipped: diff (1.1a), large-doc threshold (1.1b), tokenizer (1.1c), duplicate-key + trailing-comma (1.1d), UI shell (1.1e), tree + text (1.1f), table + search (1.1g), copy.path + copy.value (1.1h). |
+| Phase 2   | **Active**                  | Phase 2.0 NekoEnv charter PR opens here. Phase 2.1 engine MVP is the queued next-up implementation. |
 | Phase 3   | Not started                 | Premium engines (graph, semantic diff, migration). |
 | Phase 4   | Not started                 | Heavier tools (YAML, API Lens, Headers, Types, RBAC). |
 | Phase 5   | Not started                 | Expansion packs. |
@@ -36,8 +36,9 @@ previous row `Done`.
 | 6     | Phase 1.1e | UI Planning + Shell | `apps/web-suite` shell scaffold + UI charter; manifest-summary panel. Views/search/copy queued as 1.1f–h. | Done (PR #8 / `50ab36c`) |
 | 7     | Phase 1.1f | Implementation | NekoJSON **tree view** + **text view** + flip `view.tree` / `view.text` into `entitlements.free`. | Done (PR #9 / `87293eb`) |
 | 8     | Phase 1.1g | Implementation | NekoJSON **table view** + **search** across keys/values + flip `view.table` / `search` into `entitlements.free`. | Done (PR #10 / `337a05d`) |
-| 9     | Phase 1.1h | Implementation | **Copy.path** + **copy.value** affordances + flip both into `entitlements.free`. **Phase 1 free tier closes here.** | Done (this PR) |
-| 10    | Phase 2.0  | Charter        | NekoEnv charter PR (10-question reuse gate).                                                   | **Next** |
+| 9     | Phase 1.1h | Implementation | **Copy.path** + **copy.value** affordances + flip both into `entitlements.free`. **Phase 1 free tier closes here.** | Done (PR #11 / `248761c`) |
+| 10    | Phase 2.0  | Charter        | NekoEnv charter PR (10-question reuse gate). Charter doc only — no implementation. | In review (this PR) |
+| 11    | Phase 2.1  | Implementation | `@nekotools/lens-env` engine MVP: parser, diagnostics, exporters, schema inference, textual diff, workspace round-trip + conformance tests. No UI yet. | **Next** |
 
 `Later` rows are intentionally not in the queue order — they are
 candidates for promotion to `Queued` after Phase 1 is fully closed.
@@ -132,11 +133,17 @@ future `@nekotools-pro/*` package and are not present in this binary:
 
 Tools that reuse the spine heavily and validate it generalizes:
 
-- NekoEnv
+- NekoEnv (active — charter in [docs/tools/nekoenv.md](tools/nekoenv.md))
 - NekoLogs
 - NekoCron
 - NekoIgnore
 - NekoPackage
+
+NekoEnv is the Phase 2.0 reuse-gate tool: structurally different from
+NekoJSON (line-oriented dotenv, not a tree), zero new contract types,
+exercises the entire spine. If the spine only fits JSON, NekoEnv is
+where it fails. The charter doc is the gate; the Phase 2.1 engine MVP
+is the test.
 
 ## Phase 3 — First premium-grade engines
 
