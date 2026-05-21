@@ -5,14 +5,16 @@
 > `apps/web-suite` wiring ship in this PR. Implementation is blocked
 > until this charter is approved and merged.
 
-NekoLogs is the third Phase 2 tool, after NekoEnv. Where NekoEnv
-proved the spine fits a flat line-oriented `key=value` substrate,
-NekoLogs proves it fits a **heterogeneous record stream**: an ordered
-sequence of log lines that may be JSON-per-line, logfmt, or
-unstructured plaintext, each carrying an optional timestamp and
-severity level. That is a structurally different shape from both
-NekoJSON (a recursive value tree) and NekoEnv (a flat map), and it is
-the point of choosing NekoLogs as the next reuse-gate test.
+NekoLogs is the **second Phase 2 tool, after NekoEnv** — and the
+**third major substrate** the platform has been tested against, after
+JSON and dotenv. Where NekoEnv proved the spine fits a flat
+line-oriented `key=value` substrate, NekoLogs proves it fits a
+**heterogeneous record stream**: an ordered sequence of log lines that
+may be JSON-per-line, logfmt, or unstructured plaintext, each carrying
+an optional timestamp and severity level. That is a structurally
+different shape from both NekoJSON (a recursive value tree) and
+NekoEnv (a flat map), and it is the point of choosing NekoLogs as the
+next reuse-gate test.
 
 ## What NekoLogs is
 
@@ -50,19 +52,38 @@ NekoLogs introduces:
 | -------------------- | ------------------------------------------------------------------------------ | -------------- |
 | `log.document`       | A parsed log document: an ordered list of `LogEntry` records (timestamp?, level?, message, fields, raw, source line number) plus the detected line format. | Phase 2.x.1, free. |
 | `log.filter-result`  | The ordered subset of a `log.document`'s entries that match a structured filter, plus the filter that produced it. Parallel to NekoJSON's `json.path-result` and NekoEnv's `env.key-result` — a parser turns user input (the filter) into an artifact. | Phase 2.x.1, free. |
-| `log.summary`        | Aggregate stats over a `log.document`: total entries, counts by level, parsed time range, count of unparseable lines, and the top-N most frequent normalized messages. Basic aggregation only. | Phase 2.x.1, free. |
-| `log.histogram`      | A count matrix: entries bucketed by `(level × time-bucket)`. The "matrix" projection NekoLogs exercises. Basic fixed-bucket histogram is free intent; adaptive bucketing / anomaly overlay is Pro. | Free (basic) / Pro (advanced). |
+| `log.summary`        | Aggregate stats over a `log.document`: total entries, counts by level, parsed time range, count of unparseable lines, and the top-N most frequent normalized messages. Basic aggregation only. **Produced by the `log.text` parser run** (see Section 2), not a separate aggregator stage. | Phase 2.x.1, free. |
+| `log.histogram`      | A count matrix: entries bucketed by `(level × time-bucket)`. The "matrix" projection NekoLogs exercises. **Produced by the `log.text` parser run.** Basic fixed-bucket histogram is free; adaptive bucketing / anomaly overlay is Pro. | Free (basic) / Pro (advanced). |
 
 Every kind is namespaced under `log.*`. None are reused from `json.*`
 or `env.*`, even where a shape looks superficially similar.
+
+**How the derived artifacts are produced.** A single `log.text`
+parser run emits three artifacts: the primary `log.document`, plus a
+`log.summary` and a basic `log.histogram` derived from it in the same
+pass. This keeps the engine MVP to two parsers (`log.text`,
+`log.filter`) and avoids inventing a new aggregator runtime stage or
+contract — the derived artifacts ride out of the existing
+`ParserResult.artifacts` array, exactly as a parser is already allowed
+to return more than one artifact. See Section 2 for the parser
+contract and Section 5 for why the histogram is a value-shape, not a
+new contract.
 
 ### 2. Parser contract
 
 Reuses `@nekotools/contracts`'s `Parser<TArtifact>`. New parsers:
 
-- `log.text` — accepts raw log text, produces `log.document`. Splits
-  on line breaks and classifies each line with a **per-line format
-  detector**:
+- `log.text` — accepts raw log text and produces **three artifacts in
+  one run**: the primary `log.document`, plus a derived `log.summary`
+  (basic counts by level, time range, unparseable count, top
+  normalized messages) and a derived basic `log.histogram` (fixed
+  `level × time-bucket` count matrix). All three come out of the same
+  `ParserResult.artifacts` array — no second runtime stage, no
+  aggregator contract. The `log.summary` / `log.histogram`
+  computations are pure functions of the parsed `log.document`, so the
+  derived artifacts cannot drift from the document they describe. The
+  parser splits on line breaks and classifies each line with a
+  **per-line format detector**:
   - **JSON-per-line** — the line parses as a JSON object; known
     fields (`time`/`timestamp`/`ts`, `level`/`lvl`/`severity`,
     `msg`/`message`) are lifted into the entry, the rest become
@@ -299,6 +320,9 @@ export const logsManifest: ToolManifest = {
   summary:
     'Parse, filter, summarize, and export local log snapshots. Phase 2 reuse-gate tool.',
   artifactKinds: ['log.document', 'log.filter-result', 'log.summary', 'log.histogram'],
+  // Two parsers. `log.text` emits log.document + log.summary +
+  // log.histogram in one run; `log.filter` emits log.filter-result.
+  // No separate aggregator stage.
   parsers: ['log.text', 'log.filter'],
   exporters: [
     'log.export.text.plain',
@@ -385,6 +409,9 @@ export const logsManifest: ToolManifest = {
 - [ ] Free-tier parsers + exporters exist and pass tests
       (`log.text`, `log.filter`, plus every free exporter from
       Section 4 across JSON-per-line / logfmt / plaintext inputs).
+- [ ] A single `log.text` run emits `log.document` + `log.summary` +
+      basic `log.histogram`, and tests assert the derived artifacts
+      are consistent with the document (pure-function property).
 - [ ] Conformance test parallel to `lens-env` covers parser →
       diagnostic → export → workspace round-trip, including a
       multi-artifact workspace.
