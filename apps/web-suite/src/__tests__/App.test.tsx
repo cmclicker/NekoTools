@@ -3,10 +3,16 @@ import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { App } from '../App.js';
 
 describe('App integration', () => {
-  it('renders the manifest summary on first load', () => {
+  it('renders the manifest summary on first load (defaults to the NekoJSON tab)', () => {
     render(<App initialInput="{}" />);
     expect(screen.getByRole('heading', { level: 1, name: /NekoTools/ })).toBeInTheDocument();
-    expect(screen.getByText(/Phase 1\.1h/)).toBeInTheDocument();
+    const phase = document.querySelector('.suite__phase');
+    expect(phase?.textContent).toMatch(/Phase 2\.2/);
+    expect(phase?.textContent).toMatch(/Hosting/);
+    // The active tool tab is JSON by default — the JSON paste textarea
+    // is in the DOM, the env one isn't.
+    expect(screen.getByLabelText(/Paste JSON here/i)).toBeInTheDocument();
+    expect(screen.queryByTestId('env-input')).not.toBeInTheDocument();
   });
 
   it('parses the initial input and shows the tree by default', () => {
@@ -256,5 +262,30 @@ describe('App integration', () => {
       expect(writes).toHaveLength(1);
     });
     expect(JSON.parse(writes[0]!)).toEqual(doc);
+  });
+
+  it('Phase 2.2: tool tabs switch between NekoJSON and NekoEnv', () => {
+    render(<App initialInput='{"a":1}' />);
+    // JSON is default.
+    expect(screen.getByTestId('tool-tab-json')).toHaveAttribute('aria-pressed', 'true');
+    expect(screen.getByTestId('tool-tab-env')).toHaveAttribute('aria-pressed', 'false');
+    expect(screen.getByLabelText(/Paste JSON here/i)).toBeInTheDocument();
+
+    // Switch to env.
+    fireEvent.click(screen.getByTestId('tool-tab-env'));
+    expect(screen.getByTestId('tool-tab-env')).toHaveAttribute('aria-pressed', 'true');
+    expect(screen.getByTestId('env-input')).toBeInTheDocument();
+    expect(screen.queryByLabelText(/Paste JSON here/i)).not.toBeInTheDocument();
+    // "Hosting <strong>NekoEnv</strong>" — text spans two nodes, so we
+    // assert via the suite__phase element's full textContent.
+    const phase = document.querySelector('.suite__phase');
+    expect(phase?.textContent).toMatch(/Hosting\s+NekoEnv/);
+  });
+
+  it('Phase 2.2: initialTool="env" mounts the NekoEnv UI on first render', () => {
+    render(<App initialTool="env" />);
+    expect(screen.getByTestId('env-input')).toBeInTheDocument();
+    const phase = document.querySelector('.suite__phase');
+    expect(phase?.textContent).toMatch(/Hosting\s+NekoEnv/);
   });
 });

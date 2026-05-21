@@ -10,7 +10,7 @@
 | Phase 0   | **Complete** (commit `93efaa5`) | Platform spine + audit patches landed. |
 | Phase 1.0 | **Complete** (PR #2, commit `324115c`) | Engine MVP merged. No UI, no diff, no search — those land in Phase 1.1+ follow-up PRs. |
 | Phase 1.1 | **Complete** (PR #11, commit `248761c`) | All charter-declared free engine + UI capabilities shipped: diff (1.1a), large-doc threshold (1.1b), tokenizer (1.1c), duplicate-key + trailing-comma (1.1d), UI shell (1.1e), tree + text (1.1f), table + search (1.1g), copy.path + copy.value (1.1h). |
-| Phase 2   | **Active**                  | Phase 2.0 charter merged (PR #12 / `0b832dc`). Phase 2.1 engine MVP is in review (this PR). Phase 2.2 UI is the queued next-up implementation. |
+| Phase 2   | **Active**                  | Phase 2.0 charter (PR #12 / `0b832dc`), Phase 2.1 engine MVP (PR #13 / `4d188f9`), Phase 2.2 UI (this PR) — NekoEnv free tier closes here. Phase 2.0 NekoLogs charter is the queued next-up Phase 2 row. |
 | Phase 3   | Not started                 | Premium engines (graph, semantic diff, migration). |
 | Phase 4   | Not started                 | Heavier tools (YAML, API Lens, Headers, Types, RBAC). |
 | Phase 5   | Not started                 | Expansion packs. |
@@ -38,8 +38,9 @@ previous row `Done`.
 | 8     | Phase 1.1g | Implementation | NekoJSON **table view** + **search** across keys/values + flip `view.table` / `search` into `entitlements.free`. | Done (PR #10 / `337a05d`) |
 | 9     | Phase 1.1h | Implementation | **Copy.path** + **copy.value** affordances + flip both into `entitlements.free`. **Phase 1 free tier closes here.** | Done (PR #11 / `248761c`) |
 | 10    | Phase 2.0  | Charter        | NekoEnv charter PR (10-question reuse gate). Charter doc only — no implementation. | Done (PR #12 / `0b832dc`) |
-| 11    | Phase 2.1  | Implementation | `@nekotools/lens-env` engine MVP: parser, diagnostics, exporters, schema inference, textual diff, workspace round-trip + conformance tests. No UI yet. | In review (this PR) |
-| 12    | Phase 2.2  | Implementation | NekoEnv UI: table + text + diff views + search + copy.key / copy.value + mask.value. Wires `@nekotools/lens-env` into `apps/web-suite` and flips `view.table`, `view.text`, `view.diff`, `search`, `copy.key`, `copy.value`, `mask.value` into `manifest.entitlements.free`. | **Next** |
+| 11    | Phase 2.1  | Implementation | `@nekotools/lens-env` engine MVP: parser, diagnostics, exporters, schema inference, textual diff, workspace round-trip + conformance tests. No UI. | Done (PR #13 / `4d188f9`) |
+| 12    | Phase 2.2  | Implementation | NekoEnv UI: table + text + diff views + search + copy.key / copy.value + mask.value. Wires `@nekotools/lens-env` into `apps/web-suite` and flips `view.table`, `view.text`, `view.diff`, `search`, `copy.key`, `copy.value`, `mask.value` into `manifest.entitlements.free`. **NekoEnv free tier closes here.** | In review (this PR) |
+| 13    | Phase 2 / NekoLogs 0 | Charter | NekoLogs charter PR (10-question reuse gate). Charter doc only — no implementation. | **Next** |
 
 `Later` rows are intentionally not in the queue order — they are
 candidates for promotion to `Queued` after Phase 1 is fully closed.

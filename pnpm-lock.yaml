@@ -38,6 +38,9 @@ importers:
       '@nekotools/contracts':
         specifier: workspace:*
         version: link:../../packages/contracts
+      '@nekotools/lens-env':
+        specifier: workspace:*
+        version: link:../../packages/lens-env
       '@nekotools/lens-json':
         specifier: workspace:*
         version: link:../../packages/lens-json

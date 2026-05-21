@@ -1,13 +1,15 @@
 # NekoEnv — Phase 2.0 charter
 
-> Status: **IMPLEMENTED (Phase 2.1 engine MVP).** The charter was
-> approved in [PR #12](https://github.com/cmclicker/NekoTools/pull/12).
-> The engine implementation landed in the Phase 2.1 implementation
-> PR (this PR). UI (table / text / diff / search / copy / mask)
-> remains queued as Phase 2.2 and will land in its own PR with the
-> matching `view.*` / `copy.*` / `mask.*` free entitlements added in
-> the same commit. Features deferred from this PR are listed under
-> "Deferred from this PR" at the bottom.
+> Status: **IMPLEMENTED — Phase 2 free tier closed (this PR).** The
+> charter was approved in [PR #12](https://github.com/cmclicker/NekoTools/pull/12);
+> the engine MVP landed in [PR #13](https://github.com/cmclicker/NekoTools/pull/13);
+> the Phase 2.2 UI ships here. Every charter-declared free
+> capability now has a working implementation declared in
+> `manifest.entitlements.free`: engine entries live in
+> `@nekotools/lens-env`, UI entries live in `apps/web-suite`
+> (EnvApp + EnvTableView / EnvTextView / EnvDiffView). Future free
+> entitlements must be added only in the same PR that ships their
+> implementation, per the open-core governance rule.
 
 NekoEnv is the Phase 2.0 reuse-gate tool. The point of Phase 2 is to
 prove that the platform spine generalizes from the Phase 1 proof tool
@@ -405,14 +407,44 @@ All gates met in this PR:
 - [x] Offline guard sees no new violations.
 - [x] This charter doc updated from "PROPOSED" to "IMPLEMENTED".
 
-## Deferred from this PR (scope contract)
+## Phase 2.2 UI (this PR)
 
-The Phase 2.1 engine MVP shipped the entire charter-declared
-**engine** free tier. UI work is the next follow-up PR.
+The UI ships in `apps/web-suite`. The shell now hosts two tools
+side-by-side via a top-level tool tab (`NekoJSON` | `NekoEnv`),
+mounted on first render via `App`'s `initialTool` prop (defaults to
+`'json'` for backward compatibility with the Phase 1 tests).
+
+NekoEnv UI surface:
+
+- **Table view** (default) — one row per dotenv entry in source
+  order with key / value / quoting / line columns. Duplicate keys
+  are surfaced (the table is the workbench view), while `env.key`
+  lookups apply last-occurrence-wins.
+- **Text view** — raw source with line-number gutter and per-line
+  diagnostic markers. Reuses NekoJSON's `groupSeverityByLine` helper
+  (it is generic over `Diagnostic[]`).
+- **Diff view** — new view mode this PR introduces. Renders the
+  hunk list from an `env.diff` artifact computed via
+  `env.diff.textual` against the canonical sorted comparison form.
+  A second "Compare against" textarea appears only in diff mode so
+  the primary editor stays clean in table / text modes.
+- **Search** — case-insensitive substring match against key + value
+  in the table view. The same `search` entitlement covers the
+  search-input UI itself.
+- **Copy key / Copy value** — local clipboard via the shared
+  `clipboard.ts` helper from Phase 1.1h (Clipboard API → hidden-
+  textarea + `execCommand('copy')` fallback). Copy value uses the
+  same last-occurrence-wins semantics as `env.key`.
+- **Mask values** — a UI-only toggle that replaces non-empty values
+  with a fixed-width dot string in the table, the active-key
+  display, and the diff hunks. **Critical safety property:** masking
+  is a view preference; `Copy value` always writes the real value —
+  enforced by a dedicated test.
+
+## Deferred from this PR (Pro / future)
 
 | Deferred item                                       | Status          | Notes |
 | --------------------------------------------------- | --------------- | ----- |
-| UI: table / text / diff views + search + copy + mask | Phase 2.2 (next)| Wires `@nekotools/lens-env` into `apps/web-suite`. The Phase 2.2 PR adds `view.table`, `view.text`, `view.diff`, `search`, `copy.key`, `copy.value`, `mask.value` to `manifest.entitlements.free` in the same commit that ships their implementation. |
 | `env.value_looks_secret` Pro diagnostic              | Pro (future)    | Vendor-pattern catalog in the private package. |
 | `env.graph.references` Pro projector                 | Pro (future)    | Depends on the Phase 3 graph engine. |
 | Multi-env compare (3+ documents)                     | Pro (future)    | Depends on the Phase 3 multi-doc UI primitive. |

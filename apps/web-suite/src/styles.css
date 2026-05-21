@@ -698,3 +698,133 @@ code {
   opacity: 0.6;
   font-size: 0.8125rem;
 }
+
+/* Phase 2.2 — tool tabs + env-specific bits */
+
+.suite__tools {
+  display: flex;
+  gap: 0.5rem;
+  margin-bottom: 1.5rem;
+}
+
+.suite__tool {
+  padding: 0.4rem 1rem;
+  border: 1px solid rgba(0, 0, 0, 0.15);
+  border-radius: 999px;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  cursor: pointer;
+  opacity: 0.7;
+}
+
+.suite__tool--active {
+  background: #2563eb;
+  border-color: #2563eb;
+  color: white;
+  opacity: 1;
+}
+
+@media (prefers-color-scheme: dark) {
+  .suite__tool {
+    border-color: rgba(255, 255, 255, 0.2);
+  }
+}
+
+.mask {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  font-size: 0.875rem;
+  opacity: 0.85;
+}
+
+.env-table {
+  overflow-x: auto;
+}
+
+.env-table table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.9375rem;
+}
+
+.env-table th,
+.env-table td {
+  text-align: left;
+  padding: 0.4rem 0.6rem;
+  border-bottom: 1px solid rgba(0, 0, 0, 0.08);
+  vertical-align: top;
+}
+
+.env-table th {
+  font-weight: 600;
+  opacity: 0.7;
+  font-size: 0.8125rem;
+}
+
+.env-row {
+  cursor: pointer;
+}
+
+.env-row:hover {
+  background: rgba(37, 99, 235, 0.06);
+}
+
+.env-row--active {
+  background: rgba(37, 99, 235, 0.12);
+}
+
+.env-row__export {
+  opacity: 0.6;
+  font-size: 0.8125rem;
+  margin-right: 0.25rem;
+}
+
+.env-diff {
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: 0.875rem;
+}
+
+.env-diff__header {
+  display: flex;
+  flex-direction: column;
+  margin-bottom: 0.5rem;
+  opacity: 0.75;
+}
+
+.env-diff__minus {
+  color: #dc2626;
+}
+
+.env-diff__plus {
+  color: #059669;
+}
+
+.env-diff__hunks {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  border: 1px solid rgba(0, 0, 0, 0.08);
+  border-radius: 6px;
+  overflow: hidden;
+}
+
+.env-diff__hunk {
+  display: flex;
+  gap: 0.5rem;
+  padding: 0.15rem 0.5rem;
+}
+
+.env-diff__hunk--add {
+  background: rgba(5, 150, 105, 0.12);
+}
+
+.env-diff__hunk--remove {
+  background: rgba(220, 38, 38, 0.12);
+}
+
+.env-diff__marker {
+  width: 1ch;
+  opacity: 0.6;
+}
