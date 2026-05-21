@@ -70,12 +70,14 @@ export const envManifest: ToolManifest = {
     canProjectGraph: false,
   },
   entitlements: {
-    // Phase 2.1 engine-only free tier. UI entitlements (view.table,
-    // view.text, view.diff, search, copy.key, copy.value, mask.value)
-    // arrive in the Phase 2.2 UI PR, per the open-core governance
-    // rule (free entitlements must be implementation-backed in the
-    // same PR that adds them).
+    // Phase 2.2 closes the NekoEnv free tier. Engine entries from
+    // Phase 2.1 plus UI entries (view.table, view.text, view.diff,
+    // search, copy.key, copy.value, mask.value) added by this PR;
+    // each UI entry is implementation-backed in apps/web-suite per
+    // the open-core governance rule (free entitlements must be
+    // implementation-backed in the same PR that adds them).
     free: [
+      // Phase 2.1 engine MVP.
       'parse',
       'format',
       'validate',
@@ -89,6 +91,15 @@ export const envManifest: ToolManifest = {
       'export.schema.basic',
       'export.diff.textual',
       'workspace.save',
+      // Phase 2.2 UI — shipped in apps/web-suite (EnvApp +
+      // EnvTableView / EnvTextView / EnvDiffView).
+      'view.table',
+      'view.text',
+      'view.diff',
+      'search',
+      'copy.key',
+      'copy.value',
+      'mask.value',
     ],
     pro: [
       'schema.infer.advanced',

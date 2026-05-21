@@ -8,10 +8,14 @@
 
 ## What `apps/web-suite` is
 
-The local, offline web shell that hosts every NekoTools lens. The NekoJSON
-lens is the first occupant. Subsequent tools (NekoEnv, NekoLogs, etc.)
-will register themselves into the same shell via the existing
-[`ToolRegistry`](../../packages/tool-runtime/src/registry.ts).
+The local, offline web shell that hosts every NekoTools lens. NekoJSON
+was the first occupant (Phase 1.1e–1.1h). **NekoEnv joined as the
+second tool in Phase 2.2** ([`docs/tools/nekoenv.md`](nekoenv.md));
+the shell now routes between them via a top-level tool tab
+(`App` → `JsonApp` | `EnvApp`). Subsequent tools (NekoLogs, NekoCron,
+etc.) will register themselves into the same shell via the existing
+[`ToolRegistry`](../../packages/tool-runtime/src/registry.ts) and add
+their own tab.
 
 The shell is a pure consumer of artifacts produced by the lens
 packages — it never re-implements parsing, never invents a new

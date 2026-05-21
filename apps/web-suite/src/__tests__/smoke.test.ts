@@ -1,19 +1,19 @@
 import { describe, expect, it } from 'vitest';
+import { buildEnvRegistration, envManifest } from '@nekotools/lens-env';
 import { buildJsonRegistration, jsonManifest } from '@nekotools/lens-json';
 
 /**
- * Phase 1.1e shell smoke test.
+ * Web-suite shell smoke test. After Phase 2.2 the shell hosts two
+ * tools (NekoJSON + NekoEnv) and resolves both through the workspace
+ * alias. The asserts here confirm:
  *
- * The shell's contract is "Vite + React build resolves
- * `@nekotools/lens-json` through the workspace alias and the manifest
- * is what it claims to be." Asserting that here exercises:
- *   - pnpm workspace linking (lens-json -> lens-json source)
+ *   - pnpm workspace linking (lens-* -> lens-* source)
  *   - Vite's module resolution for `@nekotools/*` packages
  *   - TS project references through `tsconfig.json`
+ *   - manifest free entitlements include every UI feature this PR ships
  *
- * No DOM, no @testing-library, no jsdom — keep this PR's dep
- * footprint minimal. UI-rendering tests land with the views that
- * need them in Phase 1.1f+.
+ * UI-rendering tests live in EnvApp.test.tsx / App.test.tsx; this file
+ * stays DOM-free.
  */
 describe('apps/web-suite scaffold', () => {
   it('imports the NekoJSON manifest through the workspace alias', () => {
@@ -22,26 +22,50 @@ describe('apps/web-suite scaffold', () => {
     expect(jsonManifest.offlinePolicy.networkPolicy).toBe('network-forbidden');
   });
 
-  it('manifest free entitlements include every feature shipped through Phase 1.1h', () => {
-    // Regression guard: confirms the shell sees the same manifest the
-    // tests in lens-json see (no version drift, no stale bundle).
+  it('imports the NekoEnv manifest through the workspace alias', () => {
+    expect(envManifest.id).toBe('env');
+    expect(envManifest.name).toBe('NekoEnv');
+    expect(envManifest.offlinePolicy.networkPolicy).toBe('network-forbidden');
+  });
+
+  it('NekoJSON manifest free entitlements include every feature shipped through Phase 1.1h', () => {
     expect(jsonManifest.entitlements.free).toContain('parse');
     expect(jsonManifest.entitlements.free).toContain('diff.textual');
-    // Phase 1.1f — tree + text views.
     expect(jsonManifest.entitlements.free).toContain('view.tree');
     expect(jsonManifest.entitlements.free).toContain('view.text');
-    // Phase 1.1g — table view + search.
     expect(jsonManifest.entitlements.free).toContain('view.table');
     expect(jsonManifest.entitlements.free).toContain('search');
-    // Phase 1.1h — copy.path + copy.value; closes Phase 1's free tier.
     expect(jsonManifest.entitlements.free).toContain('copy.path');
     expect(jsonManifest.entitlements.free).toContain('copy.value');
     expect(jsonManifest.capabilities.canDiff).toBe(true);
   });
 
+  it('NekoEnv manifest free entitlements include every feature shipped through Phase 2.2', () => {
+    // Engine entries (Phase 2.1).
+    expect(envManifest.entitlements.free).toContain('parse');
+    expect(envManifest.entitlements.free).toContain('diff.textual');
+    expect(envManifest.entitlements.free).toContain('inspect.key');
+    // UI entries (Phase 2.2, this PR).
+    expect(envManifest.entitlements.free).toContain('view.table');
+    expect(envManifest.entitlements.free).toContain('view.text');
+    expect(envManifest.entitlements.free).toContain('view.diff');
+    expect(envManifest.entitlements.free).toContain('search');
+    expect(envManifest.entitlements.free).toContain('copy.key');
+    expect(envManifest.entitlements.free).toContain('copy.value');
+    expect(envManifest.entitlements.free).toContain('mask.value');
+    expect(envManifest.capabilities.canDiff).toBe(true);
+  });
+
   it('exposes buildJsonRegistration so the shell can wire NekoJSON into ToolRegistry', () => {
     const reg = buildJsonRegistration();
     expect(reg.manifest.id).toBe('json');
+    expect(reg.parsers.length).toBeGreaterThan(0);
+    expect(reg.exporters.length).toBeGreaterThan(0);
+  });
+
+  it('exposes buildEnvRegistration so the shell can wire NekoEnv into ToolRegistry', () => {
+    const reg = buildEnvRegistration();
+    expect(reg.manifest.id).toBe('env');
     expect(reg.parsers.length).toBeGreaterThan(0);
     expect(reg.exporters.length).toBeGreaterThan(0);
   });

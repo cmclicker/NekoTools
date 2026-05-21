@@ -117,12 +117,13 @@ describe('NekoEnv: monetization safety', () => {
     }
   });
 
-  it('the manifest free entitlements list matches what the Phase 2.1 engine actually ships', () => {
-    // UI entitlements (view.table, view.text, view.diff, search,
-    // copy.key, copy.value, mask.value) are deliberately ABSENT — they
-    // land in Phase 2.2. Adding them here without an implementation
-    // would be misleading advertising.
+  it('the manifest free entitlements list matches what the Phase 2.2 free tier actually ships', () => {
+    // After Phase 2.2, the NekoEnv free tier is closed. Every entry
+    // below has a working implementation: engine entries live in
+    // @nekotools/lens-env; UI entries live in apps/web-suite
+    // (EnvApp + EnvTableView/EnvTextView/EnvDiffView).
     const expectedFree = new Set([
+      // Phase 2.1 engine MVP.
       'parse',
       'format',
       'validate',
@@ -136,15 +137,27 @@ describe('NekoEnv: monetization safety', () => {
       'export.schema.basic',
       'export.diff.textual',
       'workspace.save',
+      // Phase 2.2 UI.
+      'view.table',
+      'view.text',
+      'view.diff',
+      'search',
+      'copy.key',
+      'copy.value',
+      'mask.value',
     ]);
     const declared = new Set(envManifest.entitlements.free);
     expect(declared).toEqual(expectedFree);
   });
 
-  it('declared but unimplemented free features list is empty for Phase 2.1 engine scope', () => {
+  it('declared but unimplemented free features list is empty for Phase 2.2 scope', () => {
     // Every id in `entitlements.free` must have a working implementation
-    // in this build. The engine-MVP set is fully shipped. Phase 2.2 UI
-    // entitlements are NOT in `entitlements.free` yet (see test above).
+    // in this build. After Phase 2.2, the NekoEnv free tier is closed —
+    // no charter-declared free feature is deferred. Engine entries are
+    // implementation-backed in this package; UI entries are
+    // implementation-backed in apps/web-suite. Adding a new free
+    // entitlement requires a follow-up PR that updates this expected
+    // set in the same commit.
     const declared = new Set(envManifest.entitlements.free);
     const knownImplemented = new Set([
       'parse',
@@ -160,6 +173,13 @@ describe('NekoEnv: monetization safety', () => {
       'export.schema.basic',
       'export.diff.textual',
       'workspace.save',
+      'view.table',
+      'view.text',
+      'view.diff',
+      'search',
+      'copy.key',
+      'copy.value',
+      'mask.value',
     ]);
     for (const id of declared) {
       expect(knownImplemented.has(id), `declared free entitlement "${id}" is not implemented`).toBe(
