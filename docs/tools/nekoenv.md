@@ -1,9 +1,13 @@
 # NekoEnv — Phase 2.0 charter
 
-> Status: **PROPOSED.** This PR is charter-only. No implementation
-> code under `packages/lens-env/*` and no manifest registration ship
-> in this PR. Implementation is blocked until this charter is approved
-> and merged.
+> Status: **IMPLEMENTED (Phase 2.1 engine MVP).** The charter was
+> approved in [PR #12](https://github.com/cmclicker/NekoTools/pull/12).
+> The engine implementation landed in the Phase 2.1 implementation
+> PR (this PR). UI (table / text / diff / search / copy / mask)
+> remains queued as Phase 2.2 and will land in its own PR with the
+> matching `view.*` / `copy.*` / `mask.*` free entitlements added in
+> the same commit. Features deferred from this PR are listed under
+> "Deferred from this PR" at the bottom.
 
 NekoEnv is the Phase 2.0 reuse-gate tool. The point of Phase 2 is to
 prove that the platform spine generalizes from the Phase 1 proof tool
@@ -421,36 +425,41 @@ export const envManifest: ToolManifest = {
 
 ## Acceptance for the Phase 2.1 implementation PR
 
-(Preview — these gates apply to the implementation PR, not to this
-charter PR.)
+All gates met in this PR:
 
-- [ ] `@nekotools/lens-env` package exists, registered via a
-      `buildEnvRegistration(clock, options?)` factory + the existing
-      `ToolRegistry`.
-- [ ] Manifest passes `validateManifest`.
-- [ ] Free-tier parsers and exporters exist and pass tests
+- [x] `@nekotools/lens-env` package exists, registered via
+      `buildEnvRegistration(clock, options?)` + the existing
+      `ToolRegistry`. ([`packages/lens-env/src/index.ts`](../../packages/lens-env/src/index.ts))
+- [x] Manifest passes `validateManifest`. (Asserted in
+      [`conformance.test.ts`](../../packages/lens-env/src/__tests__/conformance.test.ts).)
+- [x] Free-tier parsers and exporters exist and pass tests
       (`env.text`, `env.key`, `env.diff.textual`, plus every free
       exporter from Section 4).
-- [ ] Conformance test parallel to `lens-binary` / `lens-json`
+- [x] Conformance test parallel to `lens-binary` / `lens-json`
       covers parser → diagnostic → export → workspace round-trip,
-      including the multi-document case.
-- [ ] Monetization-safety tests parallel to NekoJSON's: free
-      entitlements match the exact MVP-backed set, deferred free
-      features are absent, Pro exporters are declared but not
+      including the multi-document + diff-artifact case.
+- [x] Monetization-safety tests parallel to NekoJSON's: free
+      entitlements match the exact MVP-backed set, Phase 2.2 UI
+      entitlements are deliberately absent from
+      `entitlements.free`, Pro exporters are declared but not
       registered, `env.graph.references` is declared but not
       registered, and `runExporter` rejects every Pro exporter id.
-- [ ] Offline guard sees no new violations.
-- [ ] This charter doc updated from "PROPOSED" to "IMPLEMENTED" in
-      the same PR.
+- [x] Offline guard sees no new violations.
+- [x] This charter doc updated from "PROPOSED" to "IMPLEMENTED".
 
-## Deferred to follow-up PRs (preview, not gating this charter)
+## Deferred from this PR (scope contract)
 
-| Item                                                | Target phase | Notes |
-| --------------------------------------------------- | ------------ | ----- |
-| UI: table / text / diff views + search + copy + mask | Phase 2.2   | Wires into `apps/web-suite`. Decides whether `view.diff` reuses an existing shell mechanism or introduces a third view mode. |
-| `env.value_looks_secret` Pro diagnostic              | Pro (future)| Vendor-pattern catalog in the private package. |
-| `env.graph.references` Pro projector                 | Pro (future)| Depends on the Phase 3 graph engine. |
-| Multi-env compare (3+ documents)                     | Pro (future)| Depends on the Phase 3 multi-doc UI primitive. |
+The Phase 2.1 engine MVP shipped the entire charter-declared
+**engine** free tier. UI work is the next follow-up PR.
+
+| Deferred item                                       | Status          | Notes |
+| --------------------------------------------------- | --------------- | ----- |
+| UI: table / text / diff views + search + copy + mask | Phase 2.2 (next)| Wires `@nekotools/lens-env` into `apps/web-suite`. The Phase 2.2 PR adds `view.table`, `view.text`, `view.diff`, `search`, `copy.key`, `copy.value`, `mask.value` to `manifest.entitlements.free` in the same commit that ships their implementation. |
+| `env.value_looks_secret` Pro diagnostic              | Pro (future)    | Vendor-pattern catalog in the private package. |
+| `env.graph.references` Pro projector                 | Pro (future)    | Depends on the Phase 3 graph engine. |
+| Multi-env compare (3+ documents)                     | Pro (future)    | Depends on the Phase 3 multi-doc UI primitive. |
+| TS / Zod / data-dictionary / compose-stack exports   | Pro (future)    | Declared in manifest. Implementation lives in `@nekotools-pro/*`. |
+| Structural / semantic diff                           | Pro (future)    | Depends on the Phase 3 semantic-diff engine. |
 
 ## Why this is the right Phase 2 tool
 
