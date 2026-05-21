@@ -10,7 +10,7 @@ import {
   type EnvDiffHunk,
   type EnvDocument,
 } from './kinds.js';
-import { makeIdFactory, type Clock } from './util.js';
+import { makeIdFactory, type Clock } from '@nekotools/lens-kit';
 
 const TOOL_ID = 'env';
 const PARSER_ID = 'env.diff.textual';

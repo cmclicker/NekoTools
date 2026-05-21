@@ -8,7 +8,7 @@ import {
   type JsonDiffArtifact,
   type JsonDiffHunk,
 } from './kinds.js';
-import { makeIdFactory, type Clock } from './util.js';
+import { makeIdFactory, type Clock } from '@nekotools/lens-kit';
 
 const TOOL_ID = 'json';
 const PARSER_ID = 'json.diff.textual';

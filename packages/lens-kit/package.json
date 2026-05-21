@@ -1,5 +1,5 @@
 {
-  "name": "@nekotools/lens-json",
+  "name": "@nekotools/lens-kit",
   "version": "0.0.0",
   "private": true,
   "type": "module",
@@ -13,12 +13,6 @@
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
     "lint": "eslint src"
-  },
-  "dependencies": {
-    "@nekotools/contracts": "workspace:*",
-    "@nekotools/lens-kit": "workspace:*",
-    "@nekotools/schemas": "workspace:*",
-    "@nekotools/tool-runtime": "workspace:*"
   },
   "devDependencies": {
     "typescript": "^5.4.0",

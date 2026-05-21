@@ -9,9 +9,11 @@
     { "path": "./packages/schemas" },
     { "path": "./packages/tool-runtime" },
     { "path": "./packages/offline-guard" },
+    { "path": "./packages/lens-kit" },
     { "path": "./packages/lens-binary" },
     { "path": "./packages/lens-json" },
     { "path": "./packages/lens-env" },
+    { "path": "./packages/lens-logs" },
     { "path": "./apps/web-suite" }
   ]
 }

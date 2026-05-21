@@ -1,9 +1,14 @@
 # NekoLogs — Phase 2 charter (NekoLogs 2.0)
 
-> Status: **PROPOSED.** This PR is charter-only. No implementation
-> code under `packages/lens-logs/*`, no manifest registration, and no
-> `apps/web-suite` wiring ship in this PR. Implementation is blocked
-> until this charter is approved and merged.
+> Status: **IMPLEMENTED (Phase 2.x.1 engine MVP).** The charter was
+> approved in [PR #15](https://github.com/cmclicker/NekoTools/pull/15).
+> The engine implementation (`@nekotools/lens-logs`) plus the
+> `@nekotools/lens-kit` extraction landed in the Phase 2.x.1
+> implementation PR. UI (table / text / summary views + structured
+> filter + search + copy) remains queued as Phase 2.x.2 and will land
+> in its own PR with the matching `view.*` / `filter.ui` / `copy.*`
+> free entitlements added in the same commit. Deferred items are
+> listed under "Deferred from this PR" at the bottom.
 
 NekoLogs is the **second Phase 2 tool, after NekoEnv** — and the
 **third major substrate** the platform has been tested against, after
@@ -381,48 +386,61 @@ export const logsManifest: ToolManifest = {
 };
 ```
 
-## What this PR does *not* include
+## What the engine MVP PR does *not* include
 
-- Any code under `packages/lens-logs/`. The package directory does
-  not exist yet; it lands in the Phase 2.x.1 engine PR.
-- The `@nekotools/lens-kit` extraction. That fires in the engine PR
-  (see Section 7), not in this charter PR.
-- Any change to `@nekotools/contracts`, `@nekotools/schemas`,
-  `@nekotools/tool-runtime`, `@nekotools/offline-guard`,
-  `@nekotools/lens-binary`, `@nekotools/lens-json`,
-  `@nekotools/lens-env`, or `apps/web-suite`.
-- Any change to CI workflows.
-- A merged manifest registration.
+(Phase 2.x.1 engine scope.)
+
+- No `apps/web-suite` UI integration. (Phase 2.x.2.)
+- No Phase 2.x.2 UI entitlements in `manifest.entitlements.free`.
+- No Pro implementation under `@nekotools-pro/*`.
+- No change to `@nekotools/contracts`, `@nekotools/schemas`,
+  `@nekotools/tool-runtime`, or `@nekotools/offline-guard`. (The
+  `@nekotools/lens-kit` extraction *does* touch `lens-binary`,
+  `lens-json`, and `lens-env` — that is the single charter-anticipated
+  cross-cutting change; see Section 7.)
+- No change to CI workflows.
 
 ## Acceptance for the Phase 2.x.1 implementation PR
 
-(Preview — these gates apply to the engine PR, not to this charter PR.)
+All gates met in the engine PR:
 
-- [ ] `@nekotools/lens-logs` package exists, registered via a
-      `buildLogsRegistration(clock, options?)` factory + the existing
-      `ToolRegistry`.
-- [ ] `@nekotools/lens-kit` shared helper exists; `lens-binary`,
+- [x] `@nekotools/lens-logs` package exists, registered via
+      `buildLogsRegistration(clock, options?)` + the existing
+      `ToolRegistry`. ([`packages/lens-logs/src/index.ts`](../../packages/lens-logs/src/index.ts))
+- [x] `@nekotools/lens-kit` shared helper exists; `lens-binary`,
       `lens-json`, `lens-env`, and `lens-logs` all consume it; the
-      four duplicated `util.ts` copies are deleted; all existing
-      tests still pass.
-- [ ] Manifest passes `validateManifest`.
-- [ ] Free-tier parsers + exporters exist and pass tests
+      duplicated `Clock`/`makeIdFactory` copies are removed
+      (`lens-json` / `lens-env` `util.ts` deleted; `lens-binary`
+      `util.ts` keeps only its hex helpers and re-exports the kit
+      trio); all existing tests still pass.
+- [x] Manifest passes `validateManifest`.
+- [x] Free-tier parsers + exporters exist and pass tests
       (`log.text`, `log.filter`, plus every free exporter from
       Section 4 across JSON-per-line / logfmt / plaintext inputs).
-- [ ] A single `log.text` run emits `log.document` + `log.summary` +
+- [x] A single `log.text` run emits `log.document` + `log.summary` +
       basic `log.histogram`, and tests assert the derived artifacts
       are consistent with the document (pure-function property).
-- [ ] Conformance test parallel to `lens-env` covers parser →
+- [x] Conformance test parallel to `lens-env` covers parser →
       diagnostic → export → workspace round-trip, including a
       multi-artifact workspace.
-- [ ] Monetization-safety tests parallel to NekoEnv's: free
+- [x] Monetization-safety tests parallel to NekoEnv's: free
       entitlements match the exact MVP-backed set, Pro exporters are
       declared but not registered, `log.graph.trace` is declared but
       not registered, and `runExporter` rejects every Pro exporter
       id.
-- [ ] Offline guard sees no new violations.
-- [ ] This charter doc updated from "PROPOSED" to "IMPLEMENTED" in
-      the engine PR.
+- [x] Offline guard sees no new violations.
+- [x] This charter doc updated from "PROPOSED" to "IMPLEMENTED".
+
+## Deferred from this PR (Pro / future + Phase 2.x.2 UI)
+
+| Deferred item | Target | Notes |
+| ------------- | ------ | ----- |
+| UI: table / text / summary views + structured filter + search + copy.line / copy.message | Phase 2.x.2 (next) | Wires `@nekotools/lens-logs` into `apps/web-suite` as the third tool tab; flips the UI entitlements into `manifest.entitlements.free` in the same commit. |
+| `log.anomaly` / `log.pattern_cluster` diagnostics | Pro (future) | Statistical anomaly + template clustering. |
+| `log.graph.trace` correlation projector | Pro (future) | Depends on the Phase 3 graph engine. |
+| Advanced histogram (adaptive bucketing, anomaly overlay) | Pro (future) | Basic fixed-bucket histogram ships free here. |
+| Incident report / histogram-SVG / clusters exports | Pro (future) | Declared in manifest; implementation in `@nekotools-pro/*`. |
+| Semantic log diff, saved filter sets | Pro (future) | Depends on Phase 3 engines / future UI work. |
 
 ## Why this is the right next Phase 2 tool
 

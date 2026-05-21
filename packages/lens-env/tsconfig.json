@@ -8,7 +8,8 @@
   "references": [
     { "path": "../contracts" },
     { "path": "../schemas" },
-    { "path": "../tool-runtime" }
+    { "path": "../tool-runtime" },
+    { "path": "../lens-kit" }
   ],
   "include": ["src/**/*"]
 }

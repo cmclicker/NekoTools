@@ -1,16 +1,15 @@
 /**
- * Deterministic, monotonic-ish id generator. We do not use a random or
- * time-based id at module scope because it makes tests fragile and
- * exports non-reproducible across runs. Each parse/export call gets a
- * fresh counter via makeIdFactory().
+ * Binary-specific byte/hex helpers.
+ *
+ * The `Clock` / `FIXED_CLOCK` / `makeIdFactory` trio that used to live
+ * here moved to `@nekotools/lens-kit` once it crossed the "duplicated
+ * more than twice across tools" threshold from NekoJSON's charter §7.
+ * These hex helpers stay because they are not shared with other lenses.
+ * `Clock`, `FIXED_CLOCK`, and `makeIdFactory` are now re-exported from
+ * this module (via lens-kit) so existing `./util.js` imports keep
+ * working.
  */
-export function makeIdFactory(prefix: string): () => string {
-  let n = 0;
-  return () => {
-    n += 1;
-    return `${prefix}_${n}`;
-  };
-}
+export { type Clock, FIXED_CLOCK, makeIdFactory } from '@nekotools/lens-kit';
 
 export function bytesToHex(bytes: Uint8Array): string {
   let out = '';
@@ -35,14 +34,3 @@ export function hexToBytes(hex: string): Uint8Array {
   }
   return out;
 }
-
-/**
- * A frozen timestamp passed in by the caller (the runtime). We deliberately
- * do not call new Date() inside parsers — that makes outputs change between
- * runs and breaks reproducible exports.
- */
-export interface Clock {
-  now(): string;
-}
-
-export const FIXED_CLOCK = (iso: string): Clock => ({ now: () => iso });

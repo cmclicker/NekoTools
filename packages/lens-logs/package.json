@@ -1,5 +1,5 @@
 {
-  "name": "@nekotools/lens-json",
+  "name": "@nekotools/lens-logs",
   "version": "0.0.0",
   "private": true,
   "type": "module",

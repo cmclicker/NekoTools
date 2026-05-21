@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import type { Diagnostic } from '@nekotools/contracts';
 import { tokenize } from '../tokenizer.js';
 import { walkForDiagnostics } from '../walker-diagnostics.js';
-import { makeIdFactory } from '../util.js';
+import { makeIdFactory } from '@nekotools/lens-kit';
 
 function walk(source: string): readonly Diagnostic[] {
   return walkForDiagnostics(tokenize(source), makeIdFactory('diag'));

@@ -17,7 +17,7 @@ import {
   type JsonToken,
   type JsonTokenSpan,
 } from './tokenizer.js';
-import { makeIdFactory, type Clock } from './util.js';
+import { makeIdFactory, type Clock } from '@nekotools/lens-kit';
 import { walkForDiagnostics } from './walker-diagnostics.js';
 
 const TOOL_ID = 'json';
