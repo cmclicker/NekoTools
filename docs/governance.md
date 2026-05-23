@@ -15,6 +15,48 @@ How work moves through this repo.
    Charter changes, roadmap shifts, license language tweaks, and new
    `offline-guard:allow` markers all live in the same PR as the code
    they justify.
+6. **`docs/roadmap.md` is the canonical status source.** Current
+   implementation status and the work queue live there; every other
+   document defers to it (see "Source of truth" below).
+
+## Source of truth
+
+`docs/roadmap.md` is the **canonical** current-status and implementation
+roadmap source for NekoTools. Its status board and Active Next Queue are
+authoritative; any other document that describes implementation status
+defers to the roadmap, and the roadmap wins on conflict.
+
+- **PR bodies must declare status impact against `docs/roadmap.md`** —
+  one of: `none`, `implementation-added`, `implementation-removed`,
+  `roadmap-advanced`, `roadmap-amended`, or `documentation-only`.
+- **Any PR that changes implementation status must update
+  `docs/roadmap.md`** in the same PR (status board and/or Active Next
+  Queue). This is Rule 5 applied to status.
+- A generated machine-readable status file (`docs/project-status.json`)
+  and generated status blocks are **not required** for this repo. They
+  may be adopted later only with explicit owner authorization.
+- The Validation Layer **must not block merge solely because
+  `docs/project-status.json` is absent.** Roadmap-as-canonical is the
+  ratified model; the absence of a generated-status workflow is not a
+  defect and is not a merge blocker.
+
+### Documentation drift policy
+
+- **No implementation-status claim outside `docs/roadmap.md` may
+  contradict roadmap state.** `README.md` and per-tool docs may
+  *summarize* status, but where they disagree with the roadmap, the
+  roadmap is correct.
+- **Any detected status conflict must be corrected before merge
+  authorization** — fix the contradicting document (or the roadmap, if
+  the roadmap is the stale side) in the same PR.
+
+### Queued enhancement (not yet implemented)
+
+A future, lightweight governance check may be added to compare
+open/merged PR references against `docs/roadmap.md` — flagging stale
+`In review` / `Next` / `Done` markers and dangling PR-number references.
+This is deliberately **not built here**; it is a future enhancement and
+is **not** a merge blocker for any current PR.
 
 ## Branching convention
 
