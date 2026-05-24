@@ -7,11 +7,19 @@ technical artifacts without sending user data anywhere.
 
 ## Status
 
-**Phase 0 — Platform spine.** Not a product yet. This phase builds the
-contracts, schemas, runtime skeleton, offline guardrails, and one trivial
-conformance lens (NekoBinary) that proves the architecture works end-to-end.
+**Phase 2 — active.** The Phase 0 platform spine is complete, and two tools
+have shipped their full free tier (engine + UI), with a third's engine landed:
 
-NekoJSON, the first real product tool, is Phase 1 and is not in this repo yet.
+- **NekoJSON** — JSON workbench: parse / validate / format, tree / text /
+  table views, search, copy. Phase 1, complete.
+- **NekoEnv** — `.env` workbench: parse / validate / diff, table / text /
+  diff views, search, copy, value masking. Phase 2, complete.
+- **NekoLogs** — log workbench: the `@nekotools/lens-logs` engine shipped
+  (parse / filter / summary / histogram + text / JSON / CSV / Markdown
+  export); the browser UI is the next queued PR.
+
+`docs/roadmap.md` is the **canonical source of truth** for current status and
+the work queue — consult it for the authoritative phase/PR state.
 
 ## Doctrine (the rules that cannot be bent)
 
@@ -27,24 +35,30 @@ See [docs/product-doctrine.md](docs/product-doctrine.md) for the full doctrine.
 
 ```
 apps/
-  web-suite/              # placeholder for the unified web shell
+  web-suite/              # unified offline web shell (NekoJSON + NekoEnv UIs; NekoLogs UI queued)
 packages/
   contracts/              # versioned TS contracts (artifact, parser, ...)
   schemas/                # JSON Schemas + valid/invalid fixtures
   tool-runtime/           # registry + runners + workspace serializer
   offline-guard/          # CI scanner enforcing the no-network rule
+  lens-kit/               # shared clock + id-factory helper
   lens-binary/            # NekoBinary — the Phase 0 conformance lens
+  lens-json/              # NekoJSON engine
+  lens-env/               # NekoEnv engine
+  lens-logs/              # NekoLogs engine
 docs/                     # doctrine, charter, versioning, roadmap, etc.
 examples/binary/          # canonical NekoBinary input/output fixtures
-.github/workflows/        # CI
+.github/workflows/        # CI (ci.yml + offline-guard.yml)
 ```
 
 ## Local development
 
 ```bash
 pnpm install
-pnpm test
+pnpm typecheck
 pnpm lint
+pnpm test
+pnpm build
 pnpm offline-guard
 ```
 

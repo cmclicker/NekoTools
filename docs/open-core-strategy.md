@@ -14,7 +14,7 @@ flag to unlock Pro" is structurally impossible.
 ## Two repositories
 
 - **`nekotools`** (this repo, public): free/core packages, public
-  schemas, public UI shell, CLI basics, docs.
+  schemas, public UI shell, docs (CLI basics planned).
 - **`nekotools-pro`** (private): Pro modules, advanced engines,
   migration studios, batch runners, advanced exporters, commercial
   policy packs.

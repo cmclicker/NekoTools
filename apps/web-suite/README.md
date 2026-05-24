@@ -1,10 +1,12 @@
 # @nekotools/web-suite
 
-The local, offline web shell that hosts NekoTools lenses. Phase 1.1e
-ships the shell + a read-only NekoJSON manifest panel; the interactive
-NekoJSON views (tree / text / table / search / copy) land in Phase
-1.1f+. See [`docs/tools/nekojson-ui.md`](../../docs/tools/nekojson-ui.md)
-for the UI charter.
+The local, offline web shell that hosts NekoTools lenses. It hosts two
+tools as top-level tabs today — **NekoJSON** (tree / text / table views,
+search, copy) and **NekoEnv** (table / text / diff views, search, copy,
+value masking) — each shipping its full free-tier UI. **NekoLogs** is the
+next tool to wire in (engine shipped; UI queued). See
+[`docs/tools/nekojson-ui.md`](../../docs/tools/nekojson-ui.md) for the
+shell/UI charter.
 
 ## Stack
 

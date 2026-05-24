@@ -11,7 +11,7 @@ license validation during normal use.
   [open-core-strategy.md](open-core-strategy.md) — the current LICENSE
   is source-available, not OSI-approved).
 - Local parsing, validation, viewing, basic export.
-- CLI basics.
+- CLI basics _(planned — no CLI ships yet)_.
 - No account. No telemetry. No cloud dependency.
 
 The free product is genuinely useful on its own. It is not a crippled

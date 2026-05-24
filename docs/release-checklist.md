@@ -101,7 +101,7 @@ Each acceptance criterion is mapped to the file or test that proves it.
 | ----------------------------------------------------- | ----------------------------- |
 | Pin GitHub Actions by SHA, not tag                    | Hardening for trust posture; current pinning is the workspace norm. Track for Phase 1+. |
 | Cross-runtime base64 adapter (not relying on global `atob`) | Node 20+ has it globally; revisit when shipping non-Node runtimes. |
-| Decide canonical repo name (`NekoTools` vs `NekoDevTools`) | Branding decision; not a code issue. |
+| Decide canonical repo name | **Resolved: `NekoTools`.** Package name, git remote, and all docs use `NekoTools`; `NekoDevTools` survives only in pre-rename git history. |
 
 ## Verification log
 
