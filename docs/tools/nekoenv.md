@@ -1,9 +1,9 @@
 # NekoEnv — Phase 2.0 charter
 
-> Status: **IMPLEMENTED — Phase 2 free tier closed (this PR).** The
+> Status: **IMPLEMENTED — Phase 2 free tier closed (PR #14).** The
 > charter was approved in [PR #12](https://github.com/cmclicker/NekoTools/pull/12);
 > the engine MVP landed in [PR #13](https://github.com/cmclicker/NekoTools/pull/13);
-> the Phase 2.2 UI ships here. Every charter-declared free
+> the Phase 2.2 UI shipped in [PR #14](https://github.com/cmclicker/NekoTools/pull/14). Every charter-declared free
 > capability now has a working implementation declared in
 > `manifest.entitlements.free`: engine entries live in
 > `@nekotools/lens-env`, UI entries live in `apps/web-suite`
@@ -409,7 +409,7 @@ All gates met in PR #13:
 - [x] Offline guard sees no new violations.
 - [x] This charter doc updated from "PROPOSED" to "IMPLEMENTED".
 
-## Phase 2.2 UI (this PR)
+## Phase 2.2 UI (PR #14)
 
 The UI ships in `apps/web-suite`. The shell now hosts two tools
 side-by-side via a top-level tool tab (`NekoJSON` | `NekoEnv`),

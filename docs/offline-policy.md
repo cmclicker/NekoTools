@@ -6,7 +6,7 @@ CI enforce that declaration.
 ## The three values
 
 - **`network-forbidden`** — the tool must not touch the network in any
-  form. This is the default and applies to every Phase 0 / Phase 1 tool.
+  form. This is the default and applies to every current tool (Phases 0–2).
 - **`explicit-import-only`** — reserved for future network-adjacent tools
   (NekoHeaders, NekoDNS, NekoTLS, NekoCORS). The tool analyzes data the
   user pasted or imported. It does not fetch.

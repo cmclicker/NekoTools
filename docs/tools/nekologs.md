@@ -307,84 +307,25 @@ export to text / JSON / CSV / Markdown — entirely offline.
 - Streaming gigantic logs beyond the local soft threshold (the
   histogram and Pro projections may gate above it).
 
-## Draft `ToolManifest` (illustrative)
+## `ToolManifest`
 
-The TS object lands in the Phase 2.x.1 engine PR under
-`packages/lens-logs/src/manifest.ts`, schema-validated by
-`validateManifest`. The shape below is illustrative for the auditor;
-the strings are the source of truth for the implementation's free/Pro
-identifier set.
+The canonical NekoLogs manifest lives at
+[`packages/lens-logs/src/manifest.ts`](../../packages/lens-logs/src/manifest.ts).
+It is the source of truth — this doc does not duplicate it, because
+duplicated manifests drift. (The charter PR carried an illustrative draft
+block here; once the engine landed in the Phase 2.x.1 PR the draft was
+replaced by this pointer, matching the NekoJSON and NekoEnv charters.)
 
-```ts
-// packages/lens-logs/src/manifest.ts (preview only, not committed here)
-export const logsManifest: ToolManifest = {
-  version: 1,
-  id: 'logs',
-  name: 'NekoLogs',
-  toolVersion: 1,
-  summary:
-    'Parse, filter, summarize, and export local log snapshots. Phase 2 reuse-gate tool.',
-  artifactKinds: ['log.document', 'log.filter-result', 'log.summary', 'log.histogram'],
-  // Two parsers. `log.text` emits log.document + log.summary +
-  // log.histogram in one run; `log.filter` emits log.filter-result.
-  // No separate aggregator stage.
-  parsers: ['log.text', 'log.filter'],
-  exporters: [
-    'log.export.text.plain',
-    'log.export.plaintext.messages',
-    'log.export.json.entries',
-    'log.export.csv.entries',
-    'log.export.markdown.summary',
-    'log.export.report.incident',   // Pro intent
-    'log.export.histogram.svg',     // Pro intent
-    'log.export.patterns.clusters', // Pro intent
-  ],
-  graphProjectors: ['log.graph.trace'], // Pro intent
-  offlinePolicy: DEFAULT_OFFLINE_POLICY,
-  capabilities: {
-    canSaveWorkspace: true,
-    canExport: true,
-    canDiff: false, // semantic log diff is Pro; no free diff in this tool
-    canProjectGraph: false,
-  },
-  entitlements: {
-    free: [
-      // Phase 2.x.1 engine MVP.
-      'parse',
-      'validate',
-      'filter',
-      'summary.basic',
-      'histogram.basic',
-      'export.text.plain',
-      'export.plaintext.messages',
-      'export.json.entries',
-      'export.csv.entries',
-      'export.markdown.summary',
-      'workspace.save',
-      // Phase 2.x.2 UI free entitlements (view.table, view.text,
-      // view.summary, search, filter.ui, copy.line, copy.message)
-      // are added in the UI PR, not the engine PR.
-    ],
-    pro: [
-      'anomaly.detect',
-      'pattern.cluster',
-      'histogram.advanced',
-      'graph.trace',
-      'report.incident',
-      'diff.semantic',
-      'query.saved',
-    ],
-  },
-  outOfScope: [
-    'live tailing or following a file/directory',
-    'remote log ingestion or shipping (syslog, HTTP collector, agents)',
-    'executing a programmable query language (Lucene, LogQL, SQL, KQL)',
-    'acting as a durable log storage backend',
-    'fetching anything referenced inside a log line',
-    'streaming gigantic logs beyond the local soft threshold',
-  ],
-};
-```
+The manifest declares two parsers — `log.text` (which emits
+`log.document` + `log.summary` + `log.histogram` in one run) and
+`log.filter` — the free exporter set (`text.plain`, `plaintext.messages`,
+`json.entries`, `csv.entries`, `markdown.summary`), the Pro-intent ids
+declared-but-not-registered in the free build (`report.incident`,
+`histogram.svg`, `patterns.clusters`, and the `log.graph.trace`
+projector), and `capabilities.canDiff = canProjectGraph = false`. It is
+schema-validated by `validateManifest` and pinned by the
+monetization-safety tests in
+[`conformance.test.ts`](../../packages/lens-logs/src/__tests__/conformance.test.ts).
 
 ## What the engine MVP PR does *not* include
 
