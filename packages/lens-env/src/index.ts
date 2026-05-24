@@ -5,7 +5,7 @@ import { createEnvKeyParser } from './parser-key.js';
 import { createEnvTextParser } from './parser-text.js';
 import { envManifest } from './manifest.js';
 import { freeExporters } from './exporters.js';
-import { FIXED_CLOCK, type Clock } from './util.js';
+import { FIXED_CLOCK, type Clock } from '@nekotools/lens-kit';
 
 export * from './kinds.js';
 export * from './diagnostics.js';
@@ -16,7 +16,7 @@ export * from './diff-textual.js';
 export * from './schema-infer.js';
 export * from './exporters.js';
 export * from './manifest.js';
-export { FIXED_CLOCK } from './util.js';
+export { FIXED_CLOCK } from '@nekotools/lens-kit';
 
 /**
  * Optional configuration for the NekoEnv registration. Mirrors

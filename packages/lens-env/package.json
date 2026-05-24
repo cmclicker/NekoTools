@@ -16,6 +16,7 @@
   },
   "dependencies": {
     "@nekotools/contracts": "workspace:*",
+    "@nekotools/lens-kit": "workspace:*",
     "@nekotools/schemas": "workspace:*",
     "@nekotools/tool-runtime": "workspace:*"
   },

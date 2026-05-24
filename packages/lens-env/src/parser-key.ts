@@ -7,7 +7,7 @@ import {
   type EnvDocument,
   type EnvKeyResultArtifact,
 } from './kinds.js';
-import { makeIdFactory, type Clock } from './util.js';
+import { makeIdFactory, type Clock } from '@nekotools/lens-kit';
 
 const TOOL_ID = 'env';
 const PARSER_ID = 'env.key';

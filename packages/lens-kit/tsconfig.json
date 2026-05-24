@@ -5,11 +5,5 @@
     "rootDir": "src",
     "composite": true
   },
-  "references": [
-    { "path": "../contracts" },
-    { "path": "../schemas" },
-    { "path": "../tool-runtime" },
-    { "path": "../lens-kit" }
-  ],
   "include": ["src/**/*"]
 }

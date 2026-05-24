@@ -5,7 +5,7 @@ import { freeExporters } from './exporters.js';
 import { jsonManifest } from './manifest.js';
 import { createJsonPointerParser } from './parser-pointer.js';
 import { createJsonTextParser } from './parser-text.js';
-import { FIXED_CLOCK, type Clock } from './util.js';
+import { FIXED_CLOCK, type Clock } from '@nekotools/lens-kit';
 
 export * from './kinds.js';
 export * from './diagnostics.js';
@@ -18,7 +18,7 @@ export * from './exporters.js';
 export * from './manifest.js';
 export * from './tokenizer.js';
 export * from './walker-diagnostics.js';
-export { FIXED_CLOCK } from './util.js';
+export { FIXED_CLOCK } from '@nekotools/lens-kit';
 
 /**
  * Optional configuration for the NekoJSON registration. Defaults are
