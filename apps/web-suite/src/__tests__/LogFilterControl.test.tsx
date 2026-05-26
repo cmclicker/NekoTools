@@ -85,6 +85,41 @@ describe('LogFilterControl', () => {
       '2026-05-21T10:00:00Z',
     );
   });
+
+  it('builds a levelIn predicate from the level checkboxes', () => {
+    const onFilterChange = vi.fn();
+    render(<LogFilterControl filter={{}} onFilterChange={onFilterChange} />);
+    fireEvent.click(screen.getByTestId('log-filter-levelin-error'));
+    expect(onFilterChange).toHaveBeenCalledWith({ levelIn: ['error'] });
+  });
+
+  it('adds a second selected level in canonical LOG_LEVELS order', () => {
+    const onFilterChange = vi.fn();
+    render(<LogFilterControl filter={{ levelIn: ['warn'] }} onFilterChange={onFilterChange} />);
+    fireEvent.click(screen.getByTestId('log-filter-levelin-error'));
+    expect(onFilterChange).toHaveBeenCalledWith({ levelIn: ['warn', 'error'] });
+  });
+
+  it('unchecking the last selected level drops the levelIn predicate', () => {
+    const onFilterChange = vi.fn();
+    render(<LogFilterControl filter={{ levelIn: ['error'] }} onFilterChange={onFilterChange} />);
+    fireEvent.click(screen.getByTestId('log-filter-levelin-error'));
+    expect(onFilterChange).toHaveBeenCalledWith({});
+  });
+
+  it('keeps minLevel and levelIn as independent AND-combined predicates', () => {
+    const onFilterChange = vi.fn();
+    render(<LogFilterControl filter={{ minLevel: 'warn' }} onFilterChange={onFilterChange} />);
+    fireEvent.click(screen.getByTestId('log-filter-levelin-error'));
+    expect(onFilterChange).toHaveBeenCalledWith({ minLevel: 'warn', levelIn: ['error'] });
+  });
+
+  it('reflects the current levelIn selection into the checkboxes (controlled)', () => {
+    render(<LogFilterControl filter={{ levelIn: ['error', 'fatal'] }} onFilterChange={() => {}} />);
+    expect((screen.getByTestId('log-filter-levelin-error') as HTMLInputElement).checked).toBe(true);
+    expect((screen.getByTestId('log-filter-levelin-fatal') as HTMLInputElement).checked).toBe(true);
+    expect((screen.getByTestId('log-filter-levelin-info') as HTMLInputElement).checked).toBe(false);
+  });
 });
 
 describe('isEmptyFilter', () => {

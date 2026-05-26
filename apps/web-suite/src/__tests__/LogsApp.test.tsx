@@ -149,4 +149,22 @@ describe('LogsApp integration', () => {
     render(<LogsApp initialInput={SAMPLE} />);
     expect(screen.getByText(/log\.mixed_formats/)).toBeInTheDocument();
   });
+
+  it('a levelIn filter narrows entries to the selected level through the engine', () => {
+    render(<LogsApp initialInput={SAMPLE} />);
+    fireEvent.click(screen.getByTestId('log-filter-levelin-error'));
+    const rows = screen.getAllByTestId('log-row');
+    expect(rows).toHaveLength(1);
+    expect(rows[0]?.textContent).toContain('upstream timeout');
+    expect(screen.getByTestId('logs-matched-count').textContent).toMatch(/matched\s*1\s*of\s*4/i);
+  });
+
+  it('a multi-level levelIn filter keeps every selected level (warn + error)', () => {
+    render(<LogsApp initialInput={SAMPLE} />);
+    fireEvent.click(screen.getByTestId('log-filter-levelin-warn'));
+    fireEvent.click(screen.getByTestId('log-filter-levelin-error'));
+    const rows = screen.getAllByTestId('log-row');
+    expect(rows).toHaveLength(2);
+    expect(screen.getByTestId('logs-matched-count').textContent).toMatch(/matched\s*2\s*of\s*4/i);
+  });
 });

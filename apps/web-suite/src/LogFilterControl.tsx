@@ -52,6 +52,19 @@ export function LogFilterControl({
     patch({ minLevel: v === '' ? undefined : (v as LogLevel) });
   }
 
+  // levelIn is an exact-set membership predicate, independent of the
+  // minLevel severity threshold (both AND-combine in the engine).
+  // Toggling a checkbox rebuilds the array in canonical LOG_LEVELS
+  // order; an empty selection drops the key so the control returns to
+  // match-all.
+  function onToggleLevelIn(level: LogLevel, checked: boolean): void {
+    const selected = new Set<LogLevel>(filter.levelIn ?? []);
+    if (checked) selected.add(level);
+    else selected.delete(level);
+    const next = LOG_LEVELS.filter((l) => selected.has(l));
+    patch({ levelIn: next.length > 0 ? next : undefined });
+  }
+
   function onMessageContains(e: ChangeEvent<HTMLInputElement>): void {
     const v = e.target.value;
     patch({ messageContains: v === '' ? undefined : v });
@@ -104,6 +117,23 @@ export function LogFilterControl({
           ))}
         </select>
       </label>
+
+      <div className="log-filter__field" role="group" aria-label="Filter by levels (any of)">
+        <span>Levels (any of)</span>
+        <div className="log-filter__levelin">
+          {LOG_LEVELS.map((level) => (
+            <label key={level} className="log-filter__level">
+              <input
+                type="checkbox"
+                checked={filter.levelIn?.includes(level) ?? false}
+                onChange={(e) => onToggleLevelIn(level, e.target.checked)}
+                data-testid={`log-filter-levelin-${level}`}
+              />
+              {level}
+            </label>
+          ))}
+        </div>
+      </div>
 
       <label className="log-filter__field">
         <span>Message contains</span>
