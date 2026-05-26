@@ -64,7 +64,7 @@ export function App({
           Local-only, air-gapped-capable, zero-telemetry developer workbenches.
         </p>
         <p className="suite__phase">
-          Web shell — Phase 2.2. Hosting <strong>{activeManifest.name}</strong>.
+          Now viewing <strong>{activeManifest.name}</strong>.
         </p>
         <nav className="suite__tools" aria-label="Tool selector">
           <button

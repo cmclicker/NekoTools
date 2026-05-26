@@ -7,16 +7,16 @@ technical artifacts without sending user data anywhere.
 
 ## Status
 
-**Phase 2 — active.** The Phase 0 platform spine is complete, and two tools
-have shipped their full free tier (engine + UI), with a third's engine landed:
+**Phase 2 — active.** The Phase 0 platform spine is complete, and three tools
+have shipped their full free tier (engine + UI):
 
 - **NekoJSON** — JSON workbench: parse / validate / format, tree / text /
   table views, search, copy. Phase 1, complete.
 - **NekoEnv** — `.env` workbench: parse / validate / diff, table / text /
   diff views, search, copy, value masking. Phase 2, complete.
-- **NekoLogs** — log workbench: the `@nekotools/lens-logs` engine shipped
-  (parse / filter / summary / histogram + text / JSON / CSV / Markdown
-  export); the browser UI is the next queued PR.
+- **NekoLogs** — log workbench: parse / filter / summary / histogram,
+  table / text / summary views, structured filter, search, copy.
+  Phase 2, complete.
 
 `docs/roadmap.md` is the **canonical source of truth** for current status and
 the work queue — consult it for the authoritative phase/PR state.
@@ -35,7 +35,7 @@ See [docs/product-doctrine.md](docs/product-doctrine.md) for the full doctrine.
 
 ```
 apps/
-  web-suite/              # unified offline web shell (NekoJSON + NekoEnv UIs; NekoLogs UI queued)
+  web-suite/              # unified offline web shell (NekoJSON + NekoEnv + NekoLogs UIs)
 packages/
   contracts/              # versioned TS contracts (artifact, parser, ...)
   schemas/                # JSON Schemas + valid/invalid fixtures
