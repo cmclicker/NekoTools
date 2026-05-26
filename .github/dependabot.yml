@@ -40,3 +40,11 @@ updates:
         update-types:
           - "minor"
           - "patch"
+    ignore:
+      # @types/node must track the supported Node runtime baseline
+      # (engines.node >=20 / CI node-version: 20). Without this, Dependabot
+      # proposes Node-25 type definitions while the repo runs Node 20, a
+      # type/runtime mismatch. Lift this only when the repo intentionally
+      # raises its Node baseline (bump engines + CI Node version first).
+      - dependency-name: "@types/node"
+        update-types: ["version-update:semver-major"]
