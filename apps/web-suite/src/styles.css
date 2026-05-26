@@ -828,3 +828,316 @@ code {
   width: 1ch;
   opacity: 0.6;
 }
+
+/* Phase 2.x.2 — NekoLogs: table / level colors / summary / histogram / filter */
+
+.log-table {
+  overflow-x: auto;
+}
+
+.log-table table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.875rem;
+}
+
+.log-table th,
+.log-table td {
+  text-align: left;
+  padding: 0.4rem 0.6rem;
+  border-bottom: 1px solid rgba(0, 0, 0, 0.08);
+  vertical-align: top;
+}
+
+@media (prefers-color-scheme: dark) {
+  .log-table th,
+  .log-table td {
+    border-color: rgba(255, 255, 255, 0.08);
+  }
+}
+
+.log-table th {
+  font-weight: 600;
+  opacity: 0.7;
+  font-size: 0.8125rem;
+}
+
+.log-row {
+  cursor: pointer;
+}
+
+.log-row:hover {
+  background: rgba(37, 99, 235, 0.06);
+}
+
+.log-row--active {
+  background: rgba(37, 99, 235, 0.12);
+}
+
+.log-row__line {
+  width: 3rem;
+  opacity: 0.5;
+  text-align: right;
+}
+
+/* Level color chips — shared by the table cells, summary list, and
+   histogram segments. Severity-ranked from quiet (trace) to loud
+   (fatal); `none`/`unknown` stay neutral. */
+.log-level {
+  display: inline-block;
+  font-size: 0.75rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  padding: 0.05rem 0.4rem;
+  border-radius: 4px;
+}
+
+.log-level--trace {
+  color: #6b7280;
+}
+
+.log-level--debug {
+  color: #2563eb;
+}
+
+.log-level--info {
+  color: #15803d;
+}
+
+.log-level--warn {
+  color: #b45309;
+}
+
+.log-level--error {
+  color: #b91c1c;
+}
+
+.log-level--fatal {
+  color: #ffffff;
+  background: #991b1b;
+}
+
+.log-level--none,
+.log-level--unknown {
+  color: rgba(0, 0, 0, 0.4);
+}
+
+@media (prefers-color-scheme: dark) {
+  .log-level--trace {
+    color: #9ca3af;
+  }
+  .log-level--debug {
+    color: #6cb6ff;
+  }
+  .log-level--info {
+    color: #4ade80;
+  }
+  .log-level--warn {
+    color: #fbbf24;
+  }
+  .log-level--error {
+    color: #f87171;
+  }
+  .log-level--none,
+  .log-level--unknown {
+    color: rgba(255, 255, 255, 0.4);
+  }
+}
+
+.results__filter-count {
+  margin: 0;
+  font-size: 0.8125rem;
+  opacity: 0.8;
+  flex-basis: 100%;
+}
+
+/* Structured-filter control */
+
+.log-filter {
+  border: 1px solid rgba(0, 0, 0, 0.12);
+  border-radius: 6px;
+  padding: 0.75rem 1rem 1rem;
+  margin: 0 0 1rem;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.75rem 1rem;
+}
+
+@media (prefers-color-scheme: dark) {
+  .log-filter {
+    border-color: rgba(255, 255, 255, 0.12);
+  }
+}
+
+.log-filter__legend {
+  font-size: 0.8125rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  opacity: 0.7;
+  padding: 0 0.4rem;
+}
+
+.log-filter__field {
+  display: flex;
+  flex-direction: column;
+  gap: 0.2rem;
+  font-size: 0.8125rem;
+}
+
+.log-filter__field span {
+  opacity: 0.7;
+}
+
+.log-filter__field input,
+.log-filter__field select {
+  font: inherit;
+  font-size: 0.875rem;
+  padding: 0.2rem 0.4rem;
+  border: 1px solid rgba(0, 0, 0, 0.15);
+  border-radius: 4px;
+  background: white;
+  color: inherit;
+}
+
+@media (prefers-color-scheme: dark) {
+  .log-filter__field input,
+  .log-filter__field select {
+    background: #0f0f0f;
+    border-color: rgba(255, 255, 255, 0.15);
+  }
+}
+
+/* Summary view */
+
+.log-summary__stats {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 1.5rem;
+  margin: 0 0 1rem;
+}
+
+.log-summary__stat {
+  display: flex;
+  flex-direction: column;
+}
+
+.log-summary__stat dt {
+  font-size: 0.75rem;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  opacity: 0.6;
+}
+
+.log-summary__stat dd {
+  margin: 0;
+  font-size: 1.1rem;
+  font-weight: 600;
+}
+
+.log-summary__heading {
+  margin: 1rem 0 0.5rem;
+  font-size: 0.85rem;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  opacity: 0.7;
+}
+
+.log-summary__levels {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+
+.log-summary__level {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 0.4rem;
+  padding: 0.15rem 0.5rem;
+  border-radius: 4px;
+  background: rgba(0, 0, 0, 0.05);
+  font-size: 0.8125rem;
+}
+
+@media (prefers-color-scheme: dark) {
+  .log-summary__level {
+    background: rgba(255, 255, 255, 0.07);
+  }
+}
+
+.log-summary__level-count {
+  font-weight: 700;
+}
+
+.log-summary__top {
+  margin: 0;
+  padding-left: 1.25rem;
+  font-size: 0.875rem;
+}
+
+.log-summary__top-item {
+  margin: 0.15rem 0;
+}
+
+.log-summary__top-count {
+  opacity: 0.6;
+  margin-right: 0.4rem;
+}
+
+.log-summary__empty {
+  margin: 0;
+  font-size: 0.8125rem;
+  opacity: 0.6;
+}
+
+/* Histogram — hand-drawn CSS bars, one per time bucket. */
+
+.log-histogram {
+  display: flex;
+  align-items: flex-end;
+  gap: 0.25rem;
+  height: 120px;
+  padding: 0.5rem;
+  border: 1px solid rgba(0, 0, 0, 0.08);
+  border-radius: 4px;
+  background: rgba(0, 0, 0, 0.02);
+}
+
+@media (prefers-color-scheme: dark) {
+  .log-histogram {
+    border-color: rgba(255, 255, 255, 0.08);
+    background: rgba(255, 255, 255, 0.03);
+  }
+}
+
+.log-histogram__bucket {
+  flex: 1;
+  height: 100%;
+  display: flex;
+  align-items: flex-end;
+  min-width: 0.5rem;
+}
+
+.log-histogram__bar {
+  width: 100%;
+  display: flex;
+  flex-direction: column-reverse;
+  min-height: 1px;
+}
+
+.log-histogram__segment {
+  width: 100%;
+  min-height: 1px;
+  /* The level color classes only set `color`; paint the bar with it. */
+  background: currentColor;
+}
+
+.log-histogram__untimed {
+  margin: 0.5rem 0 0;
+  font-size: 0.8125rem;
+  opacity: 0.6;
+}

@@ -1,13 +1,20 @@
 # NekoLogs — Phase 2 charter (NekoLogs 2.0)
 
-> Status: **IMPLEMENTED (Phase 2.x.1 engine MVP).** The charter was
-> approved in [PR #15](https://github.com/cmclicker/NekoTools/pull/15).
-> The engine implementation (`@nekotools/lens-logs`) plus the
+> Status: **IMPLEMENTED — Phase 2 free tier closed (Phase 2.x.2 UI).**
+> The charter was approved in
+> [PR #15](https://github.com/cmclicker/NekoTools/pull/15); the engine
+> implementation (`@nekotools/lens-logs`) plus the
 > `@nekotools/lens-kit` extraction landed in the Phase 2.x.1
-> implementation PR. UI (table / text / summary views + structured
-> filter + search + copy) remains queued as Phase 2.x.2 and will land
-> in its own PR with the matching `view.*` / `filter.ui` / `copy.*`
-> free entitlements added in the same commit. Deferred items are
+> implementation PR; the Phase 2.x.2 UI shipped in `apps/web-suite`
+> (NekoLogs is the third tool tab — table / text / summary views,
+> structured-filter control, free-text search, copy.line / copy.message).
+> Every charter-declared free capability now has a working
+> implementation declared in `manifest.entitlements.free`: engine
+> entries live in `@nekotools/lens-logs`, UI entries live in
+> `apps/web-suite` (`LogsApp` + `LogTableView` / `LogTextView` /
+> `LogSummaryView` / `LogFilterControl`). Future free entitlements
+> must be added only in the same PR that ships their implementation,
+> per the open-core governance rule. Deferred (Pro / future) items are
 > listed under "Deferred from this PR" at the bottom.
 
 NekoLogs is the **second Phase 2 tool, after NekoEnv** — and the
@@ -372,11 +379,47 @@ All gates met in the engine PR:
 - [x] Offline guard sees no new violations.
 - [x] This charter doc updated from "PROPOSED" to "IMPLEMENTED".
 
-## Deferred from this PR (Pro / future + Phase 2.x.2 UI)
+## Phase 2.x.2 UI
+
+The UI ships in `apps/web-suite`. The shell now hosts three tools
+side-by-side via the top-level tool tab (`NekoJSON` | `NekoEnv` |
+`NekoLogs`), mounted on first render via `App`'s `initialTool` prop
+(defaults to `'json'` for backward compatibility). The inactive panels
+stay mounted-but-`hidden`, so pasted text, view mode, active line,
+search query, and filter survive tab switches.
+
+NekoLogs UI surface:
+
+- **Table view** (default) — one row per entry: Line / Time / Level /
+  Message, with a per-level color chip. Renders the document's entries,
+  or the active filter's entries when a structured filter is set. A
+  click selects the row (active line) and enables copy.
+- **Text view** — raw source with a line-number gutter and per-line
+  diagnostic markers, reusing NekoJSON's generic `groupSeverityByLine`.
+- **Summary view** — the `log.summary` (total, per-level counts, parsed
+  time range, unparseable count, top normalized messages) plus a basic
+  fixed-bucket `log.histogram` rendered as hand-drawn CSS bars
+  (`level × time` segments + an untimed tally). No charting library;
+  adaptive bucketing / zoom / anomaly overlay remain Pro.
+- **Structured-filter control** — inputs for `minLevel` (select),
+  `messageContains`, `fieldEquals` (key + value), and `since` / `until`
+  that build a plain `LogFilter` object and drive the engine's
+  `log.filter` parser. It is **not** a query DSL — a malformed value
+  (unknown level, unparseable timestamp) fails closed in the engine and
+  surfaces as a `log.filter.invalid` diagnostic; the table falls back to
+  the full document.
+- **Search** — case-insensitive free-text narrowing over message +
+  level + fields, layered on top of whatever the structured filter
+  produced.
+- **Copy line / Copy message** — local clipboard via the shared
+  `clipboard.ts` helper (Clipboard API → hidden-textarea `execCommand`
+  fallback). Copy line writes the entry's `raw`; copy message writes the
+  parsed `message`.
+
+## Deferred from this PR (Pro / future)
 
 | Deferred item | Target | Notes |
 | ------------- | ------ | ----- |
-| UI: table / text / summary views + structured filter + search + copy.line / copy.message | Phase 2.x.2 (next) | Wires `@nekotools/lens-logs` into `apps/web-suite` as the third tool tab; flips the UI entitlements into `manifest.entitlements.free` in the same commit. |
 | `log.anomaly` / `log.pattern_cluster` diagnostics | Pro (future) | Statistical anomaly + template clustering. |
 | `log.graph.trace` correlation projector | Pro (future) | Depends on the Phase 3 graph engine. |
 | Advanced histogram (adaptive bucketing, anomaly overlay) | Pro (future) | Basic fixed-bucket histogram ships free here. |

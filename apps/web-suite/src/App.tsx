@@ -1,14 +1,17 @@
 import { useState } from 'react';
 import { envManifest } from '@nekotools/lens-env';
 import { jsonManifest } from '@nekotools/lens-json';
+import { logsManifest } from '@nekotools/lens-logs';
 
 import { EnvApp, type EnvAppProps } from './EnvApp.js';
 import { JsonApp, type JsonAppProps } from './JsonApp.js';
+import { LogsApp, type LogsAppProps } from './LogsApp.js';
 
 export type { NekoJsonUiState, ViewMode } from './JsonApp.js';
 export type { EnvViewMode, NekoEnvUiState } from './EnvApp.js';
+export type { LogViewMode, NekoLogsUiState } from './LogsApp.js';
 
-export type ActiveTool = 'json' | 'env';
+export type ActiveTool = 'json' | 'env' | 'logs';
 
 export interface AppProps extends JsonAppProps {
   /**
@@ -19,33 +22,39 @@ export interface AppProps extends JsonAppProps {
   readonly initialTool?: ActiveTool;
   /** Phase 2.2 — props forwarded to the NekoEnv sub-app. */
   readonly envApp?: EnvAppProps;
+  /** Phase 2.x.2 — props forwarded to the NekoLogs sub-app. */
+  readonly logsApp?: LogsAppProps;
 }
 
 /**
- * Phase 2.2 web-suite shell.
+ * Phase 2.x.2 web-suite shell.
  *
- * The shell hosts NekoJSON and NekoEnv as siblings; switching tabs
- * toggles which one is visible but **does not unmount the other**.
- * That preserves pasted text, view mode, active selection, search
- * query, and mask state across tab switches — a local-only dev tool
- * should never discard the user's pasted work behind their back.
- * The PR #14 audit blocker 1 fix replaced the conditional-render
- * pattern with `hidden`-toggled wrappers around both children.
+ * The shell hosts NekoJSON, NekoEnv, and NekoLogs as siblings;
+ * switching tabs toggles which one is visible but **does not unmount
+ * the others**. That preserves pasted text, view mode, active
+ * selection, search query, filter, and mask state across tab switches
+ * — a local-only dev tool should never discard the user's pasted work
+ * behind their back. The PR #14 audit blocker 1 fix replaced the
+ * conditional-render pattern with `hidden`-toggled wrappers around
+ * every child; the NekoLogs tab follows the same pattern.
  *
  * The props shape is backward-compatible with the Phase 1.1h `<App>`:
  * `initialInput`, `initialUiState`, and `clipboardDeps` are forwarded
  * to `JsonApp`, and the default `initialTool` is `'json'`. The
  * Phase 2.2 NekoEnv UI is reached via `initialTool: 'env'` and
- * `envApp: { ... }` for test seams.
+ * `envApp: { ... }`; the Phase 2.x.2 NekoLogs UI via
+ * `initialTool: 'logs'` and `logsApp: { ... }`, all for test seams.
  */
 export function App({
   initialTool,
   envApp,
+  logsApp,
   ...jsonAppProps
 }: AppProps = {}): JSX.Element {
   const [activeTool, setActiveTool] = useState<ActiveTool>(initialTool ?? 'json');
 
-  const activeManifest = activeTool === 'json' ? jsonManifest : envManifest;
+  const activeManifest =
+    activeTool === 'json' ? jsonManifest : activeTool === 'env' ? envManifest : logsManifest;
 
   return (
     <main className="suite">
@@ -76,6 +85,15 @@ export function App({
           >
             NekoEnv
           </button>
+          <button
+            type="button"
+            className={`suite__tool${activeTool === 'logs' ? ' suite__tool--active' : ''}`}
+            onClick={() => setActiveTool('logs')}
+            aria-pressed={activeTool === 'logs'}
+            data-testid="tool-tab-logs"
+          >
+            NekoLogs
+          </button>
         </nav>
       </header>
 
@@ -90,6 +108,9 @@ export function App({
       </div>
       <div hidden={activeTool !== 'env'} data-testid="tool-panel-env">
         <EnvApp {...envApp} />
+      </div>
+      <div hidden={activeTool !== 'logs'} data-testid="tool-panel-logs">
+        <LogsApp {...logsApp} />
       </div>
 
       <footer className="suite__footer">

@@ -10,7 +10,7 @@
 | Phase 0   | **Complete** (commit `93efaa5`) | Platform spine + audit patches landed. |
 | Phase 1.0 | **Complete** (PR #2, commit `324115c`) | Engine MVP merged. No UI, no diff, no search — those land in Phase 1.1+ follow-up PRs. |
 | Phase 1.1 | **Complete** (PR #11, commit `248761c`) | All charter-declared free engine + UI capabilities shipped: diff (1.1a), large-doc threshold (1.1b), tokenizer (1.1c), duplicate-key + trailing-comma (1.1d), UI shell (1.1e), tree + text (1.1f), table + search (1.1g), copy.path + copy.value (1.1h). |
-| Phase 2   | **Active**                  | NekoEnv shipped (PR #12/#13/#14; free tier closed at `a442233`). NekoLogs charter merged (PR #15 / `03b5853`); NekoLogs engine MVP + `@nekotools/lens-kit` extraction shipped (PR #16 / `bdc3f1e`); NekoLogs UI is the queued next-up implementation. |
+| Phase 2   | **Active**                  | NekoEnv shipped (PR #12/#13/#14; free tier closed at `a442233`). NekoLogs charter merged (PR #15 / `03b5853`); NekoLogs engine MVP + `@nekotools/lens-kit` extraction shipped (PR #16 / `bdc3f1e`); NekoLogs UI in review (this PR — third tool tab, free tier closing). |
 | Phase 3   | Not started                 | Premium engines (graph, semantic diff, migration). |
 | Phase 4   | Not started                 | Heavier tools (YAML, API Lens, Headers, Types, RBAC). |
 | Phase 5   | Not started                 | Expansion packs. |
@@ -42,7 +42,7 @@ previous row `Done`.
 | 12    | Phase 2.2  | Implementation | NekoEnv UI: table + text + diff views + search + copy.key / copy.value + mask.value. Wires `@nekotools/lens-env` into `apps/web-suite` and flips `view.table`, `view.text`, `view.diff`, `search`, `copy.key`, `copy.value`, `mask.value` into `manifest.entitlements.free`. **NekoEnv free tier closes here.** | Done (PR #14 / `a442233`) |
 | 13    | Phase 2 / NekoLogs 2.0 | Charter | NekoLogs charter PR (10-question reuse gate). Charter doc only — no implementation. | Done (PR #15 / `03b5853`) |
 | 14    | Phase 2 / NekoLogs 2.x.1 | Implementation | `@nekotools/lens-logs` engine MVP: `log.text` (JSON-per-line / logfmt / plaintext detection) + `log.filter` parsers, diagnostics, summary + basic histogram, text/messages/json/csv/markdown exporters, workspace round-trip + conformance tests. **Extracts `@nekotools/lens-kit`** (clock + id-factory) and re-points lens-binary/json/env/logs at it — the 3rd-reuse trigger from NekoJSON charter §7. No UI. | Done (PR #16 / `bdc3f1e`) |
-| 15    | Phase 2 / NekoLogs 2.x.2 | Implementation | NekoLogs UI: table + text + summary views + structured-filter control + search + copy.line / copy.message. Wires `@nekotools/lens-logs` into `apps/web-suite` as the third tool tab and flips the UI entitlements into `manifest.entitlements.free`. **NekoLogs free tier closes here.** | **Next** |
+| 15    | Phase 2 / NekoLogs 2.x.2 | Implementation | NekoLogs UI: table + text + summary views + structured-filter control + search + copy.line / copy.message. Wires `@nekotools/lens-logs` into `apps/web-suite` as the third tool tab and flips the UI entitlements into `manifest.entitlements.free`. **NekoLogs free tier closes here.** | In review (this PR) |
 
 `Later` rows are intentionally not in the queue order — they are
 candidates for promotion to `Queued` after Phase 1 is fully closed.

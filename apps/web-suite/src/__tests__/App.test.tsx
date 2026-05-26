@@ -17,10 +17,12 @@ describe('App integration', () => {
     const phase = document.querySelector('.suite__phase');
     expect(phase?.textContent).toMatch(/Phase 2\.2/);
     expect(phase?.textContent).toMatch(/Hosting/);
-    // PR #14 audit blocker 1: both sub-apps stay mounted; only one
-    // panel is visible at a time. JSON is visible by default.
+    // PR #14 audit blocker 1: all sub-apps stay mounted; only one
+    // panel is visible at a time. JSON is visible by default. The
+    // Phase 2.x.2 NekoLogs panel is mounted-but-hidden too.
     expect(screen.getByTestId('tool-panel-json')).toBeVisible();
     expect(screen.getByTestId('tool-panel-env')).not.toBeVisible();
+    expect(screen.getByTestId('tool-panel-logs')).not.toBeVisible();
   });
 
   it('parses the initial input and shows the tree by default', () => {
@@ -327,5 +329,64 @@ describe('App integration', () => {
 
     const envAfter = screen.getByTestId('env-input') as HTMLTextAreaElement;
     expect(envAfter.value).toBe('B=changed\n');
+  });
+
+  it('Phase 2.x.2: the NekoLogs tab toggles panel visibility (all three stay mounted)', () => {
+    render(<App initialInput='{"a":1}' />);
+    expect(screen.getByTestId('tool-tab-logs')).toHaveAttribute('aria-pressed', 'false');
+    expect(screen.getByTestId('tool-panel-logs')).not.toBeVisible();
+
+    fireEvent.click(screen.getByTestId('tool-tab-logs'));
+    expect(screen.getByTestId('tool-tab-logs')).toHaveAttribute('aria-pressed', 'true');
+    expect(screen.getByTestId('tool-panel-logs')).toBeVisible();
+    // The other two panels are still mounted, just hidden.
+    expect(screen.getByTestId('tool-panel-json')).not.toBeVisible();
+    expect(screen.getByTestId('tool-panel-env')).not.toBeVisible();
+    const phase = document.querySelector('.suite__phase');
+    expect(phase?.textContent).toMatch(/Hosting\s+NekoLogs/);
+  });
+
+  it('Phase 2.x.2: initialTool="logs" mounts the NekoLogs UI on first render', () => {
+    render(<App initialTool="logs" />);
+    expect(screen.getByTestId('tool-panel-logs')).toBeVisible();
+    expect(screen.getByTestId('tool-panel-json')).not.toBeVisible();
+    expect(screen.getByTestId('tool-panel-env')).not.toBeVisible();
+    const phase = document.querySelector('.suite__phase');
+    expect(phase?.textContent).toMatch(/Hosting\s+NekoLogs/);
+  });
+
+  it('PR #14 audit blocker 1: json / env / logs textarea edits all survive tab switches (3-tab)', () => {
+    render(
+      <App
+        initialInput='{"start":"value"}'
+        envApp={{ initialInput: 'A=1\n' }}
+        logsApp={{ initialInput: 'info: first line\n' }}
+      />,
+    );
+
+    // Edit all three textareas (json is the default-visible tab).
+    const jsonTextarea = screen.getByLabelText(/Paste JSON here/i) as HTMLTextAreaElement;
+    fireEvent.change(jsonTextarea, { target: { value: '{"edited":"json"}' } });
+
+    fireEvent.click(screen.getByTestId('tool-tab-env'));
+    const envTextarea = screen.getByTestId('env-input') as HTMLTextAreaElement;
+    fireEvent.change(envTextarea, { target: { value: 'B=changed\n' } });
+
+    fireEvent.click(screen.getByTestId('tool-tab-logs'));
+    const logsTextarea = screen.getByTestId('logs-input') as HTMLTextAreaElement;
+    fireEvent.change(logsTextarea, { target: { value: 'error: changed log\n' } });
+
+    // Cycle back through every tab; the same mounted nodes must retain
+    // their edited contents (panels are hidden, never unmounted).
+    fireEvent.click(screen.getByTestId('tool-tab-json'));
+    expect((screen.getByLabelText(/Paste JSON here/i) as HTMLTextAreaElement).value).toBe(
+      '{"edited":"json"}',
+    );
+    fireEvent.click(screen.getByTestId('tool-tab-env'));
+    expect((screen.getByTestId('env-input') as HTMLTextAreaElement).value).toBe('B=changed\n');
+    fireEvent.click(screen.getByTestId('tool-tab-logs'));
+    expect((screen.getByTestId('logs-input') as HTMLTextAreaElement).value).toBe(
+      'error: changed log\n',
+    );
   });
 });
