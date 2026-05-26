@@ -11,6 +11,8 @@ license validation during normal use.
   [open-core-strategy.md](open-core-strategy.md) — the current LICENSE
   is source-available, not OSI-approved).
 - Local parsing, validation, viewing, basic export.
+- Basic local workspace save / load — the Phase 0 workspace serializer;
+  `workspace.save` ships free in every tool.
 - CLI basics _(planned — no CLI ships yet)_.
 - No account. No telemetry. No cloud dependency.
 
@@ -24,7 +26,11 @@ Pro is leverage, not access:
 - Advanced visual engines (graph mode, semantic diff, migration studios).
 - Batch processing.
 - Advanced exports (diagrams, reports, documentation packs).
-- Saved local workspaces, snapshots, recipes.
+- Advanced workspace leverage: named snapshots, multi-workspace
+  management, saved recipes, batch recipe execution, workspace packs,
+  and signed / shareable workspace bundles. (Basic local save / load is
+  free; team / commercial policy packs are in the Commercial / Enterprise
+  tier below.)
 - Polished signed desktop / mobile builds.
 
 Pro is a **one-time** purchase. No subscription. The user gets a
