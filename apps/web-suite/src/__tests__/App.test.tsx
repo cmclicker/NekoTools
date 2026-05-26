@@ -15,8 +15,8 @@ describe('App integration', () => {
     render(<App initialInput="{}" />);
     expect(screen.getByRole('heading', { level: 1, name: /NekoTools/ })).toBeInTheDocument();
     const phase = document.querySelector('.suite__phase');
-    expect(phase?.textContent).toMatch(/Phase 2\.2/);
-    expect(phase?.textContent).toMatch(/Hosting/);
+    expect(phase?.textContent).toMatch(/Now viewing/);
+    expect(phase?.textContent).toMatch(/NekoJSON/);
     // PR #14 audit blocker 1: all sub-apps stay mounted; only one
     // panel is visible at a time. JSON is visible by default. The
     // Phase 2.x.2 NekoLogs panel is mounted-but-hidden too.
@@ -286,7 +286,7 @@ describe('App integration', () => {
     expect(screen.getByTestId('tool-panel-env')).toBeVisible();
     expect(screen.getByTestId('tool-panel-json')).not.toBeVisible();
     const phase = document.querySelector('.suite__phase');
-    expect(phase?.textContent).toMatch(/Hosting\s+NekoEnv/);
+    expect(phase?.textContent).toMatch(/Now viewing\s+NekoEnv/);
   });
 
   it('Phase 2.2: initialTool="env" mounts the NekoEnv UI on first render', () => {
@@ -294,7 +294,7 @@ describe('App integration', () => {
     expect(screen.getByTestId('tool-panel-env')).toBeVisible();
     expect(screen.getByTestId('tool-panel-json')).not.toBeVisible();
     const phase = document.querySelector('.suite__phase');
-    expect(phase?.textContent).toMatch(/Hosting\s+NekoEnv/);
+    expect(phase?.textContent).toMatch(/Now viewing\s+NekoEnv/);
   });
 
   it('PR #14 audit blocker 1: edits to the JSON textarea survive a switch to NekoEnv and back', () => {
@@ -343,7 +343,7 @@ describe('App integration', () => {
     expect(screen.getByTestId('tool-panel-json')).not.toBeVisible();
     expect(screen.getByTestId('tool-panel-env')).not.toBeVisible();
     const phase = document.querySelector('.suite__phase');
-    expect(phase?.textContent).toMatch(/Hosting\s+NekoLogs/);
+    expect(phase?.textContent).toMatch(/Now viewing\s+NekoLogs/);
   });
 
   it('Phase 2.x.2: initialTool="logs" mounts the NekoLogs UI on first render', () => {
@@ -352,7 +352,7 @@ describe('App integration', () => {
     expect(screen.getByTestId('tool-panel-json')).not.toBeVisible();
     expect(screen.getByTestId('tool-panel-env')).not.toBeVisible();
     const phase = document.querySelector('.suite__phase');
-    expect(phase?.textContent).toMatch(/Hosting\s+NekoLogs/);
+    expect(phase?.textContent).toMatch(/Now viewing\s+NekoLogs/);
   });
 
   it('PR #14 audit blocker 1: json / env / logs textarea edits all survive tab switches (3-tab)', () => {
