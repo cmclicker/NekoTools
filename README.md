@@ -62,9 +62,10 @@ pnpm build
 pnpm offline-guard
 ```
 
-## Phase 0 acceptance criteria
+## Acceptance criteria & release gate
 
-See [docs/release-checklist.md](docs/release-checklist.md).
+See [docs/release-checklist.md](docs/release-checklist.md) — the current
+release-readiness gate plus the Phase 0 baseline.
 
 ## How work moves through this repo
 
