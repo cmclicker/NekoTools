@@ -83,7 +83,7 @@ SHA.
 
 | Risk | Note |
 | ---- | ---- |
-| **F3** — no `.github/dependabot.yml`; alerts disabled | operational hygiene; offline-first + frozen lockfile + clean permissive licenses mitigate |
+| **F3** — `.github/dependabot.yml` present (weekly GitHub-Actions + npm/pnpm version checks); Dependabot **alerts** still require owner GitHub-UI enablement | config landed; offline-first + frozen lockfile + clean permissive licenses mitigate the residual |
 | Branch protection unavailable (current plan) | no mechanical merge gate; relies on the PR + review discipline in `governance.md` |
 | No e2e / a11y / bundle-size CI gate | strong component/integration coverage (557 tests) mitigates for dogfood |
 | GitHub Actions pinned by tag, not SHA | supply-chain hardening; tracked below |
