@@ -1,0 +1,42 @@
+# Dependabot configuration — repository dependency-update hygiene.
+#
+# This is repo/CI hygiene, not product behavior. Dependabot runs on
+# GitHub's infrastructure and only opens update PRs, which still go
+# through the normal branch -> PR -> CI (typecheck/lint/test/build +
+# offline-guard) -> review flow. It adds no network dependency to the
+# shipped product, so it is consistent with the offline / zero-telemetry
+# doctrine (docs/offline-policy.md, docs/product-doctrine.md).
+#
+# NOTE (owner-side follow-up): this file configures *version-update*
+# schedules only. Dependabot **security alerts** / **security updates**
+# are repository settings that must be enabled by the owner in the GitHub
+# UI (Settings -> Code security and analysis). This config does not — and
+# cannot — flip those toggles.
+version: 2
+updates:
+  # GitHub Actions pinned in .github/workflows/ (ci.yml, offline-guard.yml).
+  - package-ecosystem: "github-actions"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+    open-pull-requests-limit: 5
+    commit-message:
+      prefix: "chore(actions)"
+
+  # JS/TS workspace dependencies. This is a pnpm monorepo; Dependabot's
+  # "npm" ecosystem reads the root package.json + pnpm-lock.yaml and the
+  # workspace packages. Conservative weekly cadence; dev-dependency
+  # minor/patch bumps are grouped to keep PR noise low.
+  - package-ecosystem: "npm"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+    open-pull-requests-limit: 5
+    commit-message:
+      prefix: "chore(deps)"
+    groups:
+      dev-minor-patch:
+        dependency-type: "development"
+        update-types:
+          - "minor"
+          - "patch"
