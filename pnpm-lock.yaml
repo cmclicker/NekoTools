@@ -44,6 +44,9 @@ importers:
       '@nekotools/lens-json':
         specifier: workspace:*
         version: link:../../packages/lens-json
+      '@nekotools/lens-logs':
+        specifier: workspace:*
+        version: link:../../packages/lens-logs
       '@nekotools/schemas':
         specifier: workspace:*
         version: link:../../packages/schemas

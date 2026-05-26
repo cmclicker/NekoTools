@@ -12,11 +12,12 @@ import {
  * The NekoLogs manifest.
  *
  * Reading model (same as NekoJSON / NekoEnv):
- *   - `entitlements.free` is current-build truth. Phase 2.x.1 is
- *     engine-only, so the UI entitlements declared in the charter
- *     (view.table, view.text, view.summary, search, filter.ui,
- *     copy.line, copy.message) are deliberately ABSENT here; they
- *     arrive in the Phase 2.x.2 UI PR with their implementation.
+ *   - `entitlements.free` is current-build truth. As of Phase 2.x.2
+ *     the NekoLogs free tier is closed: the engine entitlements
+ *     (Phase 2.x.1) and the UI entitlements (view.table, view.text,
+ *     view.summary, search, filter.ui, copy.line, copy.message —
+ *     Phase 2.x.2, implemented in `apps/web-suite`) are all present
+ *     and implementation-backed.
  *   - `entitlements.pro` is honest advertising; no Pro implementation
  *     is linked in the free build.
  *   - `capabilities.*` is current-build truth. `canDiff` is false —
@@ -63,8 +64,9 @@ export const logsManifest: ToolManifest = {
     canProjectGraph: false,
   },
   entitlements: {
-    // Phase 2.x.1 engine-only free tier. UI entitlements land in the
-    // Phase 2.x.2 UI PR, per the open-core governance rule.
+    // NekoLogs free tier — closed at Phase 2.x.2. Engine entitlements
+    // (Phase 2.x.1) plus the UI entitlements (Phase 2.x.2, backed by
+    // `apps/web-suite`), per the open-core governance rule.
     free: [
       'parse',
       'validate',
@@ -77,6 +79,15 @@ export const logsManifest: ToolManifest = {
       'export.csv.entries',
       'export.markdown.summary',
       'workspace.save',
+      // Phase 2.x.2 UI — implemented in apps/web-suite (LogsApp +
+      // LogTableView / LogTextView / LogSummaryView / LogFilterControl).
+      'view.table',
+      'view.text',
+      'view.summary',
+      'search',
+      'filter.ui',
+      'copy.line',
+      'copy.message',
     ],
     pro: [
       'anomaly.detect',

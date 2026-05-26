@@ -110,10 +110,11 @@ describe('NekoLogs: monetization safety', () => {
     }
   });
 
-  it('free entitlements match the exact Phase 2.x.1 engine MVP set', () => {
-    // UI entitlements (view.table, view.text, view.summary, search,
-    // filter.ui, copy.line, copy.message) are deliberately ABSENT —
-    // they land in Phase 2.x.2 with their implementation.
+  it('free entitlements match the exact closed-free-tier set (engine + Phase 2.x.2 UI)', () => {
+    // NekoLogs free tier is closed at Phase 2.x.2: the engine
+    // entitlements plus the seven UI entitlements (view.table,
+    // view.text, view.summary, search, filter.ui, copy.line,
+    // copy.message), each implementation-backed in apps/web-suite.
     const expectedFree = new Set([
       'parse',
       'validate',
@@ -126,6 +127,13 @@ describe('NekoLogs: monetization safety', () => {
       'export.csv.entries',
       'export.markdown.summary',
       'workspace.save',
+      'view.table',
+      'view.text',
+      'view.summary',
+      'search',
+      'filter.ui',
+      'copy.line',
+      'copy.message',
     ]);
     expect(new Set(logsManifest.entitlements.free)).toEqual(expectedFree);
   });
