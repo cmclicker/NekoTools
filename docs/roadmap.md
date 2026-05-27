@@ -157,6 +157,74 @@ export target for the first time, and fires the
 clock/id-factory helper into a shared `@nekotools/lens-kit` package
 in its engine PR.
 
+> **Reprioritization note (proposed).** A market-value reordering of the
+> Phase 2 / Phase 4 tool-breadth path is under evaluation in the **Phase 2B**
+> proposal immediately below. It does **not** change the committed Active
+> Next Queue, and it does **not** authorize implementation.
+
+## Phase 2B — Tool Breadth (PROPOSED — pending owner ratification)
+
+> **Status: proposal, not committed scope.** This section converts the
+> candidate surface in [docs/product/tool-ideals.md](product/tool-ideals.md)
+> into a concrete roadmap proposal. It does **not** modify the committed
+> Active Next Queue above, and it does **not** authorize implementation of
+> any tool. Each tool still requires charter → branch → PR → Validation →
+> owner merge (see [governance.md](governance.md) and
+> [tool-charter.md](tool-charter.md)).
+
+**Product rationale.** The platform pattern is proven across three shipped
+tools (NekoJSON, NekoEnv, NekoLogs). The next product risk is
+**under-breadth**, not architecture — so the breadth path should be ordered
+by **market value**, not original listing order. This proposal moves the
+suite from 3 toward ~9 meaningful tools.
+
+### Current canonical placement (unchanged by this proposal)
+
+| Tool | Current home |
+| --- | --- |
+| NekoCron | Phase 2 |
+| NekoIgnore | Phase 2 |
+| NekoPackage | Phase 2 |
+| NekoYAML | Phase 4 |
+| NekoHeaders | Phase 4 |
+| NekoAPI (API Lens) | Phase 4 |
+
+### Proposed Phase 2B breadth sequence (for evaluation)
+
+| Rank | Tool | Proposed move | Why |
+| ---: | --- | --- | --- |
+| 1 | **NekoYAML** | promote from Phase 4 | Most natural sibling to JSON/env; high config pain; sensitive-artifact fit. |
+| 2 | **NekoIgnore** | keep (Phase 2) | Fast, practical quick-win; already a documented candidate. |
+| 3 | **NekoHeaders** | promote from Phase 4 | Easy to demo; web/security posture; sensitive-artifact fit. |
+| 4 | **NekoDiff** | new candidate | Cross-tool comparison glue; multiplies the value of the shipped tools. |
+| 5 | **NekoJWT** | new candidate | Strong sensitive-artifact use case; decode / inspect only, careful safety framing. |
+| 6 | **NekoPackage** | keep (Phase 2) | Largest, most commercially serious wedge. |
+
+This **promotes** NekoYAML and NekoHeaders from Phase 4 (stated explicitly —
+not a silent demotion of any item) and introduces **NekoDiff** and
+**NekoJWT** as new candidates currently held only in the ideation pool.
+
+### Parked / later candidates (with rationale)
+
+- **NekoCron — not deleted; parked to a later slot.** A useful scheduling
+  utility, but less central to the sensitive-artifact / local-first
+  workbench positioning than the breadth wedges above. It can return to the
+  active sequence after stronger wedges land.
+- **NekoAPI (API Lens) — remains Phase 4** for now (heavier; a
+  request/response artifact inspector, not a Postman clone). Candidate for a
+  later breadth wave.
+- The remaining ideation-pool tools (Regex, Secrets, Schema, Markdown, and
+  the commodity set: Base64, Hash, Timestamp, Color, UUID, URL) stay in
+  [tool-ideals.md](product/tool-ideals.md) as future / parked candidates.
+
+### What this proposal does NOT do
+
+- It does **not** modify the committed Active Next Queue.
+- It does **not** authorize implementation of any tool.
+- It does **not** delete or silently demote any existing roadmap entry.
+- Ratifying it (promoting any of these into the Active Next Queue) is a
+  **separate, explicitly owner-authorized** roadmap change.
+
 ## Phase 3 — First premium-grade engines
 
 This is where Pro starts to become real:
@@ -173,6 +241,12 @@ This is where Pro starts to become real:
 - NekoHeaders
 - NekoTypes
 - NekoRBAC
+
+> **Note (proposed promotion).** The **Phase 2B** proposal above evaluates
+> promoting **NekoYAML** and **NekoHeaders** into a near-term breadth
+> sequence, and surfacing **NekoAPI / API Lens** as a later breadth-wave
+> candidate. This is a proposal pending owner ratification — nothing in this
+> phase is demoted or removed by it.
 
 ## Phase 5 — Expansion packs
 
