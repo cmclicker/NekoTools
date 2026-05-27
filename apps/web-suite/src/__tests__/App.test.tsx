@@ -411,4 +411,39 @@ describe('App integration', () => {
     // The shared Pro-lock surface renders for NekoYAML via the registry.
     expect(screen.getByTestId('pro-surface-yaml')).toBeInTheDocument();
   });
+
+  it('NekoURL slice: the NekoURL tab is visible and toggles its panel (others stay mounted)', () => {
+    render(<App initialInput='{"a":1}' />);
+    expect(screen.getByTestId('tool-tab-url')).toHaveAttribute('aria-pressed', 'false');
+    expect(screen.getByTestId('tool-panel-url')).not.toBeVisible();
+
+    fireEvent.click(screen.getByTestId('tool-tab-url'));
+    expect(screen.getByTestId('tool-tab-url')).toHaveAttribute('aria-pressed', 'true');
+    expect(screen.getByTestId('tool-panel-url')).toBeVisible();
+    // The other panels stay mounted, just hidden.
+    expect(screen.getByTestId('tool-panel-json')).not.toBeVisible();
+    const phase = document.querySelector('.suite__phase');
+    expect(phase?.textContent).toMatch(/Now viewing\s+NekoURL/);
+  });
+
+  it('NekoURL slice: initialTool="url" mounts the NekoURL UI and renders its URL Pro features', () => {
+    render(<App initialTool="url" />);
+    expect(screen.getByTestId('tool-panel-url')).toBeVisible();
+    expect(screen.getByTestId('tool-panel-json')).not.toBeVisible();
+    // The component breakdown renders for the default sample URL.
+    expect(screen.getByTestId('url-components')).toBeInTheDocument();
+    // The shared Pro-lock surface renders for NekoURL via the registry,
+    // including the URL-specific locked features.
+    expect(screen.getByTestId('pro-surface-url')).toBeInTheDocument();
+    const proList = screen.getByTestId('pro-list-url');
+    expect(within(proList).getByText('inspect.redirect-chain')).toBeInTheDocument();
+    expect(within(proList).getByText('batch.audit')).toBeInTheDocument();
+  });
+
+  it('NekoURL slice: all five tool tabs remain rendered (existing tabs unaffected)', () => {
+    render(<App initialInput='{"a":1}' />);
+    for (const id of ['json', 'env', 'logs', 'yaml', 'url']) {
+      expect(screen.getByTestId(`tool-tab-${id}`)).toBeInTheDocument();
+    }
+  });
 });

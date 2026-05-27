@@ -3,6 +3,7 @@ import { jsonManifest } from '@nekotools/lens-json';
 import { envManifest } from '@nekotools/lens-env';
 import { logsManifest } from '@nekotools/lens-logs';
 import { yamlManifest } from '@nekotools/lens-yaml';
+import { urlManifest } from '@nekotools/lens-url';
 
 /**
  * The unified workbench tool registry.
@@ -13,7 +14,7 @@ import { yamlManifest } from '@nekotools/lens-yaml';
  * because the sub-apps have bespoke props / test seams; new tools add a
  * `TOOLS` entry plus their panel together.)
  */
-export type ActiveTool = 'json' | 'env' | 'logs' | 'yaml';
+export type ActiveTool = 'json' | 'env' | 'logs' | 'yaml' | 'url';
 
 export interface ToolDescriptor {
   readonly id: ActiveTool;
@@ -26,6 +27,7 @@ export const TOOLS: readonly ToolDescriptor[] = [
   { id: 'env', label: 'NekoEnv', manifest: envManifest },
   { id: 'logs', label: 'NekoLogs', manifest: logsManifest },
   { id: 'yaml', label: 'NekoYAML', manifest: yamlManifest },
+  { id: 'url', label: 'NekoURL', manifest: urlManifest },
 ];
 
 export function toolById(id: ActiveTool): ToolDescriptor {

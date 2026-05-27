@@ -47,6 +47,9 @@ importers:
       '@nekotools/lens-logs':
         specifier: workspace:*
         version: link:../../packages/lens-logs
+      '@nekotools/lens-url':
+        specifier: workspace:*
+        version: link:../../packages/lens-url
       '@nekotools/lens-yaml':
         specifier: workspace:*
         version: link:../../packages/lens-yaml
@@ -194,6 +197,31 @@ importers:
         version: 1.6.1(@types/node@20.19.41)(jsdom@29.1.1)
 
   packages/lens-logs:
+    dependencies:
+      '@nekotools/contracts':
+        specifier: workspace:*
+        version: link:../contracts
+      '@nekotools/lens-kit':
+        specifier: workspace:*
+        version: link:../lens-kit
+      '@nekotools/schemas':
+        specifier: workspace:*
+        version: link:../schemas
+      '@nekotools/tool-runtime':
+        specifier: workspace:*
+        version: link:../tool-runtime
+    devDependencies:
+      eslint:
+        specifier: ^8.57.0
+        version: 8.57.1
+      typescript:
+        specifier: ^6.0.3
+        version: 6.0.3
+      vitest:
+        specifier: ^1.4.0
+        version: 1.6.1(@types/node@20.19.41)(jsdom@29.1.1)
+
+  packages/lens-url:
     dependencies:
       '@nekotools/contracts':
         specifier: workspace:*

@@ -1231,3 +1231,95 @@ code {
     border-color: rgba(255, 255, 255, 0.08);
   }
 }
+
+/* NekoURL slice — component breakdown, query-param table, encode/decode,
+   and the shared output pane (normalized URL / params JSON). */
+
+.url-output {
+  margin: 0;
+  padding: 0.75rem;
+  border: 1px solid rgba(0, 0, 0, 0.08);
+  border-radius: 4px;
+  max-height: 360px;
+  overflow: auto;
+  background: white;
+  font-family: ui-monospace, 'SF Mono', 'Cascadia Code', 'Roboto Mono', monospace;
+  font-size: 0.875rem;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+.url-fields {
+  display: grid;
+  grid-template-columns: minmax(7rem, max-content) 1fr;
+  gap: 0.25rem 1rem;
+  margin: 0 0 1rem;
+}
+
+.url-field {
+  display: contents;
+}
+
+.url-field dt {
+  font-weight: 600;
+  opacity: 0.7;
+  font-size: 0.8125rem;
+  font-family: ui-monospace, 'SF Mono', 'Cascadia Code', 'Roboto Mono', monospace;
+}
+
+.url-field dd {
+  margin: 0;
+  word-break: break-word;
+  font-family: ui-monospace, 'SF Mono', 'Cascadia Code', 'Roboto Mono', monospace;
+  font-size: 0.875rem;
+}
+
+.url-params__heading {
+  margin: 0.5rem 0;
+  font-size: 0.9375rem;
+}
+
+.url-params {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.9375rem;
+}
+
+.url-params th,
+.url-params td {
+  text-align: left;
+  padding: 0.4rem 0.6rem;
+  border-bottom: 1px solid rgba(0, 0, 0, 0.08);
+  vertical-align: top;
+  font-family: ui-monospace, 'SF Mono', 'Cascadia Code', 'Roboto Mono', monospace;
+}
+
+.url-params th {
+  font-weight: 600;
+  opacity: 0.7;
+  font-size: 0.8125rem;
+}
+
+.encode__heading {
+  margin: 0 0 0.5rem;
+  font-size: 1rem;
+}
+
+.encode__buttons {
+  display: flex;
+  gap: 0.5rem;
+  margin: 0.5rem 0;
+  flex-wrap: wrap;
+}
+
+@media (prefers-color-scheme: dark) {
+  .url-output {
+    background: #0f0f0f;
+    border-color: rgba(255, 255, 255, 0.08);
+  }
+
+  .url-params th,
+  .url-params td {
+    border-color: rgba(255, 255, 255, 0.08);
+  }
+}

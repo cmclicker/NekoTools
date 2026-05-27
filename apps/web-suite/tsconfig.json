@@ -18,6 +18,7 @@
     { "path": "../../packages/lens-json" },
     { "path": "../../packages/lens-env" },
     { "path": "../../packages/lens-logs" },
-    { "path": "../../packages/lens-yaml" }
+    { "path": "../../packages/lens-yaml" },
+    { "path": "../../packages/lens-url" }
   ]
 }

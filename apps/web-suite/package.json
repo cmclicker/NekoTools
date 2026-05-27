@@ -17,6 +17,7 @@
     "@nekotools/lens-json": "workspace:*",
     "@nekotools/lens-logs": "workspace:*",
     "@nekotools/lens-yaml": "workspace:*",
+    "@nekotools/lens-url": "workspace:*",
     "@nekotools/schemas": "workspace:*",
     "@nekotools/tool-runtime": "workspace:*",
     "react": "^18.3.1",
