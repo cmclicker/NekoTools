@@ -5,6 +5,7 @@ import { JsonApp, type JsonAppProps } from './JsonApp.js';
 import { LogsApp, type LogsAppProps } from './LogsApp.js';
 import { YamlApp, type YamlAppProps } from './YamlApp.js';
 import { JwtApp, type JwtAppProps } from './JwtApp.js';
+import { UrlApp, type UrlAppProps } from './UrlApp.js';
 import { ProSurface } from './ProSurface.js';
 import { TOOLS, toolById, type ActiveTool } from './tools.js';
 
@@ -13,6 +14,7 @@ export type { EnvViewMode, NekoEnvUiState } from './EnvApp.js';
 export type { LogViewMode, NekoLogsUiState } from './LogsApp.js';
 export type { YamlViewMode, NekoYamlUiState } from './YamlApp.js';
 export type { JwtViewMode, NekoJwtUiState } from './JwtApp.js';
+export type { UrlViewMode, NekoUrlUiState } from './UrlApp.js';
 export type { ActiveTool } from './tools.js';
 
 export interface AppProps extends JsonAppProps {
@@ -30,6 +32,8 @@ export interface AppProps extends JsonAppProps {
   readonly yamlApp?: YamlAppProps;
   /** Wave 3 PR 2 — props forwarded to the NekoJWT sub-app. */
   readonly jwtApp?: JwtAppProps;
+  /** NekoURL slice — props forwarded to the NekoURL sub-app. */
+  readonly urlApp?: UrlAppProps;
 }
 
 /**
@@ -54,6 +58,7 @@ export function App({
   logsApp,
   yamlApp,
   jwtApp,
+  urlApp,
   ...jsonAppProps
 }: AppProps = {}): JSX.Element {
   const [activeTool, setActiveTool] = useState<ActiveTool>(initialTool ?? 'json');
@@ -110,6 +115,9 @@ export function App({
       </div>
       <div hidden={activeTool !== 'jwt'} data-testid="tool-panel-jwt">
         <JwtApp {...jwtApp} />
+      </div>
+      <div hidden={activeTool !== 'url'} data-testid="tool-panel-url">
+        <UrlApp {...urlApp} />
       </div>
 
       <footer className="suite__footer">

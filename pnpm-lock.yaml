@@ -50,6 +50,9 @@ importers:
       '@nekotools/lens-logs':
         specifier: workspace:*
         version: link:../../packages/lens-logs
+      '@nekotools/lens-url':
+        specifier: workspace:*
+        version: link:../../packages/lens-url
       '@nekotools/lens-yaml':
         specifier: workspace:*
         version: link:../../packages/lens-yaml

@@ -16,6 +16,7 @@
     { "path": "./packages/lens-logs" },
     { "path": "./packages/lens-yaml" },
     { "path": "./packages/lens-jwt" },
+    { "path": "./packages/lens-url" },
     { "path": "./apps/web-suite" }
   ]
 }
