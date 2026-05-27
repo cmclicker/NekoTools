@@ -21,7 +21,7 @@
     "@nekotools/tool-runtime": "workspace:*"
   },
   "devDependencies": {
-    "typescript": "^5.4.0",
+    "typescript": "^6.0.3",
     "vitest": "^1.4.0",
     "eslint": "^8.57.0"
   }
