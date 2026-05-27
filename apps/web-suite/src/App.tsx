@@ -1,17 +1,15 @@
 import { useState } from 'react';
-import { envManifest } from '@nekotools/lens-env';
-import { jsonManifest } from '@nekotools/lens-json';
-import { logsManifest } from '@nekotools/lens-logs';
 
 import { EnvApp, type EnvAppProps } from './EnvApp.js';
 import { JsonApp, type JsonAppProps } from './JsonApp.js';
 import { LogsApp, type LogsAppProps } from './LogsApp.js';
+import { ProSurface } from './ProSurface.js';
+import { TOOLS, toolById, type ActiveTool } from './tools.js';
 
 export type { NekoJsonUiState, ViewMode } from './JsonApp.js';
 export type { EnvViewMode, NekoEnvUiState } from './EnvApp.js';
 export type { LogViewMode, NekoLogsUiState } from './LogsApp.js';
-
-export type ActiveTool = 'json' | 'env' | 'logs';
+export type { ActiveTool } from './tools.js';
 
 export interface AppProps extends JsonAppProps {
   /**
@@ -27,23 +25,21 @@ export interface AppProps extends JsonAppProps {
 }
 
 /**
- * Phase 2.x.2 web-suite shell.
+ * Unified web-suite shell.
  *
- * The shell hosts NekoJSON, NekoEnv, and NekoLogs as siblings;
- * switching tabs toggles which one is visible but **does not unmount
- * the others**. That preserves pasted text, view mode, active
- * selection, search query, filter, and mask state across tab switches
- * — a local-only dev tool should never discard the user's pasted work
- * behind their back. The PR #14 audit blocker 1 fix replaced the
- * conditional-render pattern with `hidden`-toggled wrappers around
- * every child; the NekoLogs tab follows the same pattern.
+ * The tab strip and the Free / Pro entitlement surface (`ProSurface`)
+ * are rendered from the `TOOLS` registry (`tools.ts`), so adding a tool
+ * to those surfaces is a one-line registration. Each tool still mounts
+ * its own panel below; switching tabs toggles which panel is visible but
+ * **does not unmount the others** (`hidden`-toggled wrappers), so pasted
+ * text, view mode, selection, search, and filter survive tab switches —
+ * a local-only dev tool should never discard the user's work behind
+ * their back (PR #14 audit blocker 1). New tools add a `TOOLS` entry
+ * plus a panel here.
  *
- * The props shape is backward-compatible with the Phase 1.1h `<App>`:
- * `initialInput`, `initialUiState`, and `clipboardDeps` are forwarded
- * to `JsonApp`, and the default `initialTool` is `'json'`. The
- * Phase 2.2 NekoEnv UI is reached via `initialTool: 'env'` and
- * `envApp: { ... }`; the Phase 2.x.2 NekoLogs UI via
- * `initialTool: 'logs'` and `logsApp: { ... }`, all for test seams.
+ * The props shape stays backward-compatible with the Phase 1.1h `<App>`:
+ * `initialInput`, `initialUiState`, and `clipboardDeps` are forwarded to
+ * `JsonApp`, and the default `initialTool` is `'json'`.
  */
 export function App({
   initialTool,
@@ -53,8 +49,7 @@ export function App({
 }: AppProps = {}): JSX.Element {
   const [activeTool, setActiveTool] = useState<ActiveTool>(initialTool ?? 'json');
 
-  const activeManifest =
-    activeTool === 'json' ? jsonManifest : activeTool === 'env' ? envManifest : logsManifest;
+  const activeManifest = toolById(activeTool).manifest;
 
   return (
     <main className="suite">
@@ -67,41 +62,30 @@ export function App({
           Now viewing <strong>{activeManifest.name}</strong>.
         </p>
         <nav className="suite__tools" aria-label="Tool selector">
-          <button
-            type="button"
-            className={`suite__tool${activeTool === 'json' ? ' suite__tool--active' : ''}`}
-            onClick={() => setActiveTool('json')}
-            aria-pressed={activeTool === 'json'}
-            data-testid="tool-tab-json"
-          >
-            NekoJSON
-          </button>
-          <button
-            type="button"
-            className={`suite__tool${activeTool === 'env' ? ' suite__tool--active' : ''}`}
-            onClick={() => setActiveTool('env')}
-            aria-pressed={activeTool === 'env'}
-            data-testid="tool-tab-env"
-          >
-            NekoEnv
-          </button>
-          <button
-            type="button"
-            className={`suite__tool${activeTool === 'logs' ? ' suite__tool--active' : ''}`}
-            onClick={() => setActiveTool('logs')}
-            aria-pressed={activeTool === 'logs'}
-            data-testid="tool-tab-logs"
-          >
-            NekoLogs
-          </button>
+          {TOOLS.map((tool) => (
+            <button
+              key={tool.id}
+              type="button"
+              className={`suite__tool${activeTool === tool.id ? ' suite__tool--active' : ''}`}
+              onClick={() => setActiveTool(tool.id)}
+              aria-pressed={activeTool === tool.id}
+              data-testid={`tool-tab-${tool.id}`}
+            >
+              {tool.label}
+            </button>
+          ))}
         </nav>
       </header>
 
+      {/* Free / Pro surface for the active tool — visible monetization
+          boundary, consistent across every tool. Presentation only. */}
+      <ProSurface manifest={activeManifest} />
+
       {/*
-        Both sub-apps stay mounted. The inactive one is `hidden` so
+        All sub-apps stay mounted. The inactive ones are `hidden` so
         screen readers + visual users see exactly one tool at a time,
-        but React state — including the textarea contents — is
-        preserved across tab toggles. PR #14 audit blocker 1.
+        but React state — including the textarea contents — is preserved
+        across tab toggles. PR #14 audit blocker 1.
       */}
       <div hidden={activeTool !== 'json'} data-testid="tool-panel-json">
         <JsonApp {...jsonAppProps} />
