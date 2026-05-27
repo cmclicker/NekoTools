@@ -215,6 +215,34 @@ importers:
         specifier: ^1.4.0
         version: 1.6.1(@types/node@20.19.41)(jsdom@29.1.1)
 
+  packages/lens-yaml:
+    dependencies:
+      '@nekotools/contracts':
+        specifier: workspace:*
+        version: link:../contracts
+      '@nekotools/lens-kit':
+        specifier: workspace:*
+        version: link:../lens-kit
+      '@nekotools/schemas':
+        specifier: workspace:*
+        version: link:../schemas
+      '@nekotools/tool-runtime':
+        specifier: workspace:*
+        version: link:../tool-runtime
+      yaml:
+        specifier: ^2.5.0
+        version: 2.9.0
+    devDependencies:
+      eslint:
+        specifier: ^8.57.0
+        version: 8.57.1
+      typescript:
+        specifier: ^6.0.3
+        version: 6.0.3
+      vitest:
+        specifier: ^1.4.0
+        version: 1.6.1(@types/node@20.19.41)(jsdom@29.1.1)
+
   packages/offline-guard:
     devDependencies:
       eslint:
@@ -1981,6 +2009,11 @@ packages:
   yallist@3.1.1:
     resolution: {integrity: sha512-a4UGQaWPH59mOXUYnAG2ewncQS4i4F43Tv3JoAM+s2VDAmS9NsK8GpDMLrCHPksFT7h3K6TOoUNn2pb7RoXx4g==}
 
+  yaml@2.9.0:
+    resolution: {integrity: sha512-2AvhNX3mb8zd6Zy7INTtSpl1F15HW6Wnqj0srWlkKLcpYl/gMIMJiyuGq2KeI2YFxUPjdlB+3Lc10seMLtL4cA==}
+    engines: {node: '>= 14.6'}
+    hasBin: true
+
   yocto-queue@0.1.0:
     resolution: {integrity: sha512-rVksvsnNCdJ/ohGc6xgPwyN8eheCxsiLM8mxuE/t/mOVqJewPuO1miLpTHQiRgTKCLexL4MeAFVagts7HmNZ2Q==}
     engines: {node: '>=10'}
@@ -3591,6 +3624,8 @@ snapshots:
   xmlchars@2.2.0: {}
 
   yallist@3.1.1: {}
+
+  yaml@2.9.0: {}
 
   yocto-queue@0.1.0: {}
 
