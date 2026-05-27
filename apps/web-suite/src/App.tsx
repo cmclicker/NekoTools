@@ -4,6 +4,7 @@ import { EnvApp, type EnvAppProps } from './EnvApp.js';
 import { JsonApp, type JsonAppProps } from './JsonApp.js';
 import { LogsApp, type LogsAppProps } from './LogsApp.js';
 import { YamlApp, type YamlAppProps } from './YamlApp.js';
+import { RegexApp, type RegexAppProps } from './RegexApp.js';
 import { ProSurface } from './ProSurface.js';
 import { TOOLS, toolById, type ActiveTool } from './tools.js';
 
@@ -26,6 +27,8 @@ export interface AppProps extends JsonAppProps {
   readonly logsApp?: LogsAppProps;
   /** Wave 2 PR 2 — props forwarded to the NekoYAML sub-app. */
   readonly yamlApp?: YamlAppProps;
+  /** NekoRegex slice — props forwarded to the NekoRegex sub-app. */
+  readonly regexApp?: RegexAppProps;
 }
 
 /**
@@ -49,6 +52,7 @@ export function App({
   envApp,
   logsApp,
   yamlApp,
+  regexApp,
   ...jsonAppProps
 }: AppProps = {}): JSX.Element {
   const [activeTool, setActiveTool] = useState<ActiveTool>(initialTool ?? 'json');
@@ -102,6 +106,9 @@ export function App({
       </div>
       <div hidden={activeTool !== 'yaml'} data-testid="tool-panel-yaml">
         <YamlApp {...yamlApp} />
+      </div>
+      <div hidden={activeTool !== 'regex'} data-testid="tool-panel-regex">
+        <RegexApp {...regexApp} />
       </div>
 
       <footer className="suite__footer">
