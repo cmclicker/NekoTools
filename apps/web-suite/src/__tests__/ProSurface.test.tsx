@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { render, screen, within } from '@testing-library/react';
 import { jsonManifest } from '@nekotools/lens-json';
+import { diffManifest } from '@nekotools/lens-diff';
 
 import { ProSurface } from '../ProSurface.js';
 
@@ -32,5 +33,22 @@ describe('ProSurface', () => {
     expect(
       screen.getByTestId(`pro-surface-${jsonManifest.id}`).textContent,
     ).toMatch(/not bundled in this local build/i);
+  });
+
+  it('renders NekoDiff Pro-locked diff features as visible-but-locked (not implemented here)', () => {
+    render(<ProSurface manifest={diffManifest} />);
+    const proList = screen.getByTestId(`pro-list-${diffManifest.id}`);
+    expect(diffManifest.entitlements.pro.length).toBeGreaterThan(0);
+    for (const id of diffManifest.entitlements.pro) {
+      expect(within(proList).getByText(id)).toBeInTheDocument();
+    }
+    // Each Pro diff feature carries a locked "Pro" tag.
+    expect(within(proList).getAllByText('Pro')).toHaveLength(
+      diffManifest.entitlements.pro.length,
+    );
+    // The implemented free diff modes are listed separately.
+    const freeList = screen.getByTestId(`free-list-${diffManifest.id}`);
+    expect(within(freeList).getByText('diff.text')).toBeInTheDocument();
+    expect(within(freeList).getByText('diff.yaml')).toBeInTheDocument();
   });
 });

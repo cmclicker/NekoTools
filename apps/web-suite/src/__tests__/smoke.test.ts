@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import { buildDiffRegistration, diffManifest } from '@nekotools/lens-diff';
 import { buildEnvRegistration, envManifest } from '@nekotools/lens-env';
 import { buildJsonRegistration, jsonManifest } from '@nekotools/lens-json';
 
@@ -67,6 +68,36 @@ describe('apps/web-suite scaffold', () => {
     const reg = buildEnvRegistration();
     expect(reg.manifest.id).toBe('env');
     expect(reg.parsers.length).toBeGreaterThan(0);
+    expect(reg.exporters.length).toBeGreaterThan(0);
+  });
+
+  it('imports the NekoDiff manifest through the workspace alias', () => {
+    expect(diffManifest.id).toBe('diff');
+    expect(diffManifest.name).toBe('NekoDiff');
+    expect(diffManifest.offlinePolicy.networkPolicy).toBe('network-forbidden');
+    expect(diffManifest.capabilities.canDiff).toBe(true);
+  });
+
+  it('NekoDiff manifest free entitlements include every feature shipped in this slice', () => {
+    expect(diffManifest.entitlements.free).toContain('diff.text');
+    expect(diffManifest.entitlements.free).toContain('diff.json');
+    expect(diffManifest.entitlements.free).toContain('diff.yaml');
+    expect(diffManifest.entitlements.free).toContain('summary.counts');
+    expect(diffManifest.entitlements.free).toContain('view.unified');
+    expect(diffManifest.entitlements.free).toContain('export.unified');
+    expect(diffManifest.entitlements.free).toContain('copy.output');
+  });
+
+  it('NekoDiff keeps semantic diff + signed bundle Pro (advertised, not in the free set)', () => {
+    expect(diffManifest.entitlements.pro).toContain('diff.semantic');
+    expect(diffManifest.entitlements.pro).toContain('bundle.signed');
+    expect(diffManifest.entitlements.free).not.toContain('diff.semantic');
+  });
+
+  it('exposes buildDiffRegistration so the shell can wire NekoDiff into ToolRegistry', () => {
+    const reg = buildDiffRegistration();
+    expect(reg.manifest.id).toBe('diff');
+    expect(reg.parsers.length).toBe(3);
     expect(reg.exporters.length).toBeGreaterThan(0);
   });
 });

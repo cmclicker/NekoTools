@@ -411,4 +411,31 @@ describe('App integration', () => {
     // The shared Pro-lock surface renders for NekoYAML via the registry.
     expect(screen.getByTestId('pro-surface-yaml')).toBeInTheDocument();
   });
+
+  it('NekoDiff slice: the NekoDiff tab toggles panel visibility (all panels stay mounted)', () => {
+    render(<App initialInput='{"a":1}' />);
+    expect(screen.getByTestId('tool-tab-diff')).toHaveAttribute('aria-pressed', 'false');
+    expect(screen.getByTestId('tool-panel-diff')).not.toBeVisible();
+
+    fireEvent.click(screen.getByTestId('tool-tab-diff'));
+    expect(screen.getByTestId('tool-tab-diff')).toHaveAttribute('aria-pressed', 'true');
+    expect(screen.getByTestId('tool-panel-diff')).toBeVisible();
+    // Other panels stay mounted, just hidden.
+    expect(screen.getByTestId('tool-panel-json')).not.toBeVisible();
+    expect(screen.getByTestId('tool-panel-yaml')).not.toBeVisible();
+    const phase = document.querySelector('.suite__phase');
+    expect(phase?.textContent).toMatch(/Now viewing\s+NekoDiff/);
+  });
+
+  it('NekoDiff slice: initialTool="diff" mounts the NekoDiff UI and advertises Pro-locked diff features', () => {
+    render(<App initialTool="diff" />);
+    expect(screen.getByTestId('tool-panel-diff')).toBeVisible();
+    expect(screen.getByTestId('tool-panel-json')).not.toBeVisible();
+    // The shared Pro-lock surface renders for NekoDiff via the registry, with
+    // the Pro-only diff features visible but locked (not implemented here).
+    expect(screen.getByTestId('pro-surface-diff')).toBeInTheDocument();
+    const proList = screen.getByTestId('pro-list-diff');
+    expect(within(proList).getByText('diff.semantic')).toBeInTheDocument();
+    expect(within(proList).getByText('batch.diff')).toBeInTheDocument();
+  });
 });
