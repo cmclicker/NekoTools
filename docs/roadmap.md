@@ -43,6 +43,7 @@ previous row `Done`.
 | 13    | Phase 2 / NekoLogs 2.0 | Charter | NekoLogs charter PR (10-question reuse gate). Charter doc only — no implementation. | Done (PR #15 / `03b5853`) |
 | 14    | Phase 2 / NekoLogs 2.x.1 | Implementation | `@nekotools/lens-logs` engine MVP: `log.text` (JSON-per-line / logfmt / plaintext detection) + `log.filter` parsers, diagnostics, summary + basic histogram, text/messages/json/csv/markdown exporters, workspace round-trip + conformance tests. **Extracts `@nekotools/lens-kit`** (clock + id-factory) and re-points lens-binary/json/env/logs at it — the 3rd-reuse trigger from NekoJSON charter §7. No UI. | Done (PR #16 / `bdc3f1e`) |
 | 15    | Phase 2 / NekoLogs 2.x.2 | Implementation | NekoLogs UI: table + text + summary views + structured-filter control + search + copy.line / copy.message. Wires `@nekotools/lens-logs` into `apps/web-suite` as the third tool tab and flips the UI entitlements into `manifest.entitlements.free`. **NekoLogs free tier closes here.** | Done (PR #54 / `23c9ce2`) |
+| 16    | Phase 2B / NekoYAML 2B.0 | Charter | **NekoYAML charter PR** (10-question reuse gate). Charter doc only — **implementation NOT authorized**; the `@nekotools/lens-yaml` engine and the NekoYAML UI are separate later PRs. First ratified Phase 2B breadth target (see **Phase 2B** below). | **Next** |
 
 `Later` rows are intentionally not in the queue order — they are
 candidates for promotion to `Queued` after Phase 1 is fully closed.
@@ -157,28 +158,30 @@ export target for the first time, and fires the
 clock/id-factory helper into a shared `@nekotools/lens-kit` package
 in its engine PR.
 
-> **Reprioritization note (proposed).** A market-value reordering of the
-> Phase 2 / Phase 4 tool-breadth path is under evaluation in the **Phase 2B**
-> proposal immediately below. It does **not** change the committed Active
-> Next Queue, and it does **not** authorize implementation.
+> **Reprioritization note (ratified).** A market-value reordering of the
+> Phase 2 / Phase 4 tool-breadth path is **owner-ratified** in the **Phase 2B**
+> section immediately below. Its first target, **NekoYAML**, is now the
+> **Next** item in the Active Next Queue above (charter-only). Ratification
+> sets direction and order; it does **not** authorize implementation.
 
-## Phase 2B — Tool Breadth (PROPOSED — pending owner ratification)
+## Phase 2B — Tool Breadth (RATIFIED — owner-approved direction)
 
-> **Status: proposal, not committed scope.** This section converts the
+> **Status: owner-ratified roadmap direction.** This section converts the
 > candidate surface in [docs/product/tool-ideals.md](product/tool-ideals.md)
-> into a concrete roadmap proposal. It does **not** modify the committed
-> Active Next Queue above, and it does **not** authorize implementation of
-> any tool. Each tool still requires charter → branch → PR → Validation →
-> owner merge (see [governance.md](governance.md) and
-> [tool-charter.md](tool-charter.md)).
+> into owner-approved roadmap direction and order. Its first target —
+> **NekoYAML** — is now promoted to the Active Next Queue above as the
+> **Next** item (charter-only). Ratification sets direction and order; it
+> does **not** authorize implementation of any tool. Each tool still
+> requires charter → branch → PR → Validation → owner merge (see
+> [governance.md](governance.md) and [tool-charter.md](tool-charter.md)).
 
 **Product rationale.** The platform pattern is proven across three shipped
 tools (NekoJSON, NekoEnv, NekoLogs). The next product risk is
 **under-breadth**, not architecture — so the breadth path should be ordered
-by **market value**, not original listing order. This proposal moves the
-suite from 3 toward ~9 meaningful tools.
+by **market value**, not original listing order. Phase 2B moves the suite
+from 3 toward ~9 meaningful tools.
 
-### Current canonical placement (unchanged by this proposal)
+### Current canonical placement (pre-ratification homes)
 
 | Tool | Current home |
 | --- | --- |
@@ -189,9 +192,13 @@ suite from 3 toward ~9 meaningful tools.
 | NekoHeaders | Phase 4 |
 | NekoAPI (API Lens) | Phase 4 |
 
-### Proposed Phase 2B breadth sequence (for evaluation)
+### Ratified Phase 2B breadth sequence
 
-| Rank | Tool | Proposed move | Why |
+NekoYAML (rank 1) is now the **Next** Active Next Queue item (charter-only);
+ranks 2–6 are ratified order and enter the queue as each predecessor's
+charter completes.
+
+| Rank | Tool | Move | Why |
 | ---: | --- | --- | --- |
 | 1 | **NekoYAML** | promote from Phase 4 | Most natural sibling to JSON/env; high config pain; sensitive-artifact fit. |
 | 2 | **NekoIgnore** | keep (Phase 2) | Fast, practical quick-win; already a documented candidate. |
@@ -217,13 +224,15 @@ not a silent demotion of any item) and introduces **NekoDiff** and
   the commodity set: Base64, Hash, Timestamp, Color, UUID, URL) stay in
   [tool-ideals.md](product/tool-ideals.md) as future / parked candidates.
 
-### What this proposal does NOT do
+### What this ratification does NOT do
 
-- It does **not** modify the committed Active Next Queue.
-- It does **not** authorize implementation of any tool.
+- It does **not** authorize implementation of any tool — NekoYAML enters the
+  queue as a **charter-only** step (charter PR → Validation → owner merge →
+  separate engine PR → separate UI PR).
 - It does **not** delete or silently demote any existing roadmap entry.
-- Ratifying it (promoting any of these into the Active Next Queue) is a
-  **separate, explicitly owner-authorized** roadmap change.
+- It promotes **only NekoYAML** into the Active Next Queue now; ranks 2–6 are
+  ratified *direction* and enter the queue subsequently, each via the normal
+  closeout flow.
 
 ## Phase 3 — First premium-grade engines
 
@@ -242,11 +251,11 @@ This is where Pro starts to become real:
 - NekoTypes
 - NekoRBAC
 
-> **Note (proposed promotion).** The **Phase 2B** proposal above evaluates
-> promoting **NekoYAML** and **NekoHeaders** into a near-term breadth
-> sequence, and surfacing **NekoAPI / API Lens** as a later breadth-wave
-> candidate. This is a proposal pending owner ratification — nothing in this
-> phase is demoted or removed by it.
+> **Note (ratified promotion).** The **Phase 2B** section above is
+> owner-ratified: **NekoYAML** is promoted to the Active Next Queue (next,
+> charter-only) and **NekoHeaders** is ratified breadth direction, with
+> **NekoAPI / API Lens** held as a later breadth-wave candidate. The entries
+> in this Phase 4 list are retained for reference; nothing here is deleted.
 
 ## Phase 5 — Expansion packs
 
