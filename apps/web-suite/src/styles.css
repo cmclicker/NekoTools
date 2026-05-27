@@ -1231,3 +1231,83 @@ code {
     border-color: rgba(255, 255, 255, 0.08);
   }
 }
+
+/* ------------------------------------------------------------------ */
+/* NekoDiff slice — two input panes + unified diff output.            */
+/* ------------------------------------------------------------------ */
+
+.diff-inputs {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 1rem;
+}
+
+@media (max-width: 540px) {
+  .diff-inputs {
+    grid-template-columns: 1fr;
+  }
+}
+
+.diff-summary {
+  margin: 0 0 0.75rem;
+  font-size: 0.875rem;
+  opacity: 0.85;
+}
+
+.diff-output {
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: 0.875rem;
+}
+
+.diff-output__header {
+  display: flex;
+  flex-direction: column;
+  margin-bottom: 0.5rem;
+  opacity: 0.75;
+}
+
+.diff-output__minus {
+  color: #dc2626;
+}
+
+.diff-output__plus {
+  color: #059669;
+}
+
+.diff-output__hunks {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  border: 1px solid rgba(0, 0, 0, 0.08);
+  border-radius: 6px;
+  overflow: auto;
+  max-height: 360px;
+}
+
+@media (prefers-color-scheme: dark) {
+  .diff-output__hunks {
+    border-color: rgba(255, 255, 255, 0.08);
+  }
+}
+
+.diff-output__hunk {
+  display: flex;
+  gap: 0.5rem;
+  padding: 0.1rem 0.5rem;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+.diff-output__hunk--add {
+  background: rgba(5, 150, 105, 0.12);
+}
+
+.diff-output__hunk--remove {
+  background: rgba(220, 38, 38, 0.12);
+}
+
+.diff-output__marker {
+  width: 1ch;
+  opacity: 0.6;
+  flex: 0 0 auto;
+}
