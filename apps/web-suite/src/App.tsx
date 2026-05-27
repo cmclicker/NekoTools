@@ -4,6 +4,7 @@ import { EnvApp, type EnvAppProps } from './EnvApp.js';
 import { JsonApp, type JsonAppProps } from './JsonApp.js';
 import { LogsApp, type LogsAppProps } from './LogsApp.js';
 import { YamlApp, type YamlAppProps } from './YamlApp.js';
+import { CodecApp, type CodecAppProps } from './CodecApp.js';
 import { ProSurface } from './ProSurface.js';
 import { TOOLS, toolById, type ActiveTool } from './tools.js';
 
@@ -11,6 +12,7 @@ export type { NekoJsonUiState, ViewMode } from './JsonApp.js';
 export type { EnvViewMode, NekoEnvUiState } from './EnvApp.js';
 export type { LogViewMode, NekoLogsUiState } from './LogsApp.js';
 export type { YamlViewMode, NekoYamlUiState } from './YamlApp.js';
+export type { NekoCodecUiState } from './CodecApp.js';
 export type { ActiveTool } from './tools.js';
 
 export interface AppProps extends JsonAppProps {
@@ -26,6 +28,8 @@ export interface AppProps extends JsonAppProps {
   readonly logsApp?: LogsAppProps;
   /** Wave 2 PR 2 — props forwarded to the NekoYAML sub-app. */
   readonly yamlApp?: YamlAppProps;
+  /** NekoCodec vertical slice — props forwarded to the NekoCodec sub-app. */
+  readonly codecApp?: CodecAppProps;
 }
 
 /**
@@ -49,6 +53,7 @@ export function App({
   envApp,
   logsApp,
   yamlApp,
+  codecApp,
   ...jsonAppProps
 }: AppProps = {}): JSX.Element {
   const [activeTool, setActiveTool] = useState<ActiveTool>(initialTool ?? 'json');
@@ -102,6 +107,9 @@ export function App({
       </div>
       <div hidden={activeTool !== 'yaml'} data-testid="tool-panel-yaml">
         <YamlApp {...yamlApp} />
+      </div>
+      <div hidden={activeTool !== 'codec'} data-testid="tool-panel-codec">
+        <CodecApp {...codecApp} />
       </div>
 
       <footer className="suite__footer">

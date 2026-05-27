@@ -13,6 +13,7 @@
   },
   "dependencies": {
     "@nekotools/contracts": "workspace:*",
+    "@nekotools/lens-codec": "workspace:*",
     "@nekotools/lens-env": "workspace:*",
     "@nekotools/lens-json": "workspace:*",
     "@nekotools/lens-logs": "workspace:*",
