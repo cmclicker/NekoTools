@@ -411,4 +411,23 @@ describe('App integration', () => {
     // The shared Pro-lock surface renders for NekoYAML via the registry.
     expect(screen.getByTestId('pro-surface-yaml')).toBeInTheDocument();
   });
+
+  it('Wave 3: the NekoHeaders tab toggles panel visibility (all panels stay mounted)', () => {
+    render(<App initialInput='{"a":1}' />);
+    expect(screen.getByTestId('tool-tab-headers')).toHaveAttribute('aria-pressed', 'false');
+    expect(screen.getByTestId('tool-panel-headers')).not.toBeVisible();
+
+    fireEvent.click(screen.getByTestId('tool-tab-headers'));
+    expect(screen.getByTestId('tool-tab-headers')).toHaveAttribute('aria-pressed', 'true');
+    expect(screen.getByTestId('tool-panel-headers')).toBeVisible();
+    expect(screen.getByTestId('tool-panel-json')).not.toBeVisible();
+    const phase = document.querySelector('.suite__phase');
+    expect(phase?.textContent).toMatch(/Now viewing\s+NekoHeaders/);
+  });
+
+  it('Wave 3: initialTool="headers" mounts the NekoHeaders UI and renders its Pro surface', () => {
+    render(<App initialTool="headers" />);
+    expect(screen.getByTestId('tool-panel-headers')).toBeVisible();
+    expect(screen.getByTestId('pro-surface-headers')).toBeInTheDocument();
+  });
 });
