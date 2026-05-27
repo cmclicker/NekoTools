@@ -411,4 +411,36 @@ describe('App integration', () => {
     // The shared Pro-lock surface renders for NekoYAML via the registry.
     expect(screen.getByTestId('pro-surface-yaml')).toBeInTheDocument();
   });
+
+  it('NekoTime: the tab is visible and toggles panel visibility (all panels stay mounted)', () => {
+    render(<App initialInput='{"a":1}' />);
+    expect(screen.getByTestId('tool-tab-time')).toBeInTheDocument();
+    expect(screen.getByTestId('tool-tab-time')).toHaveAttribute('aria-pressed', 'false');
+    expect(screen.getByTestId('tool-panel-time')).not.toBeVisible();
+
+    fireEvent.click(screen.getByTestId('tool-tab-time'));
+    expect(screen.getByTestId('tool-tab-time')).toHaveAttribute('aria-pressed', 'true');
+    expect(screen.getByTestId('tool-panel-time')).toBeVisible();
+    // The other panels stay mounted, just hidden.
+    expect(screen.getByTestId('tool-panel-json')).not.toBeVisible();
+    const phase = document.querySelector('.suite__phase');
+    expect(phase?.textContent).toMatch(/Now viewing\s+NekoTime/);
+  });
+
+  it('NekoTime: initialTool="time" mounts the UI, renders conversion output + Pro surface', () => {
+    render(<App initialTool="time" timeApp={{ initialInput: '1700000000' }} />);
+    expect(screen.getByTestId('tool-panel-time')).toBeVisible();
+    expect(screen.getByTestId('tool-panel-json')).not.toBeVisible();
+    // Conversion output renders (ISO UTC for the Unix-seconds input).
+    expect(screen.getByTestId('time-iso').textContent).toBe('2023-11-14T22:13:20.000Z');
+    // The shared Pro-lock surface renders for NekoTime via the registry.
+    expect(screen.getByTestId('pro-surface-time')).toBeInTheDocument();
+  });
+
+  it('NekoTime: every existing tool tab still renders alongside the new tab', () => {
+    render(<App initialInput='{"a":1}' />);
+    for (const id of ['json', 'env', 'logs', 'yaml', 'time']) {
+      expect(screen.getByTestId(`tool-tab-${id}`)).toBeInTheDocument();
+    }
+  });
 });

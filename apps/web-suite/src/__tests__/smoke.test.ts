@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { buildEnvRegistration, envManifest } from '@nekotools/lens-env';
 import { buildJsonRegistration, jsonManifest } from '@nekotools/lens-json';
+import { buildTimeRegistration, timeManifest } from '@nekotools/lens-time';
 
 /**
  * Web-suite shell smoke test. After Phase 2.2 the shell hosts two
@@ -66,6 +67,27 @@ describe('apps/web-suite scaffold', () => {
   it('exposes buildEnvRegistration so the shell can wire NekoEnv into ToolRegistry', () => {
     const reg = buildEnvRegistration();
     expect(reg.manifest.id).toBe('env');
+    expect(reg.parsers.length).toBeGreaterThan(0);
+    expect(reg.exporters.length).toBeGreaterThan(0);
+  });
+
+  it('imports the NekoTime manifest through the workspace alias', () => {
+    expect(timeManifest.id).toBe('time');
+    expect(timeManifest.name).toBe('NekoTime');
+    expect(timeManifest.offlinePolicy.networkPolicy).toBe('network-forbidden');
+  });
+
+  it('NekoTime free entitlements include the engine + UI features this slice ships', () => {
+    expect(timeManifest.entitlements.free).toContain('parse');
+    expect(timeManifest.entitlements.free).toContain('convert.units');
+    expect(timeManifest.entitlements.free).toContain('relative.age');
+    expect(timeManifest.entitlements.free).toContain('view.summary');
+    expect(timeManifest.entitlements.free).toContain('copy.value');
+  });
+
+  it('exposes buildTimeRegistration so the shell can wire NekoTime into ToolRegistry', () => {
+    const reg = buildTimeRegistration();
+    expect(reg.manifest.id).toBe('time');
     expect(reg.parsers.length).toBeGreaterThan(0);
     expect(reg.exporters.length).toBeGreaterThan(0);
   });

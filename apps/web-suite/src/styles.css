@@ -1231,3 +1231,86 @@ code {
     border-color: rgba(255, 255, 255, 0.08);
   }
 }
+
+/* NekoTime slice — timestamp input row + resolved-instant summary. */
+
+.time-input-row {
+  display: flex;
+  gap: 0.5rem;
+  align-items: center;
+}
+
+.time-input {
+  flex: 1;
+  font-family: ui-monospace, 'SF Mono', 'Cascadia Code', 'Roboto Mono', monospace;
+  font-size: 0.9375rem;
+  border: 1px solid rgba(0, 0, 0, 0.15);
+  border-radius: 4px;
+  padding: 0.4rem 0.5rem;
+  background: white;
+  color: inherit;
+}
+
+@media (prefers-color-scheme: dark) {
+  .time-input {
+    background: #0f0f0f;
+    border-color: rgba(255, 255, 255, 0.12);
+  }
+}
+
+.time-interpretation {
+  font-size: 0.75rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  padding: 0.1rem 0.5rem;
+  border-radius: 999px;
+  background: rgba(37, 99, 235, 0.12);
+  color: #2563eb;
+}
+
+@media (prefers-color-scheme: dark) {
+  .time-interpretation {
+    color: #6cb6ff;
+    background: rgba(108, 182, 255, 0.14);
+  }
+}
+
+.time-summary {
+  margin-top: 0.5rem;
+  align-items: baseline;
+}
+
+.time-summary dd code {
+  font-size: 0.9375rem;
+}
+
+.time-offset {
+  opacity: 0.65;
+  font-size: 0.875rem;
+}
+
+.time-copy-inline {
+  font: inherit;
+  font-size: 0.6875rem;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  padding: 0 0.3rem;
+  margin-left: 0.25rem;
+  border: 1px solid rgba(0, 0, 0, 0.15);
+  border-radius: 4px;
+  background: transparent;
+  color: inherit;
+  cursor: pointer;
+  opacity: 0.6;
+}
+
+.time-copy-inline:hover {
+  opacity: 1;
+}
+
+@media (prefers-color-scheme: dark) {
+  .time-copy-inline {
+    border-color: rgba(255, 255, 255, 0.15);
+  }
+}
