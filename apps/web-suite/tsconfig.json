@@ -17,6 +17,7 @@
     { "path": "../../packages/tool-runtime" },
     { "path": "../../packages/lens-json" },
     { "path": "../../packages/lens-env" },
-    { "path": "../../packages/lens-logs" }
+    { "path": "../../packages/lens-logs" },
+    { "path": "../../packages/lens-yaml" }
   ]
 }
