@@ -411,4 +411,34 @@ describe('App integration', () => {
     // The shared Pro-lock surface renders for NekoYAML via the registry.
     expect(screen.getByTestId('pro-surface-yaml')).toBeInTheDocument();
   });
+
+  it('NekoCodec: the tab toggles panel visibility (all panels stay mounted)', () => {
+    render(<App initialInput='{"a":1}' />);
+    expect(screen.getByTestId('tool-tab-codec')).toHaveAttribute('aria-pressed', 'false');
+    expect(screen.getByTestId('tool-panel-codec')).not.toBeVisible();
+
+    fireEvent.click(screen.getByTestId('tool-tab-codec'));
+    expect(screen.getByTestId('tool-tab-codec')).toHaveAttribute('aria-pressed', 'true');
+    expect(screen.getByTestId('tool-panel-codec')).toBeVisible();
+    // Other panels stay mounted, just hidden.
+    expect(screen.getByTestId('tool-panel-json')).not.toBeVisible();
+    const phase = document.querySelector('.suite__phase');
+    expect(phase?.textContent).toMatch(/Now viewing\s+NekoCodec/);
+  });
+
+  it('NekoCodec: initialTool="codec" mounts the NekoCodec UI and renders its Pro surface', () => {
+    render(<App initialTool="codec" />);
+    expect(screen.getByTestId('tool-panel-codec')).toBeVisible();
+    expect(screen.getByTestId('tool-panel-json')).not.toBeVisible();
+    // The shared Pro-lock surface renders codec Pro features via the registry.
+    expect(screen.getByTestId('pro-surface-codec')).toBeInTheDocument();
+    expect(screen.getByTestId('pro-list-codec').textContent).toMatch(/batch\.transform/);
+  });
+
+  it('NekoCodec: every existing tool tab still renders alongside the new tab', () => {
+    render(<App initialInput='{"a":1}' />);
+    for (const id of ['json', 'env', 'logs', 'yaml', 'codec']) {
+      expect(screen.getByTestId(`tool-tab-${id}`)).toBeInTheDocument();
+    }
+  });
 });
