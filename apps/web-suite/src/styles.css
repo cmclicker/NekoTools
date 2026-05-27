@@ -1208,3 +1208,26 @@ code {
     background: rgba(255, 255, 255, 0.12);
   }
 }
+
+/* Wave 2 PR 2 — NekoYAML output pane (JSON projection / normalized YAML). */
+
+.yaml-output {
+  margin: 0;
+  padding: 0.75rem;
+  border: 1px solid rgba(0, 0, 0, 0.08);
+  border-radius: 4px;
+  max-height: 360px;
+  overflow: auto;
+  background: white;
+  font-family: ui-monospace, 'SF Mono', 'Cascadia Code', 'Roboto Mono', monospace;
+  font-size: 0.875rem;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+@media (prefers-color-scheme: dark) {
+  .yaml-output {
+    background: #0f0f0f;
+    border-color: rgba(255, 255, 255, 0.08);
+  }
+}

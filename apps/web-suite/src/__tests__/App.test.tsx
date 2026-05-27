@@ -389,4 +389,26 @@ describe('App integration', () => {
       'error: changed log\n',
     );
   });
+
+  it('Wave 2: the NekoYAML tab toggles panel visibility (all panels stay mounted)', () => {
+    render(<App initialInput='{"a":1}' />);
+    expect(screen.getByTestId('tool-tab-yaml')).toHaveAttribute('aria-pressed', 'false');
+    expect(screen.getByTestId('tool-panel-yaml')).not.toBeVisible();
+
+    fireEvent.click(screen.getByTestId('tool-tab-yaml'));
+    expect(screen.getByTestId('tool-tab-yaml')).toHaveAttribute('aria-pressed', 'true');
+    expect(screen.getByTestId('tool-panel-yaml')).toBeVisible();
+    // Other panels stay mounted, just hidden.
+    expect(screen.getByTestId('tool-panel-json')).not.toBeVisible();
+    const phase = document.querySelector('.suite__phase');
+    expect(phase?.textContent).toMatch(/Now viewing\s+NekoYAML/);
+  });
+
+  it('Wave 2: initialTool="yaml" mounts the NekoYAML UI and renders its Pro surface', () => {
+    render(<App initialTool="yaml" />);
+    expect(screen.getByTestId('tool-panel-yaml')).toBeVisible();
+    expect(screen.getByTestId('tool-panel-json')).not.toBeVisible();
+    // The shared Pro-lock surface renders for NekoYAML via the registry.
+    expect(screen.getByTestId('pro-surface-yaml')).toBeInTheDocument();
+  });
 });

@@ -3,12 +3,14 @@ import { useState } from 'react';
 import { EnvApp, type EnvAppProps } from './EnvApp.js';
 import { JsonApp, type JsonAppProps } from './JsonApp.js';
 import { LogsApp, type LogsAppProps } from './LogsApp.js';
+import { YamlApp, type YamlAppProps } from './YamlApp.js';
 import { ProSurface } from './ProSurface.js';
 import { TOOLS, toolById, type ActiveTool } from './tools.js';
 
 export type { NekoJsonUiState, ViewMode } from './JsonApp.js';
 export type { EnvViewMode, NekoEnvUiState } from './EnvApp.js';
 export type { LogViewMode, NekoLogsUiState } from './LogsApp.js';
+export type { YamlViewMode, NekoYamlUiState } from './YamlApp.js';
 export type { ActiveTool } from './tools.js';
 
 export interface AppProps extends JsonAppProps {
@@ -22,20 +24,21 @@ export interface AppProps extends JsonAppProps {
   readonly envApp?: EnvAppProps;
   /** Phase 2.x.2 — props forwarded to the NekoLogs sub-app. */
   readonly logsApp?: LogsAppProps;
+  /** Wave 2 PR 2 — props forwarded to the NekoYAML sub-app. */
+  readonly yamlApp?: YamlAppProps;
 }
 
 /**
  * Unified web-suite shell.
  *
- * The tab strip and the Free / Pro entitlement surface (`ProSurface`)
- * are rendered from the `TOOLS` registry (`tools.ts`), so adding a tool
- * to those surfaces is a one-line registration. Each tool still mounts
- * its own panel below; switching tabs toggles which panel is visible but
+ * The tab strip and the Free / Pro entitlement surface (`ProSurface`) are
+ * rendered from the `TOOLS` registry (`tools.ts`), so adding a tool to
+ * those surfaces is a one-line registration. Each tool still mounts its
+ * own panel below; switching tabs toggles which panel is visible but
  * **does not unmount the others** (`hidden`-toggled wrappers), so pasted
- * text, view mode, selection, search, and filter survive tab switches —
- * a local-only dev tool should never discard the user's work behind
- * their back (PR #14 audit blocker 1). New tools add a `TOOLS` entry
- * plus a panel here.
+ * text, view mode, selection, search, and filter survive tab switches
+ * (PR #14 audit blocker 1). New tools add a `TOOLS` entry plus a panel
+ * here.
  *
  * The props shape stays backward-compatible with the Phase 1.1h `<App>`:
  * `initialInput`, `initialUiState`, and `clipboardDeps` are forwarded to
@@ -45,6 +48,7 @@ export function App({
   initialTool,
   envApp,
   logsApp,
+  yamlApp,
   ...jsonAppProps
 }: AppProps = {}): JSX.Element {
   const [activeTool, setActiveTool] = useState<ActiveTool>(initialTool ?? 'json');
@@ -95,6 +99,9 @@ export function App({
       </div>
       <div hidden={activeTool !== 'logs'} data-testid="tool-panel-logs">
         <LogsApp {...logsApp} />
+      </div>
+      <div hidden={activeTool !== 'yaml'} data-testid="tool-panel-yaml">
+        <YamlApp {...yamlApp} />
       </div>
 
       <footer className="suite__footer">
