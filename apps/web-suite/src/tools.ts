@@ -3,6 +3,7 @@ import { jsonManifest } from '@nekotools/lens-json';
 import { envManifest } from '@nekotools/lens-env';
 import { logsManifest } from '@nekotools/lens-logs';
 import { yamlManifest } from '@nekotools/lens-yaml';
+import { jwtManifest } from '@nekotools/lens-jwt';
 import { urlManifest } from '@nekotools/lens-url';
 
 /**
@@ -14,7 +15,7 @@ import { urlManifest } from '@nekotools/lens-url';
  * because the sub-apps have bespoke props / test seams; new tools add a
  * `TOOLS` entry plus their panel together.)
  */
-export type ActiveTool = 'json' | 'env' | 'logs' | 'yaml' | 'url';
+export type ActiveTool = 'json' | 'env' | 'logs' | 'yaml' | 'jwt' | 'url';
 
 export interface ToolDescriptor {
   readonly id: ActiveTool;
@@ -27,6 +28,7 @@ export const TOOLS: readonly ToolDescriptor[] = [
   { id: 'env', label: 'NekoEnv', manifest: envManifest },
   { id: 'logs', label: 'NekoLogs', manifest: logsManifest },
   { id: 'yaml', label: 'NekoYAML', manifest: yamlManifest },
+  { id: 'jwt', label: 'NekoJWT', manifest: jwtManifest },
   { id: 'url', label: 'NekoURL', manifest: urlManifest },
 ];
 

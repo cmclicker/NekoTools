@@ -15,6 +15,7 @@
     "@nekotools/contracts": "workspace:*",
     "@nekotools/lens-env": "workspace:*",
     "@nekotools/lens-json": "workspace:*",
+    "@nekotools/lens-jwt": "workspace:*",
     "@nekotools/lens-logs": "workspace:*",
     "@nekotools/lens-yaml": "workspace:*",
     "@nekotools/lens-url": "workspace:*",
