@@ -1,0 +1,16 @@
+{
+  "extends": "../../tsconfig.base.json",
+  "compilerOptions": {
+    "outDir": "dist",
+    "rootDir": "src",
+    "composite": true,
+    "lib": ["ES2022", "DOM"]
+  },
+  "references": [
+    { "path": "../contracts" },
+    { "path": "../schemas" },
+    { "path": "../tool-runtime" },
+    { "path": "../lens-kit" }
+  ],
+  "include": ["src/**/*"]
+}

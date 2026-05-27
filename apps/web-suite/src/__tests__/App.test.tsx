@@ -411,4 +411,33 @@ describe('App integration', () => {
     // The shared Pro-lock surface renders for NekoYAML via the registry.
     expect(screen.getByTestId('pro-surface-yaml')).toBeInTheDocument();
   });
+
+  it('NekoHash: the tab toggles panel visibility (all panels stay mounted)', () => {
+    render(<App initialInput='{"a":1}' />);
+    expect(screen.getByTestId('tool-tab-hash')).toHaveAttribute('aria-pressed', 'false');
+    expect(screen.getByTestId('tool-panel-hash')).not.toBeVisible();
+
+    fireEvent.click(screen.getByTestId('tool-tab-hash'));
+    expect(screen.getByTestId('tool-tab-hash')).toHaveAttribute('aria-pressed', 'true');
+    expect(screen.getByTestId('tool-panel-hash')).toBeVisible();
+    // Other panels stay mounted, just hidden.
+    expect(screen.getByTestId('tool-panel-json')).not.toBeVisible();
+    const phase = document.querySelector('.suite__phase');
+    expect(phase?.textContent).toMatch(/Now viewing\s+NekoHash/);
+  });
+
+  it('NekoHash: initialTool="hash" mounts the NekoHash UI and renders its Pro surface', () => {
+    render(<App initialTool="hash" />);
+    expect(screen.getByTestId('tool-panel-hash')).toBeVisible();
+    expect(screen.getByTestId('tool-panel-json')).not.toBeVisible();
+    // The shared Pro-lock surface renders for NekoHash via the registry.
+    expect(screen.getByTestId('pro-surface-hash')).toBeInTheDocument();
+  });
+
+  it('NekoHash: every existing tool tab still renders alongside the new tab', () => {
+    render(<App initialInput='{"a":1}' />);
+    for (const id of ['json', 'env', 'logs', 'yaml', 'hash']) {
+      expect(screen.getByTestId(`tool-tab-${id}`)).toBeInTheDocument();
+    }
+  });
 });
