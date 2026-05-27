@@ -1,16 +1,14 @@
 # NekoYAML — Phase 2B charter (NekoYAML 2B.0)
 
-> Status: **PROPOSED — charter only.** This document is the NekoYAML tool
-> charter and answers the 10-question reuse gate
-> ([tool-charter.md](../tool-charter.md)). It defines what NekoYAML is
-> *allowed to become*. It does **not** authorize implementation: no
-> `@nekotools/lens-yaml` engine, no NekoYAML UI, no YAML parser, and no
-> dependencies ship in this PR. Per the roadmap Active Next Queue
-> ([../roadmap.md](../roadmap.md), row 16), NekoYAML is queued **charter-only**
-> as the first ratified Phase 2B breadth target; the engine, UI, and roadmap
-> closeout are separate later PRs (see *Required implementation sequence*).
-> Per the open-core governance rule, every free entitlement becomes real only
-> in the same PR that ships its implementation.
+> Status: **ENGINE MVP — Phase 2B engine PR (Wave 2 PR 1).** This document is
+> the NekoYAML tool charter ([tool-charter.md](../tool-charter.md)). The engine
+> (`@nekotools/lens-yaml`) — `yaml.text` + `yaml.from-json` parsers, diagnostics,
+> exporters, manifest, and conformance tests — is delivered by the Phase 2B
+> engine PR. The **NekoYAML UI tab is the next PR** (Wave 2 PR 2); the roadmap
+> closeout follows. Pro features remain advertising-only (not bundled). Per the
+> open-core governance rule each free entitlement becomes real only in the PR
+> that ships it — the engine free-tier set is now implementation-backed in
+> `@nekotools/lens-yaml`.
 
 **Tool identity.** NekoYAML — a local YAML workbench.
 
