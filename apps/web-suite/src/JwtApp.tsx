@@ -81,7 +81,10 @@ export function JwtApp({
 
   const license = useLicenseContext();
   const effectiveEntitlement = entitlement ?? license.entitlement;
-  const parsed = useMemo(() => parseJwtText(input, effectiveEntitlement), [input, effectiveEntitlement]);
+  const parsed = useMemo(
+    () => parseJwtText(input, effectiveEntitlement, verifyResult),
+    [input, effectiveEntitlement, verifyResult],
+  );
   const { document } = parsed;
   const proUnlocked = parsed.proUnlocked;
 
@@ -123,7 +126,12 @@ export function JwtApp({
   const handleVerify = useCallback(async () => {
     const key = buildKey();
     if (key === null) {
-      setVerifyResult({ verified: false, alg: '?', reason: 'paste a valid key / secret (JWK/JWKS must be JSON)' });
+      setVerifyResult({
+        verified: false,
+        alg: '?',
+        status: 'unverifiable',
+        reason: 'paste a valid key / secret (JWK/JWKS must be JSON)',
+      });
       return;
     }
     setVerifying(true);
@@ -144,7 +152,10 @@ export function JwtApp({
           id="jwt-paste"
           className="paste__textarea"
           value={input}
-          onChange={(e: ChangeEvent<HTMLTextAreaElement>) => setInput(e.target.value)}
+          onChange={(e: ChangeEvent<HTMLTextAreaElement>) => {
+            setInput(e.target.value);
+            setVerifyResult(null); // a changed token invalidates the prior verify result
+          }}
           spellCheck={false}
           rows={8}
           data-testid="jwt-input"

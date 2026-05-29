@@ -63,7 +63,7 @@ describe('JwtApp', () => {
   });
 
   it('verifies a signature via the offline verifier', async () => {
-    const verify = vi.fn(async () => ({ verified: true, alg: 'HS256' }));
+    const verify = vi.fn(async () => ({ verified: true, alg: 'HS256', status: 'verified' as const }));
     render(<JwtApp initialInput={VALID} entitlement={PRO} verify={verify} />);
     fireEvent.change(screen.getByTestId('jwt-verify-key'), { target: { value: 'topsecret' } });
     fireEvent.click(screen.getByTestId('jwt-verify-run'));
@@ -93,5 +93,43 @@ describe('JwtApp', () => {
     await waitFor(() =>
       expect(screen.getByTestId('jwt-verify-result')).toHaveAttribute('data-verified', 'true'),
     );
+  });
+
+  // FLAGSHIP (wedge): the offline signature outcome is NekoJWT's headline
+  // security signal — it must flow past the UI into the CI-consumable SARIF,
+  // not stay a UI-only badge. A failing verification has to surface as a
+  // `jwt.signature_invalid` SARIF result, or the Pro export is hollow.
+  it('flows a failed signature verification into the SARIF export (jwt.signature_invalid)', async () => {
+    const verify = vi.fn(async () => ({
+      verified: false,
+      alg: 'HS256',
+      status: 'invalid' as const,
+      reason: 'signature does not match',
+    }));
+    render(
+      <JwtApp
+        initialInput={VALID}
+        initialUiState={{ viewMode: 'sarif' }}
+        entitlement={PRO}
+        verify={verify}
+      />,
+    );
+    // Before verifying, the SARIF must NOT already carry a signature finding.
+    expect(screen.getByTestId('jwt-sarif-output').textContent ?? '').not.toContain(
+      'jwt.signature_invalid',
+    );
+    fireEvent.change(screen.getByTestId('jwt-verify-key'), { target: { value: 'WRONG' } });
+    fireEvent.click(screen.getByTestId('jwt-verify-run'));
+    await waitFor(() =>
+      expect(screen.getByTestId('jwt-sarif-output').textContent ?? '').toContain(
+        'jwt.signature_invalid',
+      ),
+    );
+    // ...and it lands as a SARIF "error" level (high severity), not a note.
+    const sarif = JSON.parse(screen.getByTestId('jwt-sarif-output').textContent ?? '{}') as {
+      runs: { results: { ruleId: string; level: string }[] }[];
+    };
+    const sig = sarif.runs[0]?.results.find((r) => r.ruleId === 'jwt.signature_invalid');
+    expect(sig?.level).toBe('error');
   });
 });

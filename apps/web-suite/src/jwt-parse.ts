@@ -3,8 +3,11 @@ import {
   buildJwtRegistration,
   FIXED_CLOCK,
   JWT_KIND_DOCUMENT,
+  makeDiagnostic,
+  signatureFinding,
   type JwtDocument,
   type JwtDocumentArtifact,
+  type JwtVerifyResult,
 } from '@nekotools/lens-jwt';
 import type { Diagnostic, Entitlement } from '@nekotools/contracts';
 
@@ -54,7 +57,11 @@ export interface ParsedJwt {
  * Output strings come from the real engine exporters (not re-derived in
  * the UI), so the tab can't drift from the engine's behavior.
  */
-export function parseJwtText(raw: string, entitlement: Entitlement = FREE_ENTITLEMENT): ParsedJwt {
+export function parseJwtText(
+  raw: string,
+  entitlement: Entitlement = FREE_ENTITLEMENT,
+  verifyResult: JwtVerifyResult | null = null,
+): ParsedJwt {
   const bytes = utf8ByteLength(raw);
   const result = runParser(registry, 'jwt', 'jwt.text', {
     raw,
@@ -65,10 +72,23 @@ export function parseJwtText(raw: string, entitlement: Entitlement = FREE_ENTITL
     (a): a is JwtDocumentArtifact => a.kind === JWT_KIND_DOCUMENT,
   );
 
+  // Fold the offline signature-verification outcome into the diagnostics, so
+  // it flows into both the Diagnostics panel AND the Pro audit/SARIF — the
+  // signature status is the headline security signal, not a UI-only result.
+  const sigDiag: Diagnostic | null =
+    verifyResult !== null
+      ? (() => {
+          const f = signatureFinding(verifyResult);
+          return makeDiagnostic('diag_sig', f.severity, f.code, f.message);
+        })()
+      : null;
+  const diagnostics: readonly Diagnostic[] =
+    sigDiag !== null ? [...result.diagnostics, sigDiag] : result.diagnostics;
+
   // Free exporters take only the document; the Pro audit/SARIF also need the
-  // diagnostics (for the clock-aware expiry/nbf findings).
+  // diagnostics (clock-aware expiry/nbf findings + the signature outcome).
   const freeInput = { artifacts: documentArtifact ? [documentArtifact] : [], diagnostics: [] };
-  const proInput = { artifacts: documentArtifact ? [documentArtifact] : [], diagnostics: result.diagnostics };
+  const proInput = { artifacts: documentArtifact ? [documentArtifact] : [], diagnostics };
 
   const run = (id: string): string | null =>
     documentArtifact ? String(runExporter(registry, 'jwt', id, freeInput).body) : null;
@@ -90,7 +110,7 @@ export function parseJwtText(raw: string, entitlement: Entitlement = FREE_ENTITL
     audit: runPro('jwt.export.claims.policy'),
     sarif: runPro('jwt.export.sarif'),
     proUnlocked: entitlement.tier !== 'free',
-    diagnostics: result.diagnostics,
+    diagnostics,
     inputBytes: bytes,
   };
 }

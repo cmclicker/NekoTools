@@ -139,6 +139,40 @@ A finished tool has, at minimum:
 - **UI** — each view mode, copy, empty/clean states, Pro lock + unlock, and
   any tool-specific control (filter, file load, audio, …).
 
+### 5.1 The wedge gate — what stops "done-but-hollow"
+
+A parts checklist (engine ✓, exporters ✓, UI ✓, tests pass ✓) is **not** a
+definition of done. Every part can be present and the tool can still miss the
+one thing that makes it worth shipping. NekoJWT failed exactly here once:
+offline signature verification existed, but its result was a UI-only badge that
+never reached the audit or the SARIF — so the tool's headline security signal
+was invisible to its headline Pro export. All the parts were green; the wedge
+was severed.
+
+To prevent the recurrence, "done" is anchored to the tool's **wedge** — the
+specific capability that makes it worth choosing over a generic alternative
+(for NekoJWT: *the signature/claims security verdict crosses into a
+CI-consumable SARIF*; for NekoSecrets: *the masked-but-actionable findings cross
+into SARIF without ever leaking the secret*).
+
+1. **Name the wedge in the charter.** `docs/tools/<tool>.md` states, in one
+   sentence, the capability that justifies the tool. If you can't, the tool is a
+   reskin of a generic lens and should not get a slice.
+2. **Flagship test — prove the wedge end-to-end.** Ship at least one test that
+   drives the wedge across *every* seam it must cross — engine → UI → the
+   export a buyer pays for — asserting on **stable codes/ids**, not prose. For
+   NekoJWT: inject a *failing* verify, then assert the SARIF export contains a
+   `jwt.signature_invalid` result at `error` level. A test that stops at the UI
+   badge would have passed while the wedge was broken — so it doesn't count.
+3. **Islands check — no orphaned capability.** For each Pro/headline feature,
+   trace its output to a consumer a user can actually reach. A result that an
+   engine computes but no export or view surfaces is an *island*: either wire it
+   through or cut it. "It's implemented" is not "it's reachable."
+
+The flagship test and the islands check are **review gates**, not optional
+polish. A reviewer (human or AI) signs off on the wedge being provably wired,
+not just on the parts existing.
+
 ## 6. Verification gate (all four, every change)
 
 ```bash
@@ -164,13 +198,15 @@ it rather than duplicating it (duplicated manifests drift).
 
 ## 8. The per-tool sequence
 
-1. **Charter** — `docs/tools/<tool>.md` answers the 10 questions; the draft
-   manifest passes the schema.
+1. **Charter** — `docs/tools/<tool>.md` answers the 10 questions **and names
+   the wedge** (§5.1); the draft manifest passes the schema.
 2. **Engine** — parser + diagnostics + exporters + manifest + conformance &
    edge tests. Flip free entitlements on as they ship.
 3. **Monetization** — real gated Pro exporters + gating tests (most tools can
    reuse the NekoSecrets pattern wholesale).
-4. **UI** — the web-suite tab + UI tests; wire the shared license.
+4. **UI + flagship** — the web-suite tab + UI tests; wire the shared license;
+   add the **flagship test** that proves the wedge end-to-end and run the
+   **islands check** (§5.1).
 5. **Docs** — charter → IMPLEMENTED, README, rule catalog.
 6. **Verify + sync** — all four gates green; commit; keep `main` in sync.
 

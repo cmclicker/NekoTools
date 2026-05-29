@@ -1,12 +1,25 @@
 import { describe, expect, it } from 'vitest';
-import { ToolRegistry, runParser } from '@nekotools/tool-runtime';
+import { ToolRegistry, runExporter, runParser } from '@nekotools/tool-runtime';
+import type { Entitlement } from '@nekotools/contracts';
 
 import { FIXED_CLOCK, buildJwtRegistration, JWT_KIND_DOCUMENT } from '../index.js';
 import { auditJwt } from '../audit.js';
-import { verifyJwtSignature } from '../verify.js';
+import { makeDiagnostic } from '../diagnostics.js';
+import { signatureFinding, verifyJwtSignature } from '../verify.js';
 import type { JwtDocumentArtifact } from '../kinds.js';
 
 const clock = FIXED_CLOCK('2026-05-27T00:00:00.000Z');
+
+const PRO_ENTITLEMENT: Entitlement = {
+  version: 1,
+  licenseId: 'L',
+  licensee: 'B',
+  tier: 'pro',
+  features: ['*'],
+  issuedAt: '2026-01-01T00:00:00.000Z',
+  expiresAt: null,
+  signature: 's',
+};
 
 function registry(opts?: { largeDocumentBytes?: number }): ToolRegistry {
   const r = new ToolRegistry();
@@ -167,5 +180,66 @@ describe('NekoJWT edge: offline signature verification', () => {
     const bad = await verifyJwtSignature('not-a-jwt', { kind: 'secret', secret: 's' });
     expect(bad.verified).toBe(false);
     expect(bad.reason).toBeDefined();
+  });
+
+  it('classifies every verification outcome with a stable status discriminator', async () => {
+    // verified
+    const good = await signHS256({ sub: 'x' }, 'topsecret');
+    expect((await verifyJwtSignature(good, { kind: 'secret', secret: 'topsecret' })).status).toBe('verified');
+    // invalid (real mismatch — wrong key / tampered)
+    expect((await verifyJwtSignature(good, { kind: 'secret', secret: 'WRONG' })).status).toBe('invalid');
+    // unverifiable (couldn't even run the check)
+    expect((await verifyJwtSignature('eyJhbGciOiJub25lIn0.eyJzdWIiOiJ4In0.', { kind: 'secret', secret: 's' })).status).toBe('unverifiable');
+    expect((await verifyJwtSignature('not-a-jwt', { kind: 'secret', secret: 's' })).status).toBe('unverifiable');
+  });
+});
+
+// The whole point of NekoJWT-as-a-security-artifact: the offline signature
+// outcome is not a UI badge, it crosses the engine seam into the audit + SARIF
+// via signatureFinding -> diagnostic -> auditJwt. These tests pin that bridge
+// with stable codes so a refactor can't quietly sever it.
+describe('NekoJWT edge: signature finding bridges verify -> audit', () => {
+  it('maps each verify status to a stable diagnostic code + severity', () => {
+    expect(signatureFinding({ verified: true, alg: 'HS256', status: 'verified' })).toMatchObject({
+      code: 'jwt.signature_verified',
+      severity: 'info',
+    });
+    expect(
+      signatureFinding({ verified: false, alg: 'HS256', status: 'invalid', reason: 'x' }),
+    ).toMatchObject({ code: 'jwt.signature_invalid', severity: 'error' });
+    expect(
+      signatureFinding({ verified: false, alg: 'none', status: 'unverifiable', reason: 'y' }),
+    ).toMatchObject({ code: 'jwt.signature_unverifiable', severity: 'warning' });
+  });
+
+  it('promotes an invalid signature to a HIGH audit finding (no document needed)', () => {
+    const f = signatureFinding({ verified: false, alg: 'HS256', status: 'invalid', reason: 'mismatch' });
+    const diag = makeDiagnostic('diag_sig', f.severity, f.code, f.message);
+    const findings = auditJwt(undefined, [diag]);
+    const sig = findings.find((x) => x.ruleId === 'jwt.signature_invalid');
+    expect(sig?.severity).toBe('high');
+  });
+
+  it('carries the signature outcome through into the SARIF export as an error-level result', () => {
+    const token = `${b64urlStr('{"alg":"HS256"}')}.${b64urlStr('{"sub":"x","exp":9999999999}')}.test`;
+    const reg = registry();
+    const r = runParser(reg, 'jwt', 'jwt.text', { raw: token, source: { kind: 'paste', bytes: token.length } });
+    const artifacts = r.artifacts.filter((a) => a.kind === JWT_KIND_DOCUMENT);
+
+    const f = signatureFinding({ verified: false, alg: 'HS256', status: 'invalid', reason: 'mismatch' });
+    const diagnostics = [...r.diagnostics, makeDiagnostic('diag_sig', f.severity, f.code, f.message)];
+
+    const out = String(
+      runExporter(
+        reg,
+        'jwt',
+        'jwt.export.sarif',
+        { artifacts, diagnostics },
+        PRO_ENTITLEMENT,
+      ).body,
+    );
+    const sarif = JSON.parse(out) as { runs: { results: { ruleId: string; level: string }[] }[] };
+    const sig = sarif.runs[0]?.results.find((x) => x.ruleId === 'jwt.signature_invalid');
+    expect(sig?.level).toBe('error');
   });
 });
