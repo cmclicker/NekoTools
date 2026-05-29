@@ -29,7 +29,7 @@ body {
 }
 
 .suite {
-  width: min(1180px, calc(100% - 2rem));
+  width: min(1920px, calc(100% - 4rem));
   margin: 0 auto;
   padding: 2rem 0;
 }
@@ -339,7 +339,8 @@ code {
   border: 0;
   margin: 0;
   padding: 0;
-  display: inline-flex;
+  display: flex;
+  flex-wrap: wrap;
   gap: 0.5rem;
 }
 
@@ -2096,6 +2097,34 @@ code {
 
 /* ---- NekoSecrets ---------------------------------------------------- */
 
+/* Two-column workbench on wide screens: sticky input panel | results. */
+.tool--secrets {
+  display: grid;
+  gap: 1.25rem;
+  grid-template-columns: minmax(0, 1fr);
+}
+
+.tool--secrets > .paste,
+.tool--secrets > .results {
+  margin: 0;
+}
+
+@media (min-width: 1000px) {
+  .tool--secrets {
+    grid-template-columns: minmax(360px, 30%) minmax(0, 1fr);
+    align-items: start;
+  }
+
+  .tool--secrets > .paste {
+    position: sticky;
+    top: 1rem;
+  }
+
+  .tool--secrets .paste__textarea {
+    min-height: 340px;
+  }
+}
+
 .paste__head {
   display: flex;
   align-items: baseline;
@@ -2125,6 +2154,12 @@ code {
 }
 
 /* Severity stat chips. */
+.secrets-stats li {
+  border: 1px solid rgba(0, 0, 0, 0.1);
+  border-radius: 999px;
+  padding: 0.2rem 0.7rem;
+  background: rgba(0, 0, 0, 0.025);
+}
 .secrets-stats .secrets-stat--high strong {
   color: #b00020;
 }
