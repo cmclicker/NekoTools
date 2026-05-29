@@ -44,6 +44,7 @@
     { "path": "./packages/lens-unicode" },
     { "path": "./packages/lens-hex" },
     { "path": "./packages/lens-csp" },
+    { "path": "./packages/lens-license" },
     { "path": "./apps/web-suite" }
   ]
 }

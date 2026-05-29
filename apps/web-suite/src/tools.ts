@@ -33,6 +33,7 @@ import { sortManifest } from '@nekotools/lens-sort';
 import { unicodeManifest } from '@nekotools/lens-unicode';
 import { hexManifest } from '@nekotools/lens-hex';
 import { cspManifest } from '@nekotools/lens-csp';
+import { licenseManifest } from '@nekotools/lens-license';
 
 /**
  * The unified workbench tool registry.
@@ -77,7 +78,8 @@ export type ActiveTool =
   | 'sort'
   | 'unicode'
   | 'hex'
-  | 'csp';
+  | 'csp'
+  | 'license';
 
 export type ToolCategoryId = 'data' | 'web' | 'text' | 'project' | 'utility' | 'security';
 
@@ -125,6 +127,7 @@ export const TOOLS: readonly ToolDescriptor[] = [
   { id: 'sort', label: 'NekoSort', category: 'text', manifest: sortManifest },
   { id: 'package', label: 'NekoPackage', category: 'project', manifest: packageManifest },
   { id: 'gitignore', label: 'NekoGitignore', category: 'project', manifest: gitignoreManifest },
+  { id: 'license', label: 'NekoLicense', category: 'project', manifest: licenseManifest },
   { id: 'binary', label: 'NekoBinary', category: 'utility', manifest: binaryManifest },
   { id: 'hash', label: 'NekoHash', category: 'utility', manifest: hashManifest },
   { id: 'time', label: 'NekoTime', category: 'utility', manifest: timeManifest },

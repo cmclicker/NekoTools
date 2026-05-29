@@ -34,6 +34,7 @@ import { SortApp, type SortAppProps } from './SortApp.js';
 import { UnicodeApp, type UnicodeAppProps } from './UnicodeApp.js';
 import { HexApp, type HexAppProps } from './HexApp.js';
 import { CspApp, type CspAppProps } from './CspApp.js';
+import { LicenseApp, type LicenseAppProps } from './LicenseApp.js';
 import { ProSurface } from './ProSurface.js';
 import { TOOL_CATEGORIES, toolById, toolsByCategory, type ActiveTool } from './tools.js';
 
@@ -69,6 +70,7 @@ export type { SortViewMode, NekoSortUiState } from './SortApp.js';
 export type { UnicodeViewMode, NekoUnicodeUiState } from './UnicodeApp.js';
 export type { HexViewMode, NekoHexUiState } from './HexApp.js';
 export type { CspViewMode, NekoCspUiState } from './CspApp.js';
+export type { LicenseViewMode, NekoLicenseUiState } from './LicenseApp.js';
 export type { ActiveTool } from './tools.js';
 
 export interface AppProps extends JsonAppProps {
@@ -144,6 +146,8 @@ export interface AppProps extends JsonAppProps {
   readonly hexApp?: HexAppProps;
   /** NekoCSP slice props forwarded to the NekoCSP sub-app. */
   readonly cspApp?: CspAppProps;
+  /** NekoLicense slice props forwarded to the NekoLicense sub-app. */
+  readonly licenseApp?: LicenseAppProps;
 }
 
 /**
@@ -197,6 +201,7 @@ export function App({
   unicodeApp,
   hexApp,
   cspApp,
+  licenseApp,
   ...jsonAppProps
 }: AppProps = {}): JSX.Element {
   const [activeTool, setActiveTool] = useState<ActiveTool>(initialTool ?? 'json');
@@ -378,6 +383,9 @@ export function App({
       </div>
       <div hidden={activeTool !== 'csp'} data-testid="tool-panel-csp">
         <CspApp {...cspApp} />
+      </div>
+      <div hidden={activeTool !== 'license'} data-testid="tool-panel-license">
+        <LicenseApp {...licenseApp} />
       </div>
 
       <footer className="suite__footer">

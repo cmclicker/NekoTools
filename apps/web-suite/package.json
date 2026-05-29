@@ -32,6 +32,7 @@
     "@nekotools/lens-ini": "workspace:*",
     "@nekotools/lens-json": "workspace:*",
     "@nekotools/lens-jwt": "workspace:*",
+    "@nekotools/lens-license": "workspace:*",
     "@nekotools/lens-logs": "workspace:*",
     "@nekotools/lens-mime": "workspace:*",
     "@nekotools/lens-ndjson": "workspace:*",
