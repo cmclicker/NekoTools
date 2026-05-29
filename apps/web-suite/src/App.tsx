@@ -31,6 +31,7 @@ import { MimeApp, type MimeAppProps } from './MimeApp.js';
 import { DurationApp, type DurationAppProps } from './DurationApp.js';
 import { CaseApp, type CaseAppProps } from './CaseApp.js';
 import { SortApp, type SortAppProps } from './SortApp.js';
+import { UnicodeApp, type UnicodeAppProps } from './UnicodeApp.js';
 import { ProSurface } from './ProSurface.js';
 import { TOOL_CATEGORIES, toolById, toolsByCategory, type ActiveTool } from './tools.js';
 
@@ -63,6 +64,7 @@ export type { MimeViewMode, NekoMimeUiState } from './MimeApp.js';
 export type { DurationViewMode, NekoDurationUiState } from './DurationApp.js';
 export type { CaseViewMode, NekoCaseUiState } from './CaseApp.js';
 export type { SortViewMode, NekoSortUiState } from './SortApp.js';
+export type { UnicodeViewMode, NekoUnicodeUiState } from './UnicodeApp.js';
 export type { ActiveTool } from './tools.js';
 
 export interface AppProps extends JsonAppProps {
@@ -132,6 +134,8 @@ export interface AppProps extends JsonAppProps {
   readonly caseApp?: CaseAppProps;
   /** NekoSort slice props forwarded to the NekoSort sub-app. */
   readonly sortApp?: SortAppProps;
+  /** NekoUnicode slice props forwarded to the NekoUnicode sub-app. */
+  readonly unicodeApp?: UnicodeAppProps;
 }
 
 /**
@@ -182,6 +186,7 @@ export function App({
   durationApp,
   caseApp,
   sortApp,
+  unicodeApp,
   ...jsonAppProps
 }: AppProps = {}): JSX.Element {
   const [activeTool, setActiveTool] = useState<ActiveTool>(initialTool ?? 'json');
@@ -354,6 +359,9 @@ export function App({
       </div>
       <div hidden={activeTool !== 'sort'} data-testid="tool-panel-sort">
         <SortApp {...sortApp} />
+      </div>
+      <div hidden={activeTool !== 'unicode'} data-testid="tool-panel-unicode">
+        <UnicodeApp {...unicodeApp} />
       </div>
 
       <footer className="suite__footer">

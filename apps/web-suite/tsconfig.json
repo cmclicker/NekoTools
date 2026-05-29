@@ -45,6 +45,7 @@
     { "path": "../../packages/lens-mime" },
     { "path": "../../packages/lens-duration" },
     { "path": "../../packages/lens-case" },
-    { "path": "../../packages/lens-sort" }
+    { "path": "../../packages/lens-sort" },
+    { "path": "../../packages/lens-unicode" }
   ]
 }
