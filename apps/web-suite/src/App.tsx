@@ -283,16 +283,15 @@ export function App({
         </nav>
       </header>
 
-      {/* Free / Pro surface for the active tool — visible monetization
-          boundary, consistent across every tool. Presentation only. */}
-      <ProSurface manifest={activeManifest} />
-
       {/*
         All sub-apps stay mounted. The inactive ones are `hidden` so
         screen readers + visual users see exactly one tool at a time,
         but React state — including the textarea contents — is preserved
-        across tab toggles. PR #14 audit blocker 1.
+        across tab toggles. PR #14 audit blocker 1. The panels area
+        grows to fill the viewport so the sticky bottom bar anchors to
+        the screen bottom even when a tool's content is short.
       */}
+      <div className="suite__panels">
       <div hidden={activeTool !== 'json'} data-testid="tool-panel-json">
         <JsonApp {...jsonAppProps} />
       </div>
@@ -399,12 +398,20 @@ export function App({
         <LicenseApp {...licenseApp} />
       </div>
 
-      <footer className="suite__footer">
-        <small>
-          No telemetry. No analytics. No remote fetches. See{' '}
-          <code>docs/product-doctrine.md</code> for the full rules.
-        </small>
-      </footer>
+      </div>
+
+      {/* Sticky bottom bar: the Free / Pro entitlement surface (collapsed
+          by default) sits above the doctrine footer and stays pinned to the
+          bottom of the viewport. */}
+      <div className="suite__bottombar">
+        <ProSurface manifest={activeManifest} />
+        <footer className="suite__footer">
+          <small>
+            No telemetry. No analytics. No remote fetches. See{' '}
+            <code>docs/product-doctrine.md</code> for the full rules.
+          </small>
+        </footer>
+      </div>
     </main>
     </LicenseProvider>
   );

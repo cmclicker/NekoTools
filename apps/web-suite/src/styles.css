@@ -30,15 +30,51 @@ body {
 
 .suite {
   /* Fill the viewport edge-to-edge with a thin responsive gutter — no
-     fixed max-width cap, so wide/ultrawide monitors are used fully. */
+     fixed max-width cap, so wide/ultrawide monitors are used fully. A
+     flex column with min-height:100vh lets the panels grow so the sticky
+     bottom bar anchors to the screen bottom even on short content. */
+  --suite-gutter: clamp(0.75rem, 1.2vw, 1.25rem);
   width: 100%;
+  min-height: 100vh;
   margin: 0;
-  padding: 1.5rem clamp(0.75rem, 1.2vw, 1.25rem);
+  padding: 1.5rem var(--suite-gutter) 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.suite__panels {
+  flex: 1 0 auto;
+}
+
+/* Sticky bottom bar: Free/Pro disclosure + doctrine footer, pinned to the
+   bottom of the viewport and full-bleed (cancels the suite gutter). */
+.suite__bottombar {
+  position: sticky;
+  bottom: 0;
+  margin: 1.5rem calc(-1 * var(--suite-gutter)) 0;
+  padding: 0.6rem var(--suite-gutter);
+  background: #fafaf9;
+  border-top: 1px solid rgba(0, 0, 0, 0.12);
+}
+
+.suite__bottombar .pro-surface {
+  margin: 0;
+}
+
+.suite__bottombar .suite__footer {
+  margin-top: 0.5rem;
+}
+
+@media (prefers-color-scheme: dark) {
+  .suite__bottombar {
+    background: #131313;
+    border-top-color: rgba(255, 255, 255, 0.12);
+  }
 }
 
 @media (max-width: 640px) {
   .suite {
-    padding: 0.75rem;
+    padding: 0.75rem 0.75rem 0;
   }
 }
 
