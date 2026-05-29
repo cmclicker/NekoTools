@@ -21,6 +21,7 @@ import { secretsManifest } from '@nekotools/lens-secrets';
 import { cronManifest } from '@nekotools/lens-cron';
 import { uuidManifest } from '@nekotools/lens-uuid';
 import { semverManifest } from '@nekotools/lens-semver';
+import { ndjsonManifest } from '@nekotools/lens-ndjson';
 
 /**
  * The unified workbench tool registry.
@@ -53,7 +54,8 @@ export type ActiveTool =
   | 'secrets'
   | 'cron'
   | 'uuid'
-  | 'semver';
+  | 'semver'
+  | 'ndjson';
 
 export type ToolCategoryId = 'data' | 'web' | 'text' | 'project' | 'utility' | 'security';
 
@@ -84,6 +86,7 @@ export const TOOLS: readonly ToolDescriptor[] = [
   { id: 'logs', label: 'NekoLogs', category: 'data', manifest: logsManifest },
   { id: 'yaml', label: 'NekoYAML', category: 'data', manifest: yamlManifest },
   { id: 'csv', label: 'NekoCSV', category: 'data', manifest: csvManifest },
+  { id: 'ndjson', label: 'NekoNDJSON', category: 'data', manifest: ndjsonManifest },
   { id: 'toml', label: 'NekoTOML', category: 'data', manifest: tomlManifest },
   { id: 'xml', label: 'NekoXML', category: 'data', manifest: xmlManifest },
   { id: 'jwt', label: 'NekoJWT', category: 'web', manifest: jwtManifest },

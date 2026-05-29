@@ -26,6 +26,7 @@
     "@nekotools/lens-json": "workspace:*",
     "@nekotools/lens-jwt": "workspace:*",
     "@nekotools/lens-logs": "workspace:*",
+    "@nekotools/lens-ndjson": "workspace:*",
     "@nekotools/lens-package": "workspace:*",
     "@nekotools/lens-regex": "workspace:*",
     "@nekotools/lens-secrets": "workspace:*",
