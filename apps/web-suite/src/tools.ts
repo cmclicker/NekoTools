@@ -16,6 +16,7 @@ import { binaryManifest } from '@nekotools/lens-binary';
 import { csvManifest } from '@nekotools/lens-csv';
 import { tomlManifest } from '@nekotools/lens-toml';
 import { xmlManifest } from '@nekotools/lens-xml';
+import { cookiesManifest } from '@nekotools/lens-cookies';
 
 /**
  * The unified workbench tool registry.
@@ -43,7 +44,8 @@ export type ActiveTool =
   | 'binary'
   | 'csv'
   | 'toml'
-  | 'xml';
+  | 'xml'
+  | 'cookies';
 
 export type ToolCategoryId = 'data' | 'web' | 'text' | 'project' | 'utility';
 
@@ -78,6 +80,7 @@ export const TOOLS: readonly ToolDescriptor[] = [
   { id: 'jwt', label: 'NekoJWT', category: 'web', manifest: jwtManifest },
   { id: 'url', label: 'NekoURL', category: 'web', manifest: urlManifest },
   { id: 'headers', label: 'NekoHeaders', category: 'web', manifest: headersManifest },
+  { id: 'cookies', label: 'NekoCookies', category: 'web', manifest: cookiesManifest },
   { id: 'codec', label: 'NekoCodec', category: 'text', manifest: codecManifest },
   { id: 'regex', label: 'NekoRegex', category: 'text', manifest: regexManifest },
   { id: 'diff', label: 'NekoDiff', category: 'text', manifest: diffManifest },

@@ -1791,3 +1791,16 @@ code {
     background: rgba(255, 255, 255, 0.04);
   }
 }
+
+/* NekoCookies — mask toggle; reuses the shared .url-params table + .toml-* output. */
+.cookies-mask {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  font-size: 0.8125rem;
+  white-space: nowrap;
+}
+
+.cookies-mask input {
+  margin: 0;
+}

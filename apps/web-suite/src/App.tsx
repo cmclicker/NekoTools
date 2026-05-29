@@ -17,6 +17,7 @@ import { BinaryApp, type BinaryAppProps } from './BinaryApp.js';
 import { CsvApp, type CsvAppProps } from './CsvApp.js';
 import { TomlApp, type TomlAppProps } from './TomlApp.js';
 import { XmlApp, type XmlAppProps } from './XmlApp.js';
+import { CookiesApp, type CookiesAppProps } from './CookiesApp.js';
 import { ProSurface } from './ProSurface.js';
 import { TOOL_CATEGORIES, toolById, toolsByCategory, type ActiveTool } from './tools.js';
 
@@ -35,6 +36,7 @@ export type { NekoBinaryUiState } from './BinaryApp.js';
 export type { NekoCsvUiState } from './CsvApp.js';
 export type { TomlViewMode, NekoTomlUiState } from './TomlApp.js';
 export type { XmlViewMode, NekoXmlUiState } from './XmlApp.js';
+export type { CookiesViewMode, NekoCookiesUiState } from './CookiesApp.js';
 export type { ActiveTool } from './tools.js';
 
 export interface AppProps extends JsonAppProps {
@@ -76,6 +78,8 @@ export interface AppProps extends JsonAppProps {
   readonly tomlApp?: TomlAppProps;
   /** NekoXML slice props forwarded to the NekoXML sub-app. */
   readonly xmlApp?: XmlAppProps;
+  /** NekoCookies slice props forwarded to the NekoCookies sub-app. */
+  readonly cookiesApp?: CookiesAppProps;
 }
 
 /**
@@ -112,6 +116,7 @@ export function App({
   csvApp,
   tomlApp,
   xmlApp,
+  cookiesApp,
   ...jsonAppProps
 }: AppProps = {}): JSX.Element {
   const [activeTool, setActiveTool] = useState<ActiveTool>(initialTool ?? 'json');
@@ -242,6 +247,9 @@ export function App({
       </div>
       <div hidden={activeTool !== 'xml'} data-testid="tool-panel-xml">
         <XmlApp {...xmlApp} />
+      </div>
+      <div hidden={activeTool !== 'cookies'} data-testid="tool-panel-cookies">
+        <CookiesApp {...cookiesApp} />
       </div>
 
       <footer className="suite__footer">
