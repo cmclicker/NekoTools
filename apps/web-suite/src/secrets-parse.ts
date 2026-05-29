@@ -27,9 +27,16 @@ const registry = (() => {
   return r;
 })();
 
+export interface SeverityCounts {
+  readonly high: number;
+  readonly medium: number;
+  readonly low: number;
+}
+
 export interface SecretsView {
   readonly findingCount: number;
   readonly findings: readonly SecretFinding[];
+  readonly severityCounts: SeverityCounts;
   readonly json: string;
   readonly csv: string;
   readonly markdown: string;
@@ -37,6 +44,10 @@ export interface SecretsView {
   readonly sarif: string | null;
   /** Pro: redacted source text, or null when not entitled. */
   readonly redacted: string | null;
+  /** Pro: self-contained HTML report, or null when not entitled. */
+  readonly html: string | null;
+  /** Pro: deterministic CI baseline JSON, or null when not entitled. */
+  readonly baseline: string | null;
   readonly proUnlocked: boolean;
   readonly diagnostics: readonly Diagnostic[];
   readonly inputBytes: number;
@@ -67,14 +78,20 @@ export function scanSecrets(raw: string, entitlement: Entitlement = FREE_ENTITLE
   };
 
   const proUnlocked = entitlement.tier !== 'free';
+  const findings = value?.findings ?? [];
+  const severityCounts = { high: 0, medium: 0, low: 0 };
+  for (const f of findings) severityCounts[f.severity] += 1;
   return {
     findingCount: value?.findingCount ?? 0,
-    findings: value?.findings ?? [],
+    findings,
+    severityCounts,
     json: run('secret.export.json', '{}'),
     csv: run('secret.export.csv', ''),
     markdown: run('secret.export.markdown.summary', ''),
     sarif: runPro('secret.export.sarif'),
     redacted: runPro('secret.export.redacted'),
+    html: runPro('secret.export.html'),
+    baseline: runPro('secret.export.baseline'),
     proUnlocked,
     diagnostics: result.diagnostics,
     inputBytes: bytes,

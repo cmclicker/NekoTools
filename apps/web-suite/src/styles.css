@@ -2093,3 +2093,147 @@ code {
     background: rgba(230, 164, 23, 0.12);
   }
 }
+
+/* ---- NekoSecrets ---------------------------------------------------- */
+
+.paste__head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 0.75rem;
+  flex-wrap: wrap;
+}
+
+.secrets__file {
+  font-size: 0.8125rem;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+}
+
+.secrets__file input[type='file'] {
+  font: inherit;
+  font-size: 0.75rem;
+  max-width: 12rem;
+}
+
+.secrets__options {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem 1.25rem;
+  margin-top: 0.5rem;
+}
+
+/* Severity stat chips. */
+.secrets-stats .secrets-stat--high strong {
+  color: #b00020;
+}
+.secrets-stats .secrets-stat--medium strong {
+  color: #8a5a00;
+}
+.secrets-stats .secrets-stat--low strong {
+  opacity: 0.7;
+}
+
+/* Severity filter. */
+.secrets-filter {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  flex-wrap: wrap;
+  border: 1px solid rgba(0, 0, 0, 0.12);
+  border-radius: 6px;
+  padding: 0.4rem 0.75rem;
+  margin: 0 0 0.75rem;
+}
+
+.secrets-filter legend {
+  font-size: 0.75rem;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  opacity: 0.65;
+  padding: 0 0.35rem;
+}
+
+.secrets-filter__opt {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+  font-size: 0.8125rem;
+  text-transform: capitalize;
+}
+
+/* Severity badges in the findings table. */
+.sev-badge {
+  display: inline-block;
+  padding: 0.05rem 0.45rem;
+  border-radius: 999px;
+  font-size: 0.6875rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+}
+.sev-badge--high {
+  background: #fde2e1;
+  color: #8a1c13;
+}
+.sev-badge--medium {
+  background: #fdefcf;
+  color: #8a5a00;
+}
+.sev-badge--low {
+  background: #e8e8ec;
+  color: #444;
+}
+
+/* Findings table: severity row accents + horizontal scroll on narrow screens. */
+.secrets-table {
+  display: block;
+  overflow-x: auto;
+}
+.secrets-table tr[data-severity='high'] {
+  background: rgba(176, 0, 32, 0.05);
+}
+.secrets-table tr[data-severity='medium'] {
+  background: rgba(230, 164, 23, 0.06);
+}
+
+@media (max-width: 640px) {
+  .secrets__options {
+    flex-direction: column;
+    gap: 0.4rem;
+  }
+  .secrets-stats {
+    gap: 0.5rem 1rem;
+  }
+}
+
+@media (prefers-color-scheme: dark) {
+  .secrets-filter {
+    border-color: rgba(255, 255, 255, 0.18);
+  }
+  .sev-badge--high {
+    background: rgba(176, 0, 32, 0.25);
+    color: #ff9b94;
+  }
+  .sev-badge--medium {
+    background: rgba(230, 164, 23, 0.22);
+    color: #ffd479;
+  }
+  .sev-badge--low {
+    background: rgba(255, 255, 255, 0.12);
+    color: #cfcfd6;
+  }
+  .secrets-stats .secrets-stat--high strong {
+    color: #ff9b94;
+  }
+  .secrets-stats .secrets-stat--medium strong {
+    color: #ffd479;
+  }
+  .secrets-table tr[data-severity='high'] {
+    background: rgba(176, 0, 32, 0.14);
+  }
+  .secrets-table tr[data-severity='medium'] {
+    background: rgba(230, 164, 23, 0.12);
+  }
+}
