@@ -26,6 +26,7 @@ import { iniManifest } from '@nekotools/lens-ini';
 import { passwordManifest } from '@nekotools/lens-password';
 import { colorManifest } from '@nekotools/lens-color';
 import { gitignoreManifest } from '@nekotools/lens-gitignore';
+import { mimeManifest } from '@nekotools/lens-mime';
 
 /**
  * The unified workbench tool registry.
@@ -63,7 +64,8 @@ export type ActiveTool =
   | 'ini'
   | 'password'
   | 'color'
-  | 'gitignore';
+  | 'gitignore'
+  | 'mime';
 
 export type ToolCategoryId = 'data' | 'web' | 'text' | 'project' | 'utility' | 'security';
 
@@ -102,6 +104,7 @@ export const TOOLS: readonly ToolDescriptor[] = [
   { id: 'url', label: 'NekoURL', category: 'web', manifest: urlManifest },
   { id: 'headers', label: 'NekoHeaders', category: 'web', manifest: headersManifest },
   { id: 'cookies', label: 'NekoCookies', category: 'web', manifest: cookiesManifest },
+  { id: 'mime', label: 'NekoMIME', category: 'web', manifest: mimeManifest },
   { id: 'codec', label: 'NekoCodec', category: 'text', manifest: codecManifest },
   { id: 'regex', label: 'NekoRegex', category: 'text', manifest: regexManifest },
   { id: 'diff', label: 'NekoDiff', category: 'text', manifest: diffManifest },

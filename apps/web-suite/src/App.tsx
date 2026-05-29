@@ -27,6 +27,7 @@ import { IniApp, type IniAppProps } from './IniApp.js';
 import { PasswordApp, type PasswordAppProps } from './PasswordApp.js';
 import { ColorApp, type ColorAppProps } from './ColorApp.js';
 import { GitignoreApp, type GitignoreAppProps } from './GitignoreApp.js';
+import { MimeApp, type MimeAppProps } from './MimeApp.js';
 import { ProSurface } from './ProSurface.js';
 import { TOOL_CATEGORIES, toolById, toolsByCategory, type ActiveTool } from './tools.js';
 
@@ -55,6 +56,7 @@ export type { IniViewMode, NekoIniUiState } from './IniApp.js';
 export type { PasswordViewMode, NekoPasswordUiState } from './PasswordApp.js';
 export type { ColorViewMode, NekoColorUiState } from './ColorApp.js';
 export type { GitignoreViewMode, NekoGitignoreUiState } from './GitignoreApp.js';
+export type { MimeViewMode, NekoMimeUiState } from './MimeApp.js';
 export type { ActiveTool } from './tools.js';
 
 export interface AppProps extends JsonAppProps {
@@ -116,6 +118,8 @@ export interface AppProps extends JsonAppProps {
   readonly colorApp?: ColorAppProps;
   /** NekoGitignore slice props forwarded to the NekoGitignore sub-app. */
   readonly gitignoreApp?: GitignoreAppProps;
+  /** NekoMIME slice props forwarded to the NekoMIME sub-app. */
+  readonly mimeApp?: MimeAppProps;
 }
 
 /**
@@ -162,6 +166,7 @@ export function App({
   passwordApp,
   colorApp,
   gitignoreApp,
+  mimeApp,
   ...jsonAppProps
 }: AppProps = {}): JSX.Element {
   const [activeTool, setActiveTool] = useState<ActiveTool>(initialTool ?? 'json');
@@ -322,6 +327,9 @@ export function App({
       </div>
       <div hidden={activeTool !== 'gitignore'} data-testid="tool-panel-gitignore">
         <GitignoreApp {...gitignoreApp} />
+      </div>
+      <div hidden={activeTool !== 'mime'} data-testid="tool-panel-mime">
+        <MimeApp {...mimeApp} />
       </div>
 
       <footer className="suite__footer">
