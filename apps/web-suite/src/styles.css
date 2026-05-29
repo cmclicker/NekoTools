@@ -17,9 +17,18 @@
   box-sizing: border-box;
 }
 
+html {
+  height: 100%;
+}
+
 body {
   margin: 0;
   padding: 0;
+  /* App shell: the page itself never scrolls — the suite fills the viewport
+     and individual panels scroll internally (real viewport-height math). */
+  height: 100vh;
+  height: 100dvh;
+  overflow: hidden;
   background: #fafaf9;
   color: #1a1a1a;
 }
@@ -42,7 +51,8 @@ body {
   --pad: 0.45rem;
   --suite-gutter: var(--gap);
   width: 100%;
-  min-height: 100vh;
+  height: 100vh;
+  height: 100dvh;
   margin: 0;
   padding: var(--gap) var(--suite-gutter) 0;
   display: flex;
@@ -50,15 +60,18 @@ body {
   gap: var(--gap);
 }
 
+/* The panels region fills the space between header and bottom bar and is the
+   single scroll container for tools that don't manage their own height. */
 .suite__panels {
-  flex: 1 0 auto;
+  flex: 1 1 0;
+  min-height: 0;
+  overflow: auto;
 }
 
 /* Sticky bottom bar: Free/Pro disclosure + doctrine footer, pinned to the
    bottom of the viewport and full-bleed (cancels the suite gutter). */
 .suite__bottombar {
-  position: sticky;
-  bottom: 0;
+  flex: 0 0 auto;
   margin: 0 calc(-1 * var(--suite-gutter));
   padding: var(--pad) var(--suite-gutter);
   background: #fafaf9;
@@ -2221,23 +2234,41 @@ code {
 .tool--cols > .paste,
 .tool--cols > .results {
   margin: 0;
+  min-width: 0;
 }
 
 @media (min-width: 1000px) {
+  /* The active tool panel + a cols workbench fill the panels region height,
+     so the panes reach the bottom bar and scroll their own overflow — the
+     page never scrolls regardless of how tall the inputs get. */
+  .suite__panels > [data-testid^='tool-panel-']:not([hidden]) {
+    height: 100%;
+  }
+
   .tool--cols {
+    height: 100%;
+    min-height: 0;
     grid-template-columns: minmax(360px, 30%) minmax(0, 1fr);
-    align-items: start;
+    align-items: stretch;
   }
 
+  .tool--cols > .paste,
+  .tool--cols > .results {
+    min-height: 0;
+    overflow: auto;
+  }
+
+  /* The input pane is a flex column so its main textarea fills down to the
+     bottom bar; nested textareas (e.g. NekoJWT's verify box) keep their
+     own size. */
   .tool--cols > .paste {
-    position: sticky;
-    top: var(--gap);
+    display: flex;
+    flex-direction: column;
   }
 
-  /* Only the main input textarea fills the column — not nested ones
-     (e.g. NekoJWT's verify-key box). */
   .tool--cols > .paste > .paste__textarea {
-    min-height: 320px;
+    flex: 1 1 auto;
+    min-height: 8rem;
   }
 }
 
