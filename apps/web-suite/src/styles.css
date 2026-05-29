@@ -1854,3 +1854,55 @@ code {
   font-size: 0.9375rem;
   opacity: 0.85;
 }
+
+/* NekoPassword — input field + 0–4 strength meter. */
+.password-input {
+  width: 100%;
+  box-sizing: border-box;
+  padding: 0.5rem 0.6rem;
+  border: 1px solid rgba(0, 0, 0, 0.2);
+  border-radius: 4px;
+  font-family: ui-monospace, 'SF Mono', 'Cascadia Code', 'Roboto Mono', monospace;
+  font-size: 0.95rem;
+}
+
+.password-meter {
+  height: 8px;
+  border-radius: 4px;
+  background: rgba(0, 0, 0, 0.1);
+  overflow: hidden;
+  margin: 0 0 0.5rem;
+}
+
+.password-meter__fill {
+  display: block;
+  height: 100%;
+  transition: width 0.2s ease;
+  background: #d33;
+}
+
+.password-meter--2 .password-meter__fill {
+  background: #e6a417;
+}
+.password-meter--3 .password-meter__fill {
+  background: #6abf2a;
+}
+.password-meter--4 .password-meter__fill {
+  background: #2a9d3f;
+}
+
+.password-meter__label {
+  margin: 0 0 1rem;
+  font-size: 0.9375rem;
+}
+
+@media (prefers-color-scheme: dark) {
+  .password-input {
+    border-color: rgba(255, 255, 255, 0.2);
+    background: rgba(255, 255, 255, 0.06);
+    color: inherit;
+  }
+  .password-meter {
+    background: rgba(255, 255, 255, 0.12);
+  }
+}

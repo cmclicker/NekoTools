@@ -24,6 +24,7 @@ import { UuidApp, type UuidAppProps } from './UuidApp.js';
 import { SemverApp, type SemverAppProps } from './SemverApp.js';
 import { NdjsonApp, type NdjsonAppProps } from './NdjsonApp.js';
 import { IniApp, type IniAppProps } from './IniApp.js';
+import { PasswordApp, type PasswordAppProps } from './PasswordApp.js';
 import { ProSurface } from './ProSurface.js';
 import { TOOL_CATEGORIES, toolById, toolsByCategory, type ActiveTool } from './tools.js';
 
@@ -49,6 +50,7 @@ export type { UuidViewMode, NekoUuidUiState } from './UuidApp.js';
 export type { SemverViewMode, NekoSemverUiState } from './SemverApp.js';
 export type { NdjsonViewMode, NekoNdjsonUiState } from './NdjsonApp.js';
 export type { IniViewMode, NekoIniUiState } from './IniApp.js';
+export type { PasswordViewMode, NekoPasswordUiState } from './PasswordApp.js';
 export type { ActiveTool } from './tools.js';
 
 export interface AppProps extends JsonAppProps {
@@ -104,6 +106,8 @@ export interface AppProps extends JsonAppProps {
   readonly ndjsonApp?: NdjsonAppProps;
   /** NekoINI slice props forwarded to the NekoINI sub-app. */
   readonly iniApp?: IniAppProps;
+  /** NekoPassword slice props forwarded to the NekoPassword sub-app. */
+  readonly passwordApp?: PasswordAppProps;
 }
 
 /**
@@ -147,6 +151,7 @@ export function App({
   semverApp,
   ndjsonApp,
   iniApp,
+  passwordApp,
   ...jsonAppProps
 }: AppProps = {}): JSX.Element {
   const [activeTool, setActiveTool] = useState<ActiveTool>(initialTool ?? 'json');
@@ -298,6 +303,9 @@ export function App({
       </div>
       <div hidden={activeTool !== 'ini'} data-testid="tool-panel-ini">
         <IniApp {...iniApp} />
+      </div>
+      <div hidden={activeTool !== 'password'} data-testid="tool-panel-password">
+        <PasswordApp {...passwordApp} />
       </div>
 
       <footer className="suite__footer">

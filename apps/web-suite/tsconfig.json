@@ -38,6 +38,7 @@
     { "path": "../../packages/lens-uuid" },
     { "path": "../../packages/lens-semver" },
     { "path": "../../packages/lens-ndjson" },
-    { "path": "../../packages/lens-ini" }
+    { "path": "../../packages/lens-ini" },
+    { "path": "../../packages/lens-password" }
   ]
 }

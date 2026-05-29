@@ -23,6 +23,7 @@ import { uuidManifest } from '@nekotools/lens-uuid';
 import { semverManifest } from '@nekotools/lens-semver';
 import { ndjsonManifest } from '@nekotools/lens-ndjson';
 import { iniManifest } from '@nekotools/lens-ini';
+import { passwordManifest } from '@nekotools/lens-password';
 
 /**
  * The unified workbench tool registry.
@@ -57,7 +58,8 @@ export type ActiveTool =
   | 'uuid'
   | 'semver'
   | 'ndjson'
-  | 'ini';
+  | 'ini'
+  | 'password';
 
 export type ToolCategoryId = 'data' | 'web' | 'text' | 'project' | 'utility' | 'security';
 
@@ -107,6 +109,7 @@ export const TOOLS: readonly ToolDescriptor[] = [
   { id: 'uuid', label: 'NekoUUID', category: 'utility', manifest: uuidManifest },
   { id: 'semver', label: 'NekoSemver', category: 'utility', manifest: semverManifest },
   { id: 'secrets', label: 'NekoSecrets', category: 'security', manifest: secretsManifest },
+  { id: 'password', label: 'NekoPassword', category: 'security', manifest: passwordManifest },
 ];
 
 export function toolsByCategory(category: ToolCategoryId): readonly ToolDescriptor[] {
