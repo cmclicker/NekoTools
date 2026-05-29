@@ -25,6 +25,7 @@ import { SemverApp, type SemverAppProps } from './SemverApp.js';
 import { NdjsonApp, type NdjsonAppProps } from './NdjsonApp.js';
 import { IniApp, type IniAppProps } from './IniApp.js';
 import { PasswordApp, type PasswordAppProps } from './PasswordApp.js';
+import { ColorApp, type ColorAppProps } from './ColorApp.js';
 import { ProSurface } from './ProSurface.js';
 import { TOOL_CATEGORIES, toolById, toolsByCategory, type ActiveTool } from './tools.js';
 
@@ -51,6 +52,7 @@ export type { SemverViewMode, NekoSemverUiState } from './SemverApp.js';
 export type { NdjsonViewMode, NekoNdjsonUiState } from './NdjsonApp.js';
 export type { IniViewMode, NekoIniUiState } from './IniApp.js';
 export type { PasswordViewMode, NekoPasswordUiState } from './PasswordApp.js';
+export type { ColorViewMode, NekoColorUiState } from './ColorApp.js';
 export type { ActiveTool } from './tools.js';
 
 export interface AppProps extends JsonAppProps {
@@ -108,6 +110,8 @@ export interface AppProps extends JsonAppProps {
   readonly iniApp?: IniAppProps;
   /** NekoPassword slice props forwarded to the NekoPassword sub-app. */
   readonly passwordApp?: PasswordAppProps;
+  /** NekoColor slice props forwarded to the NekoColor sub-app. */
+  readonly colorApp?: ColorAppProps;
 }
 
 /**
@@ -152,6 +156,7 @@ export function App({
   ndjsonApp,
   iniApp,
   passwordApp,
+  colorApp,
   ...jsonAppProps
 }: AppProps = {}): JSX.Element {
   const [activeTool, setActiveTool] = useState<ActiveTool>(initialTool ?? 'json');
@@ -306,6 +311,9 @@ export function App({
       </div>
       <div hidden={activeTool !== 'password'} data-testid="tool-panel-password">
         <PasswordApp {...passwordApp} />
+      </div>
+      <div hidden={activeTool !== 'color'} data-testid="tool-panel-color">
+        <ColorApp {...colorApp} />
       </div>
 
       <footer className="suite__footer">

@@ -35,6 +35,7 @@
     { "path": "./packages/lens-ndjson" },
     { "path": "./packages/lens-ini" },
     { "path": "./packages/lens-password" },
+    { "path": "./packages/lens-color" },
     { "path": "./apps/web-suite" }
   ]
 }

@@ -24,6 +24,7 @@ import { semverManifest } from '@nekotools/lens-semver';
 import { ndjsonManifest } from '@nekotools/lens-ndjson';
 import { iniManifest } from '@nekotools/lens-ini';
 import { passwordManifest } from '@nekotools/lens-password';
+import { colorManifest } from '@nekotools/lens-color';
 
 /**
  * The unified workbench tool registry.
@@ -59,7 +60,8 @@ export type ActiveTool =
   | 'semver'
   | 'ndjson'
   | 'ini'
-  | 'password';
+  | 'password'
+  | 'color';
 
 export type ToolCategoryId = 'data' | 'web' | 'text' | 'project' | 'utility' | 'security';
 
@@ -108,6 +110,7 @@ export const TOOLS: readonly ToolDescriptor[] = [
   { id: 'cron', label: 'NekoCron', category: 'utility', manifest: cronManifest },
   { id: 'uuid', label: 'NekoUUID', category: 'utility', manifest: uuidManifest },
   { id: 'semver', label: 'NekoSemver', category: 'utility', manifest: semverManifest },
+  { id: 'color', label: 'NekoColor', category: 'utility', manifest: colorManifest },
   { id: 'secrets', label: 'NekoSecrets', category: 'security', manifest: secretsManifest },
   { id: 'password', label: 'NekoPassword', category: 'security', manifest: passwordManifest },
 ];

@@ -1906,3 +1906,50 @@ code {
     background: rgba(255, 255, 255, 0.12);
   }
 }
+
+/* NekoColor — swatch list. */
+.color-swatches {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 0.5rem;
+}
+
+.color-swatch {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+}
+
+.color-swatch__chip {
+  flex: 0 0 auto;
+  width: 2.5rem;
+  height: 2.5rem;
+  border-radius: 6px;
+  border: 1px solid rgba(0, 0, 0, 0.15);
+}
+
+.color-swatch__detail {
+  display: flex;
+  flex-direction: column;
+  gap: 0.1rem;
+  font-size: 0.8125rem;
+}
+
+.color-swatch__detail code {
+  font-family: ui-monospace, 'SF Mono', 'Cascadia Code', 'Roboto Mono', monospace;
+  font-size: 0.875rem;
+}
+
+.color-swatch__forms,
+.color-swatch__contrast {
+  opacity: 0.75;
+  font-family: ui-monospace, 'SF Mono', 'Cascadia Code', 'Roboto Mono', monospace;
+}
+
+@media (prefers-color-scheme: dark) {
+  .color-swatch__chip {
+    border-color: rgba(255, 255, 255, 0.2);
+  }
+}
