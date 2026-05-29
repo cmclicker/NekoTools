@@ -1,18 +1,22 @@
 import { useCallback, useMemo, useState, type ChangeEvent } from 'react';
 
+import type { Entitlement } from '@nekotools/contracts';
+
 import { Diagnostics } from './Diagnostics.js';
 import { copyToClipboard, type ClipboardDeps } from './clipboard.js';
+import { useLicenseContext } from './license-store.js';
 import { assessPasswordInput } from './password-parse.js';
 
 /**
  * NekoPassword sub-app. Wires `@nekotools/lens-password` into the shared
  * web-suite shell as a Security tool tab. Free surface: type/paste a
  * password (masked by default), see a 0–4 strength meter, entropy,
- * crack-time scenarios, and pattern warnings. The password never leaves the
- * input box — the engine returns metrics only.
+ * crack-time scenarios, and pattern warnings. Pro (gated by the suite
+ * license): a policy-compliance audit + CSV export for CI. The password
+ * never leaves the input box — the engine returns metrics only.
  */
 
-export type PasswordViewMode = 'overview' | 'json' | 'markdown';
+export type PasswordViewMode = 'overview' | 'json' | 'markdown' | 'policy' | 'audit';
 
 export interface NekoPasswordUiState {
   readonly viewMode: PasswordViewMode;
@@ -23,6 +27,8 @@ export interface PasswordAppProps {
   readonly initialInput?: string;
   readonly initialUiState?: Partial<NekoPasswordUiState>;
   readonly clipboardDeps?: ClipboardDeps;
+  /** Injected entitlement; defaults to the suite license context. */
+  readonly entitlement?: Entitlement;
 }
 
 interface CopyStatus {
@@ -32,25 +38,57 @@ interface CopyStatus {
 
 const SCORE_LABELS = ['Very weak', 'Weak', 'Fair', 'Strong', 'Very strong'];
 
-export function PasswordApp({ initialInput, initialUiState, clipboardDeps }: PasswordAppProps = {}): JSX.Element {
+const PRO_VIEWS = new Set<PasswordViewMode>(['policy', 'audit']);
+const VIEW_MODES: readonly PasswordViewMode[] = ['overview', 'json', 'markdown', 'policy', 'audit'];
+const VIEW_LABELS: Record<PasswordViewMode, string> = {
+  overview: 'Overview',
+  json: 'JSON',
+  markdown: 'Markdown',
+  policy: 'Policy ⭐',
+  audit: 'Audit CSV ⭐',
+};
+
+export function PasswordApp({
+  initialInput,
+  initialUiState,
+  clipboardDeps,
+  entitlement,
+}: PasswordAppProps = {}): JSX.Element {
   const [input, setInput] = useState<string>(initialInput ?? '');
   const [viewMode, setViewMode] = useState<PasswordViewMode>(initialUiState?.viewMode ?? 'overview');
   const [reveal, setReveal] = useState<boolean>(initialUiState?.reveal ?? false);
   const [copyStatus, setCopyStatus] = useState<CopyStatus | null>(null);
 
-  const result = useMemo(() => assessPasswordInput(input), [input]);
+  const license = useLicenseContext();
+  const effectiveEntitlement = entitlement ?? license.entitlement;
+  const result = useMemo(
+    () => assessPasswordInput(input, effectiveEntitlement),
+    [input, effectiveEntitlement],
+  );
   const report = result.report;
   const score = report?.score ?? 0;
+  const proUnlocked = result.proUnlocked;
+  const isProView = PRO_VIEWS.has(viewMode);
+
+  const outputText =
+    viewMode === 'json'
+      ? result.json
+      : viewMode === 'markdown'
+        ? result.markdown
+        : viewMode === 'policy'
+          ? (result.policyReport ?? '')
+          : viewMode === 'audit'
+            ? (result.auditCsv ?? '')
+            : '';
 
   const handleCopy = useCallback(async () => {
-    const text = viewMode === 'json' ? result.json : result.markdown;
-    if (text === '' || input === '') {
+    if (input === '' || outputText === '') {
       setCopyStatus({ ok: false, method: 'none' });
       return;
     }
-    const r = await copyToClipboard(text, clipboardDeps);
+    const r = await copyToClipboard(outputText, clipboardDeps);
     setCopyStatus({ ok: r.ok, method: r.method });
-  }, [viewMode, result, input, clipboardDeps]);
+  }, [input, outputText, clipboardDeps]);
 
   return (
     <section className="tool tool--password" aria-label="NekoPassword workbench">
@@ -87,7 +125,7 @@ export function PasswordApp({ initialInput, initialUiState, clipboardDeps }: Pas
         <div className="results__toolbar">
           <fieldset className="viewmode" aria-label="Password output mode">
             <legend className="visually-hidden">Password output mode</legend>
-            {(['overview', 'json', 'markdown'] as const).map((m) => (
+            {VIEW_MODES.map((m) => (
               <label key={m} className={viewMode === m ? 'viewmode--active' : ''}>
                 <input
                   type="radio"
@@ -96,7 +134,7 @@ export function PasswordApp({ initialInput, initialUiState, clipboardDeps }: Pas
                   checked={viewMode === m}
                   onChange={() => setViewMode(m)}
                 />
-                {m === 'overview' ? 'Overview' : m === 'json' ? 'JSON' : 'Markdown'}
+                {VIEW_LABELS[m]}
               </label>
             ))}
           </fieldset>
@@ -106,10 +144,10 @@ export function PasswordApp({ initialInput, initialUiState, clipboardDeps }: Pas
               type="button"
               className="copy__btn"
               onClick={handleCopy}
-              disabled={input === ''}
+              disabled={input === '' || outputText === ''}
               data-testid="password-copy-output"
             >
-              {viewMode === 'json' ? 'Copy JSON' : 'Copy markdown summary'}
+              Copy {VIEW_LABELS[viewMode].replace(' ⭐', '')}
             </button>
           </div>
 
@@ -165,9 +203,18 @@ export function PasswordApp({ initialInput, initialUiState, clipboardDeps }: Pas
                 </>
               ) : null}
             </div>
+          ) : isProView && !proUnlocked ? (
+            <div className="pro-lock" role="status" data-testid="password-locked">
+              <strong>{viewMode === 'policy' ? 'Policy audit' : 'Audit CSV'} is a Pro feature.</strong>
+              <p>
+                Score the password against an org policy (length, entropy, character classes,
+                weak-pattern checks) and export a pass/fail audit for CI. Unlock with a license key
+                (verified locally, works offline forever).
+              </p>
+            </div>
           ) : (
             <pre className="toml-output" data-testid="password-output" aria-label={`${viewMode} output`}>
-              {viewMode === 'json' ? result.json : result.markdown}
+              {outputText}
             </pre>
           )
         ) : (
