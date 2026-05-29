@@ -12,7 +12,8 @@
     "build": "tsc -b",
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
-    "lint": "eslint src"
+    "lint": "eslint src",
+    "keygen": "tsx scripts/keygen.ts"
   },
   "dependencies": {
     "@nekotools/contracts": "workspace:*",

@@ -36,6 +36,8 @@ import { HexApp, type HexAppProps } from './HexApp.js';
 import { CspApp, type CspAppProps } from './CspApp.js';
 import { LicenseApp, type LicenseAppProps } from './LicenseApp.js';
 import { ProSurface } from './ProSurface.js';
+import { LicenseBadge } from './LicenseBadge.js';
+import { LicenseProvider, type UseLicenseDeps } from './license-store.js';
 import { TOOL_CATEGORIES, toolById, toolsByCategory, type ActiveTool } from './tools.js';
 
 export type { NekoJsonUiState, ViewMode } from './JsonApp.js';
@@ -148,6 +150,8 @@ export interface AppProps extends JsonAppProps {
   readonly cspApp?: CspAppProps;
   /** NekoLicense slice props forwarded to the NekoLicense sub-app. */
   readonly licenseApp?: LicenseAppProps;
+  /** Injected suite-license deps (storage / public key / verify) for tests. */
+  readonly licenseDeps?: UseLicenseDeps;
 }
 
 /**
@@ -202,6 +206,7 @@ export function App({
   hexApp,
   cspApp,
   licenseApp,
+  licenseDeps,
   ...jsonAppProps
 }: AppProps = {}): JSX.Element {
   const [activeTool, setActiveTool] = useState<ActiveTool>(initialTool ?? 'json');
@@ -213,12 +218,18 @@ export function App({
   };
 
   return (
+    <LicenseProvider deps={licenseDeps}>
     <main className="suite">
       <header className="suite__header">
-        <h1>NekoTools</h1>
-        <p className="suite__tagline">
-          Local-only, air-gapped-capable, zero-telemetry developer workbenches.
-        </p>
+        <div className="suite__titlebar">
+          <div>
+            <h1>NekoTools</h1>
+            <p className="suite__tagline">
+              Local-only, air-gapped-capable, zero-telemetry developer workbenches.
+            </p>
+          </div>
+          <LicenseBadge />
+        </div>
         <p className="suite__phase">
           Now viewing <strong>{activeManifest.name}</strong>.
         </p>
@@ -395,5 +406,6 @@ export function App({
         </small>
       </footer>
     </main>
+    </LicenseProvider>
   );
 }

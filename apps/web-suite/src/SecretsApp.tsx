@@ -1,10 +1,10 @@
 import { useCallback, useMemo, useState, type ChangeEvent } from 'react';
 
 import type { Entitlement } from '@nekotools/contracts';
-import { FREE_ENTITLEMENT } from '@nekotools/tool-runtime';
 
 import { Diagnostics } from './Diagnostics.js';
 import { copyToClipboard, type ClipboardDeps } from './clipboard.js';
+import { useLicenseContext } from './license-store.js';
 import { scanSecrets } from './secrets-parse.js';
 
 /**
@@ -71,7 +71,13 @@ export function SecretsApp({
   const [devUnlock, setDevUnlock] = useState<boolean>(initialUiState?.proUnlocked ?? false);
   const [copyStatus, setCopyStatus] = useState<CopyStatus | null>(null);
 
-  const effectiveEntitlement = entitlement ?? (devUnlock ? DEV_PRO : FREE_ENTITLEMENT);
+  // The suite-wide license (set via the header) is the real unlock; the
+  // explicit `entitlement` prop overrides it (tests/embeds), and the dev
+  // toggle is a local stand-in shown only when neither already grants Pro.
+  const license = useLicenseContext();
+  const effectiveEntitlement =
+    entitlement ?? (devUnlock ? DEV_PRO : license.entitlement);
+  const showDevToggle = entitlement === undefined && !license.isPro;
   const result = useMemo(() => scanSecrets(input, effectiveEntitlement), [input, effectiveEntitlement]);
   const proUnlocked = result.proUnlocked;
 
@@ -131,7 +137,7 @@ export function SecretsApp({
           Scanning runs entirely in your browser. The cleartext only lives in this box — findings
           store masked previews only, and nothing is ever uploaded.
         </p>
-        {entitlement === undefined ? (
+        {showDevToggle ? (
           <label className="cookies-mask">
             <input
               type="checkbox"
