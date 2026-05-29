@@ -48,12 +48,18 @@ describe('JwtApp', () => {
     expect(JSON.parse(screen.getByTestId('jwt-sarif-output').textContent ?? '{}').version).toBe('2.1.0');
   });
 
-  it('hides the verify panel when free and shows it when Pro', () => {
+  it('always shows the verify panel — locked/disabled when free, enabled when Pro (no tier layout shift)', () => {
     const { unmount } = render(<JwtApp initialInput={VALID} />);
-    expect(screen.queryByTestId('jwt-verify-panel')).not.toBeInTheDocument();
+    expect(screen.getByTestId('jwt-verify-panel')).toBeInTheDocument();
+    expect(screen.getByTestId('jwt-verify-key')).toBeDisabled();
+    expect(screen.getByTestId('jwt-verify-run')).toBeDisabled();
+    expect(screen.getByTestId('jwt-verify-locked')).toBeInTheDocument();
     unmount();
     render(<JwtApp initialInput={VALID} entitlement={PRO} />);
     expect(screen.getByTestId('jwt-verify-panel')).toBeInTheDocument();
+    expect(screen.getByTestId('jwt-verify-key')).not.toBeDisabled();
+    expect(screen.getByTestId('jwt-verify-run')).not.toBeDisabled();
+    expect(screen.queryByTestId('jwt-verify-locked')).not.toBeInTheDocument();
   });
 
   it('verifies a signature via the offline verifier', async () => {

@@ -2271,7 +2271,7 @@ code {
   }
 
   .tool--cols > .paste > .paste__textarea {
-    flex: 1 1 auto;
+    flex: 2 1 0;
     min-height: 5rem;
     resize: none;
   }
@@ -2451,11 +2451,27 @@ code {
   word-break: break-word;
 }
 
-/* Pro offline signature-verify panel. */
+/* Pro offline signature-verify panel. Always shown (locked when free) and a
+   flex column so its key box shares the input pane's height with the JWT
+   box rather than being a tiny strip — the layout is identical across tiers. */
 .jwt-verify {
   margin-top: var(--gap);
   padding-top: var(--gap);
   border-top: 1px solid rgba(0, 0, 0, 0.12);
+  display: flex;
+  flex-direction: column;
+  flex: 1 1 0;
+  min-height: 0;
+}
+
+.jwt-verify[data-locked='true'] {
+  opacity: 0.7;
+}
+
+.jwt-verify__locked {
+  margin: var(--gap) 0 0;
+  font-size: 0.8rem;
+  opacity: 0.8;
 }
 
 .jwt-verify__row {
@@ -2466,10 +2482,11 @@ code {
   margin: var(--gap) 0;
 }
 
-/* Fixed size so it can't be dragged into a pane/page scroll; long keys
-   scroll inside the textarea natively. */
+/* Shares the verify panel's height (no resize → can't be dragged into a
+   scroll); long keys scroll inside the textarea natively. */
 .jwt-verify .paste__textarea {
-  flex: 0 0 auto;
+  flex: 1 1 0;
+  min-height: 4rem;
   resize: none;
 }
 

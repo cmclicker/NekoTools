@@ -154,60 +154,70 @@ export function JwtApp({
           telemetry, nothing uploaded.
         </p>
 
-        {/* Pro: offline signature verification (needs a key, so not an export). */}
-        {proUnlocked ? (
-          <div className="jwt-verify" data-testid="jwt-verify-panel">
-            <label className="paste__label" htmlFor="jwt-verify-key">
-              Verify signature (offline) ⭐
-            </label>
-            <div className="jwt-verify__row">
-              <select
-                className="viewmode__select"
-                value={keyKind}
-                onChange={(e) => setKeyKind(e.target.value as KeyKind)}
-                aria-label="Key type"
-                data-testid="jwt-verify-kind"
-              >
-                {(Object.keys(KEY_KIND_LABELS) as KeyKind[]).map((k) => (
-                  <option key={k} value={k}>
-                    {KEY_KIND_LABELS[k]}
-                  </option>
-                ))}
-              </select>
-              <button
-                type="button"
-                className="copy__btn"
-                onClick={handleVerify}
-                disabled={verifying}
-                data-testid="jwt-verify-run"
-              >
-                Verify
-              </button>
-            </div>
-            <textarea
-              id="jwt-verify-key"
-              className="paste__textarea"
-              value={keyText}
-              onChange={(e) => setKeyText(e.target.value)}
-              spellCheck={false}
-              rows={3}
-              placeholder="Paste the shared secret, public-key PEM, JWK, or JWKS…"
-              data-testid="jwt-verify-key"
-            />
-            {verifyResult !== null ? (
-              <p
-                className={`jwt-verify__result jwt-verify__result--${verifyResult.verified ? 'ok' : 'fail'}`}
-                role="status"
-                data-testid="jwt-verify-result"
-                data-verified={verifyResult.verified ? 'true' : 'false'}
-              >
-                {verifyResult.verified
-                  ? `✓ Signature verified (${verifyResult.alg}).`
-                  : `✗ Not verified (${verifyResult.alg})${verifyResult.reason ? ` — ${verifyResult.reason}` : ''}.`}
-              </p>
-            ) : null}
+        {/* Offline signature verification (needs a key, so not an export). It
+            is ALWAYS shown — locked/disabled when free — so the layout never
+            shifts between tiers; unlocking just enables it in place. */}
+        <div className="jwt-verify" data-testid="jwt-verify-panel" data-locked={proUnlocked ? undefined : 'true'}>
+          <label className="paste__label" htmlFor="jwt-verify-key">
+            Verify signature (offline) {proUnlocked ? '⭐' : '🔒'}
+          </label>
+          <div className="jwt-verify__row">
+            <select
+              className="viewmode__select"
+              value={keyKind}
+              onChange={(e) => setKeyKind(e.target.value as KeyKind)}
+              aria-label="Key type"
+              disabled={!proUnlocked}
+              data-testid="jwt-verify-kind"
+            >
+              {(Object.keys(KEY_KIND_LABELS) as KeyKind[]).map((k) => (
+                <option key={k} value={k}>
+                  {KEY_KIND_LABELS[k]}
+                </option>
+              ))}
+            </select>
+            <button
+              type="button"
+              className="copy__btn"
+              onClick={handleVerify}
+              disabled={!proUnlocked || verifying}
+              data-testid="jwt-verify-run"
+            >
+              Verify
+            </button>
           </div>
-        ) : null}
+          <textarea
+            id="jwt-verify-key"
+            className="paste__textarea"
+            value={keyText}
+            onChange={(e) => setKeyText(e.target.value)}
+            spellCheck={false}
+            rows={3}
+            disabled={!proUnlocked}
+            placeholder={
+              proUnlocked
+                ? 'Paste the shared secret, public-key PEM, JWK, or JWKS…'
+                : 'Unlock Pro to verify the signature offline.'
+            }
+            data-testid="jwt-verify-key"
+          />
+          {proUnlocked && verifyResult !== null ? (
+            <p
+              className={`jwt-verify__result jwt-verify__result--${verifyResult.verified ? 'ok' : 'fail'}`}
+              role="status"
+              data-testid="jwt-verify-result"
+              data-verified={verifyResult.verified ? 'true' : 'false'}
+            >
+              {verifyResult.verified
+                ? `✓ Signature verified (${verifyResult.alg}).`
+                : `✗ Not verified (${verifyResult.alg})${verifyResult.reason ? ` — ${verifyResult.reason}` : ''}.`}
+            </p>
+          ) : !proUnlocked ? (
+            <p className="jwt-verify__locked" data-testid="jwt-verify-locked" role="note">
+              Pro — unlock with a license key (verified locally, offline forever).
+            </p>
+          ) : null}
+        </div>
       </section>
 
       <section className="results card">
