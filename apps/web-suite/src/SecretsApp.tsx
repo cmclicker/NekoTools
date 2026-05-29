@@ -9,7 +9,7 @@ import { scanSecrets } from './secrets-parse.js';
 
 /**
  * NekoSecrets sub-app. Free surface: scan pasted text (or a locally-loaded
- * file) for leaked credentials (29 provider patterns + entropy), masked
+ * file) for leaked credentials (30 detection rules + entropy), masked
  * previews, severity filter, JSON/CSV/Markdown export — all local. Pro
  * surface (gated by a license entitlement): SARIF, redacted source, a
  * self-contained HTML report, and a CI baseline. The cleartext secret only
