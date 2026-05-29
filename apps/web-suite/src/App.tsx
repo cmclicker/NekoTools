@@ -18,6 +18,7 @@ import { CsvApp, type CsvAppProps } from './CsvApp.js';
 import { TomlApp, type TomlAppProps } from './TomlApp.js';
 import { XmlApp, type XmlAppProps } from './XmlApp.js';
 import { CookiesApp, type CookiesAppProps } from './CookiesApp.js';
+import { SecretsApp, type SecretsAppProps } from './SecretsApp.js';
 import { ProSurface } from './ProSurface.js';
 import { TOOL_CATEGORIES, toolById, toolsByCategory, type ActiveTool } from './tools.js';
 
@@ -37,6 +38,7 @@ export type { NekoCsvUiState } from './CsvApp.js';
 export type { TomlViewMode, NekoTomlUiState } from './TomlApp.js';
 export type { XmlViewMode, NekoXmlUiState } from './XmlApp.js';
 export type { CookiesViewMode, NekoCookiesUiState } from './CookiesApp.js';
+export type { SecretsViewMode, NekoSecretsUiState } from './SecretsApp.js';
 export type { ActiveTool } from './tools.js';
 
 export interface AppProps extends JsonAppProps {
@@ -80,6 +82,8 @@ export interface AppProps extends JsonAppProps {
   readonly xmlApp?: XmlAppProps;
   /** NekoCookies slice props forwarded to the NekoCookies sub-app. */
   readonly cookiesApp?: CookiesAppProps;
+  /** NekoSecrets slice props forwarded to the NekoSecrets sub-app. */
+  readonly secretsApp?: SecretsAppProps;
 }
 
 /**
@@ -117,6 +121,7 @@ export function App({
   tomlApp,
   xmlApp,
   cookiesApp,
+  secretsApp,
   ...jsonAppProps
 }: AppProps = {}): JSX.Element {
   const [activeTool, setActiveTool] = useState<ActiveTool>(initialTool ?? 'json');
@@ -250,6 +255,9 @@ export function App({
       </div>
       <div hidden={activeTool !== 'cookies'} data-testid="tool-panel-cookies">
         <CookiesApp {...cookiesApp} />
+      </div>
+      <div hidden={activeTool !== 'secrets'} data-testid="tool-panel-secrets">
+        <SecretsApp {...secretsApp} />
       </div>
 
       <footer className="suite__footer">

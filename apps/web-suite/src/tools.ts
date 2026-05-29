@@ -17,6 +17,7 @@ import { csvManifest } from '@nekotools/lens-csv';
 import { tomlManifest } from '@nekotools/lens-toml';
 import { xmlManifest } from '@nekotools/lens-xml';
 import { cookiesManifest } from '@nekotools/lens-cookies';
+import { secretsManifest } from '@nekotools/lens-secrets';
 
 /**
  * The unified workbench tool registry.
@@ -45,9 +46,10 @@ export type ActiveTool =
   | 'csv'
   | 'toml'
   | 'xml'
-  | 'cookies';
+  | 'cookies'
+  | 'secrets';
 
-export type ToolCategoryId = 'data' | 'web' | 'text' | 'project' | 'utility';
+export type ToolCategoryId = 'data' | 'web' | 'text' | 'project' | 'utility' | 'security';
 
 export interface ToolCategory {
   readonly id: ToolCategoryId;
@@ -67,6 +69,7 @@ export const TOOL_CATEGORIES: readonly ToolCategory[] = [
   { id: 'text', label: 'Text' },
   { id: 'project', label: 'Project' },
   { id: 'utility', label: 'Utility' },
+  { id: 'security', label: 'Security' },
 ];
 
 export const TOOLS: readonly ToolDescriptor[] = [
@@ -88,6 +91,7 @@ export const TOOLS: readonly ToolDescriptor[] = [
   { id: 'binary', label: 'NekoBinary', category: 'utility', manifest: binaryManifest },
   { id: 'hash', label: 'NekoHash', category: 'utility', manifest: hashManifest },
   { id: 'time', label: 'NekoTime', category: 'utility', manifest: timeManifest },
+  { id: 'secrets', label: 'NekoSecrets', category: 'security', manifest: secretsManifest },
 ];
 
 export function toolsByCategory(category: ToolCategoryId): readonly ToolDescriptor[] {

@@ -27,6 +27,7 @@
     "@nekotools/lens-logs": "workspace:*",
     "@nekotools/lens-package": "workspace:*",
     "@nekotools/lens-regex": "workspace:*",
+    "@nekotools/lens-secrets": "workspace:*",
     "@nekotools/lens-time": "workspace:*",
     "@nekotools/lens-toml": "workspace:*",
     "@nekotools/lens-url": "workspace:*",
