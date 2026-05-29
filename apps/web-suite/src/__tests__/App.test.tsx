@@ -435,7 +435,7 @@ describe('App integration', () => {
     // The shared Pro-lock surface renders for NekoURL via the registry,
     // including the URL-specific locked features.
     expect(screen.getByTestId('pro-surface-url')).toBeInTheDocument();
-    const proList = screen.getByTestId('pro-list-url');
+    const proList = screen.getByTestId('features-list-url');
     expect(within(proList).getByText('inspect.redirect-chain')).toBeInTheDocument();
     expect(within(proList).getByText('batch.audit')).toBeInTheDocument();
   });

@@ -285,13 +285,20 @@ body {
 .entitlements li {
   min-width: 0;
   max-width: 100%;
-  font-size: 0.875rem;
-  padding: 0.125rem 0.5rem;
+  font-size: 0.75rem;
+  padding: 0.08rem 0.4rem;
   border-radius: 4px;
   background: rgba(0, 0, 0, 0.05);
   overflow-wrap: anywhere;
   word-break: break-word;
   white-space: normal;
+}
+
+/* Merged feature list: Pro items pair the id with an inline PRO tag. */
+.entitlements__pro {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
 }
 
 @media (prefers-color-scheme: dark) {
@@ -347,6 +354,9 @@ code {
 
 .paste__textarea {
   width: 100%;
+  /* Resizable, but capped so dragging it tall can't push the page into a
+     scroll. */
+  max-height: 65vh;
   font-family: ui-monospace, 'SF Mono', 'Cascadia Code', 'Roboto Mono', monospace;
   font-size: 0.875rem;
   border: 1px solid rgba(0, 0, 0, 0.15);

@@ -22,9 +22,10 @@ export function ProSurface({ manifest }: ProSurfaceProps): JSX.Element {
       aria-label={`${manifest.name} free and Pro features`}
     >
       <summary className="pro-surface__summary">
-        <span className="pro-surface__summaryLabel">Free &amp; Pro features</span>
+        <span className="pro-surface__summaryLabel">{manifest.name} features</span>
         <span className="pro-surface__counts">
-          {manifest.entitlements.free.length} free · {manifest.entitlements.pro.length} Pro
+          {manifest.entitlements.free.length + manifest.entitlements.pro.length} ·{' '}
+          {manifest.entitlements.pro.length} Pro
         </span>
         <span
           className={`pro-badge pro-badge--${isPro ? 'unlocked' : 'locked'}`}
@@ -35,20 +36,17 @@ export function ProSurface({ manifest }: ProSurfaceProps): JSX.Element {
       </summary>
 
       <div className="pro-surface__body">
-        <h3 className="pro-surface__heading">Free</h3>
-        <ul className="entitlements entitlements--free" data-testid={`free-list-${manifest.id}`}>
-          {manifest.entitlements.free.map((id) => (
-            <li key={id}>{id}</li>
-          ))}
-        </ul>
-
-        <h3 className="pro-surface__heading">Pro</h3>
+        {/* One flat, color-coded feature list: Pro items carry a PRO tag
+            (green once unlocked). No separate Free/Pro lists. */}
         <ul
-          className={`entitlements entitlements--pro${isPro ? ' entitlements--unlocked' : ''}`}
-          data-testid={`pro-list-${manifest.id}`}
+          className={`entitlements${isPro ? ' entitlements--unlocked' : ''}`}
+          data-testid={`features-list-${manifest.id}`}
         >
+          {manifest.entitlements.free.map((id) => (
+            <li key={`free-${id}`}>{id}</li>
+          ))}
           {manifest.entitlements.pro.map((id) => (
-            <li key={id} className={isPro ? '' : 'entitlements__locked'}>
+            <li key={`pro-${id}`} className="entitlements__pro" data-feature="pro">
               <span>{id}</span>
               <span className="pro-tag">Pro</span>
             </li>
@@ -57,8 +55,8 @@ export function ProSurface({ manifest }: ProSurfaceProps): JSX.Element {
 
         <p className="pro-surface__note">
           {isPro
-            ? `Pro unlocked${licensee !== null ? ` — licensed to ${licensee}` : ''}. Verified locally; no account, no telemetry, no remote check.`
-            : 'Unlock Pro with a license key, verified locally on your machine. No account, no telemetry, no remote check.'}
+            ? `Pro unlocked${licensee !== null ? ` — licensed to ${licensee}` : ''}. Verified locally; no telemetry.`
+            : 'Pro unlocks with a license key, verified locally. No account, no telemetry, no remote check.'}
         </p>
       </div>
     </details>

@@ -83,11 +83,11 @@ describe('RegexApp in the shell', () => {
 
   it('renders the shared Pro surface with NekoRegex Pro features shown locked', () => {
     render(<App initialTool="regex" />);
-    const proList = screen.getByTestId('pro-list-regex');
+    const proList = screen.getByTestId('features-list-regex');
     expect(within(proList).getByText('explain.mode')).toBeInTheDocument();
     expect(within(proList).getByText('redaction.recipes')).toBeInTheDocument();
     expect(within(proList).getByText('suites.saved')).toBeInTheDocument();
-    // Each Pro row carries a visible locked "Pro" tag.
+    // Each Pro feature carries a color-coded "Pro" tag.
     expect(within(proList).getAllByText('Pro')).toHaveLength(6);
   });
 });
