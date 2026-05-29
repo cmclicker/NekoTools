@@ -16,6 +16,14 @@ export type JwtVerifyKey =
 export interface JwtVerifyResult {
   readonly verified: boolean;
   readonly alg: string;
+  /**
+   * - `verified`     — the signature checks out against the supplied key.
+   * - `invalid`      — a real signature mismatch (wrong key / tampered token).
+   * - `unverifiable` — couldn't even run the check (alg "none", bad/absent
+   *                    key, malformed token). This is the discriminator the
+   *                    audit/SARIF use to classify the finding.
+   */
+  readonly status: 'verified' | 'invalid' | 'unverifiable';
   /** Why verification failed or could not run (absent on success). */
   readonly reason?: string;
 }
@@ -108,7 +116,8 @@ function pickJwk(jwks: { keys: readonly JsonWebKey[] }, kid: string | undefined)
  */
 export async function verifyJwtSignature(token: string, key: JwtVerifyKey): Promise<JwtVerifyResult> {
   const segments = token.trim().split('.');
-  if (segments.length !== 3) return { verified: false, alg: '?', reason: 'token does not have 3 segments' };
+  if (segments.length !== 3)
+    return { verified: false, alg: '?', status: 'unverifiable', reason: 'token does not have 3 segments' };
   const [headerSeg, payloadSeg, signatureSeg] = segments as [string, string, string];
 
   let alg: string;
@@ -118,14 +127,16 @@ export async function verifyJwtSignature(token: string, key: JwtVerifyKey): Prom
       alg?: string;
       kid?: string;
     };
-    if (typeof header.alg !== 'string') return { verified: false, alg: '?', reason: 'header has no alg' };
+    if (typeof header.alg !== 'string')
+      return { verified: false, alg: '?', status: 'unverifiable', reason: 'header has no alg' };
     alg = header.alg;
     kid = header.kid;
   } catch {
-    return { verified: false, alg: '?', reason: 'header is not valid JSON' };
+    return { verified: false, alg: '?', status: 'unverifiable', reason: 'header is not valid JSON' };
   }
 
-  if (alg === 'none') return { verified: false, alg, reason: 'alg "none" cannot be verified' };
+  if (alg === 'none')
+    return { verified: false, alg, status: 'unverifiable', reason: 'alg "none" cannot be verified' };
 
   try {
     const params = paramsFor(alg, key.kind);
@@ -148,7 +159,8 @@ export async function verifyJwtSignature(token: string, key: JwtVerifyKey): Prom
       );
     } else {
       const jwk = key.kind === 'jwk' ? key.jwk : pickJwk(key.jwks, kid);
-      if (jwk === undefined) return { verified: false, alg, reason: 'no matching JWK for kid' };
+      if (jwk === undefined)
+        return { verified: false, alg, status: 'unverifiable', reason: 'no matching JWK for kid' };
       cryptoKey = await crypto.subtle.importKey('jwk', jwk, params.importParams, false, ['verify']);
     }
 
@@ -160,8 +172,42 @@ export async function verifyJwtSignature(token: string, key: JwtVerifyKey): Prom
       sig as BufferSource,
       data as BufferSource,
     );
-    return ok ? { verified: true, alg } : { verified: false, alg, reason: 'signature does not match' };
+    return ok
+      ? { verified: true, alg, status: 'verified' }
+      : { verified: false, alg, status: 'invalid', reason: 'signature does not match' };
   } catch (e) {
-    return { verified: false, alg, reason: e instanceof Error ? e.message : 'verification failed' };
+    return {
+      verified: false,
+      alg,
+      status: 'unverifiable',
+      reason: e instanceof Error ? e.message : 'verification failed',
+    };
   }
+}
+
+/**
+ * Map a verification result to a diagnostic-finding triple so the signature
+ * outcome flows into the claims audit + SARIF (the whole point of NekoJWT as
+ * a security artifact). Codes are stable.
+ */
+export function signatureFinding(result: JwtVerifyResult): {
+  code: string;
+  severity: 'error' | 'warning' | 'info';
+  message: string;
+} {
+  if (result.status === 'verified') {
+    return { code: 'jwt.signature_verified', severity: 'info', message: `signature verified (${result.alg})` };
+  }
+  if (result.status === 'invalid') {
+    return {
+      code: 'jwt.signature_invalid',
+      severity: 'error',
+      message: `signature does NOT verify (${result.alg}) — wrong key or tampered token`,
+    };
+  }
+  return {
+    code: 'jwt.signature_unverifiable',
+    severity: 'warning',
+    message: `signature could not be verified (${result.alg})${result.reason ? ` — ${result.reason}` : ''}`,
+  };
 }

@@ -71,6 +71,31 @@ describe('SecretsApp', () => {
     expect(JSON.parse(out).version).toBe('2.1.0');
   });
 
+  // FLAGSHIP (wedge): NekoSecrets earns its place by turning a masked finding
+  // into a CI-consumable SARIF result — a STABLE ruleId at the right severity —
+  // WITHOUT ever leaking the raw secret. A `version`-only assertion would pass
+  // even if the UI emitted zero results, so this pins the finding end-to-end
+  // through the seam a buyer actually pays for (tool-standard.md §5.1).
+  it('flows a masked finding into the SARIF export as an error-level result (no leak)', () => {
+    render(
+      <SecretsApp
+        initialInput={'aws=AKIAIOSFODNN7EXAMPLE'}
+        initialUiState={{ viewMode: 'sarif' }}
+        entitlement={PRO}
+      />,
+    );
+    const out = screen.getByTestId('secrets-output').textContent ?? '';
+    const sarif = JSON.parse(out) as {
+      version: string;
+      runs: { results: { ruleId: string; level: string }[] }[];
+    };
+    expect(sarif.version).toBe('2.1.0');
+    const finding = sarif.runs[0]?.results.find((r) => r.ruleId === 'aws.access-key');
+    expect(finding?.level).toBe('error');
+    // The wedge's whole premise: the CI artifact carries the verdict, never the secret.
+    expect(out).not.toContain('AKIAIOSFODNN7EXAMPLE');
+  });
+
   it('unlocks via an injected Pro entitlement (no dev toggle shown)', () => {
     render(
       <SecretsApp

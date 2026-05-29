@@ -29,6 +29,9 @@ export const JWT_AUDIT_SEVERITY_RANK: Record<JwtAuditSeverity, number> = {
 /** Parser diagnostic codes that map straight into audit findings. */
 const FROM_DIAGNOSTIC: Record<string, JwtAuditSeverity> = {
   'jwt.alg_none': 'high',
+  'jwt.signature_invalid': 'high',
+  'jwt.signature_unverifiable': 'medium',
+  'jwt.signature_verified': 'info',
   'jwt.token_expired': 'high',
   'jwt.token_not_yet_valid': 'medium',
   'jwt.missing_expiration': 'medium',

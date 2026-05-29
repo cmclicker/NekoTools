@@ -54,6 +54,9 @@ export const JWT_DIAGNOSTIC_CODES = {
   missingExpiration: 'jwt.missing_expiration',
   algNone: 'jwt.alg_none',
   signatureNotVerified: 'jwt.signature_not_verified',
+  signatureVerified: 'jwt.signature_verified',
+  signatureInvalid: 'jwt.signature_invalid',
+  signatureUnverifiable: 'jwt.signature_unverifiable',
   largeDocument: 'jwt.large_document',
 } as const;
 
