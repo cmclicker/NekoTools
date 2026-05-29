@@ -1966,3 +1966,29 @@ code {
   white-space: pre;
   overflow-x: auto;
 }
+
+/* Gated Pro feature placeholder (shown when a Pro view is selected while free). */
+.pro-lock {
+  border: 1px dashed rgba(0, 0, 0, 0.25);
+  border-radius: 6px;
+  padding: 1rem 1.25rem;
+  background: rgba(230, 164, 23, 0.08);
+}
+
+.pro-lock strong {
+  display: block;
+  margin-bottom: 0.35rem;
+}
+
+.pro-lock p {
+  margin: 0;
+  font-size: 0.875rem;
+  opacity: 0.85;
+}
+
+@media (prefers-color-scheme: dark) {
+  .pro-lock {
+    border-color: rgba(255, 255, 255, 0.25);
+    background: rgba(230, 164, 23, 0.12);
+  }
+}

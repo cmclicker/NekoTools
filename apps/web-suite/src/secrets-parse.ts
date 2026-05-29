@@ -1,4 +1,4 @@
-import { ToolRegistry, runExporter, runParser } from '@nekotools/tool-runtime';
+import { ToolRegistry, runExporter, runParser, FREE_ENTITLEMENT } from '@nekotools/tool-runtime';
 import {
   buildSecretsRegistration,
   FIXED_CLOCK,
@@ -6,7 +6,7 @@ import {
   type SecretFinding,
   type SecretReportArtifact,
 } from '@nekotools/lens-secrets';
-import type { Diagnostic } from '@nekotools/contracts';
+import type { Diagnostic, Entitlement } from '@nekotools/contracts';
 
 /**
  * NekoSecrets UI parse helper, extracted out of SecretsApp for testability
@@ -33,11 +33,16 @@ export interface SecretsView {
   readonly json: string;
   readonly csv: string;
   readonly markdown: string;
+  /** Pro: SARIF 2.1.0, or null when not entitled. */
+  readonly sarif: string | null;
+  /** Pro: redacted source text, or null when not entitled. */
+  readonly redacted: string | null;
+  readonly proUnlocked: boolean;
   readonly diagnostics: readonly Diagnostic[];
   readonly inputBytes: number;
 }
 
-export function scanSecrets(raw: string): SecretsView {
+export function scanSecrets(raw: string, entitlement: Entitlement = FREE_ENTITLEMENT): SecretsView {
   const bytes = utf8ByteLength(raw);
   const result = runParser(registry, 'secrets', 'secret.text', {
     raw,
@@ -51,13 +56,26 @@ export function scanSecrets(raw: string): SecretsView {
   const exportInput = { artifacts: artifact ? [artifact] : [], diagnostics: result.diagnostics };
   const run = (id: string, fallback: string): string =>
     artifact ? String(runExporter(registry, 'secrets', id, exportInput).body) : fallback;
+  // Pro exporters are gated: runExporter throws EntitlementError when free.
+  const runPro = (id: string): string | null => {
+    if (!artifact) return null;
+    try {
+      return String(runExporter(registry, 'secrets', id, exportInput, entitlement).body);
+    } catch {
+      return null;
+    }
+  };
 
+  const proUnlocked = entitlement.tier !== 'free';
   return {
     findingCount: value?.findingCount ?? 0,
     findings: value?.findings ?? [],
     json: run('secret.export.json', '{}'),
     csv: run('secret.export.csv', ''),
     markdown: run('secret.export.markdown.summary', ''),
+    sarif: runPro('secret.export.sarif'),
+    redacted: runPro('secret.export.redacted'),
+    proUnlocked,
     diagnostics: result.diagnostics,
     inputBytes: bytes,
   };

@@ -21,6 +21,12 @@ export interface ToolRegistration {
   readonly parsers: readonly Parser[];
   readonly exporters: readonly Exporter[];
   readonly graphProjectors?: readonly GraphProjector[];
+  /**
+   * Pro exporters. In the single-build-gated model these ship in the binary
+   * alongside the free ones, but `runExporter` refuses to run them without a
+   * valid entitlement. They must still be declared in `manifest.exporters`.
+   */
+  readonly proExporters?: readonly Exporter[];
 }
 
 export class ToolRegistry {
@@ -53,7 +59,7 @@ export class ToolRegistry {
       }
     }
 
-    for (const exporter of reg.exporters) {
+    for (const exporter of [...reg.exporters, ...(reg.proExporters ?? [])]) {
       if (exporter.toolId !== manifest.id) {
         throw new Error(
           `exporter "${exporter.id}" toolId "${exporter.toolId}" does not match manifest "${manifest.id}"`,

@@ -9,10 +9,24 @@ import {
 } from '@nekotools/tool-runtime';
 import { validate } from '@nekotools/schemas';
 
+import { EntitlementError } from '@nekotools/tool-runtime';
+import type { Entitlement } from '@nekotools/contracts';
+
 import { FIXED_CLOCK, buildSecretsRegistration, secretsManifest } from '../index.js';
 import type { SecretReportArtifact } from '../kinds.js';
 
 const clock = FIXED_CLOCK('2026-05-28T00:00:00.000Z');
+
+const PRO: Entitlement = {
+  version: 1,
+  licenseId: 'TEST',
+  licensee: 'Test User',
+  tier: 'pro',
+  features: ['*'],
+  issuedAt: '2026-01-01T00:00:00.000Z',
+  expiresAt: null,
+  signature: 'test',
+};
 
 function registry(): ToolRegistry {
   const r = new ToolRegistry();
@@ -63,20 +77,50 @@ describe('NekoSecrets: manifest', () => {
   });
 });
 
-describe('NekoSecrets: monetization safety', () => {
-  const registration = buildSecretsRegistration(clock);
+describe('NekoSecrets: monetization gating (single-build, entitlement-gated)', () => {
   const proExporterIds = ['secret.export.sarif', 'secret.export.redacted'];
 
-  it('no Pro exporter is registered, and each throws "unknown exporter"', () => {
-    const registered = new Set(registration.exporters.map((e) => e.id));
-    const r = registry();
+  it('Pro exporters are declared AND registered as proExporters', () => {
+    const reg = buildSecretsRegistration(clock);
+    const proIds = new Set((reg.proExporters ?? []).map((e) => e.id));
     for (const id of proExporterIds) {
-      expect(registered.has(id)).toBe(false);
       expect(secretsManifest.exporters).toContain(id);
-      expect(() => runExporter(r, 'secrets', id, { artifacts: [], diagnostics: [] })).toThrow(
-        /unknown exporter/,
-      );
+      expect(proIds.has(id)).toBe(true);
+      // ...and NOT among the free exporters.
+      expect(reg.exporters.some((e) => e.id === id)).toBe(false);
     }
+  });
+
+  it('a free caller (default entitlement) is refused with EntitlementError', () => {
+    const r = registry();
+    const parsed = scan('k=AKIAIOSFODNN7EXAMPLE');
+    for (const id of proExporterIds) {
+      expect(() =>
+        runExporter(r, 'secrets', id, { artifacts: parsed.artifacts, diagnostics: [] }),
+      ).toThrow(EntitlementError);
+    }
+  });
+
+  it('a Pro entitlement unlocks the SARIF + redacted exporters', () => {
+    const r = registry();
+    const parsed = scan('aws=AKIAIOSFODNN7EXAMPLE');
+    const sarif = JSON.parse(
+      String(runExporter(r, 'secrets', 'secret.export.sarif', { artifacts: parsed.artifacts, diagnostics: [] }, PRO).body),
+    );
+    expect(sarif.version).toBe('2.1.0');
+    expect(sarif.runs[0].results[0].ruleId).toBe('aws.access-key');
+
+    const redacted = String(
+      runExporter(r, 'secrets', 'secret.export.redacted', { artifacts: parsed.artifacts, diagnostics: [] }, PRO).body,
+    );
+    expect(redacted).toContain('[REDACTED:aws.access-key]');
+    expect(redacted).not.toContain('AKIAIOSFODNN7EXAMPLE');
+  });
+
+  it('a truly unknown exporter id still throws "unknown exporter"', () => {
+    expect(() =>
+      runExporter(registry(), 'secrets', 'secret.export.nope', { artifacts: [], diagnostics: [] }, PRO),
+    ).toThrow(/unknown exporter/);
   });
 });
 

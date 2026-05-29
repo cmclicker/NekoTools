@@ -105,3 +105,68 @@ export const freeExporters: readonly Exporter<SecretArtifact>[] = [
   csvExporter,
   markdownSummaryExporter,
 ];
+
+// --- Pro exporters (registered in the binary, gated by entitlement) --------
+
+const SARIF_LEVEL: Record<string, string> = { high: 'error', medium: 'warning', low: 'note' };
+
+/**
+ * `secret.export.sarif` (Pro) — SARIF 2.1.0 so findings drop straight into
+ * CI code-scanning dashboards. Carries masked previews only.
+ */
+export const sarifExporter: Exporter<SecretArtifact> = {
+  version: 1,
+  id: 'secret.export.sarif',
+  toolId: TOOL_ID,
+  target: 'json',
+  accepts: SECRET_REPORT_EXPORT_KINDS,
+  producesMimeType: 'application/sarif+json',
+  producesExtension: 'sarif',
+  export({ artifacts }) {
+    const findings = pickReport(artifacts)?.value.findings ?? [];
+    const ruleIds = [...new Set(findings.map((f) => f.ruleId))];
+    const sarif = {
+      version: '2.1.0',
+      $schema: 'https://json.schemastore.org/sarif-2.1.0.json',
+      runs: [
+        {
+          tool: { driver: { name: 'NekoSecrets', informationUri: 'https://nekotools.local', rules: ruleIds.map((id) => ({ id })) } },
+          results: findings.map((f) => ({
+            ruleId: f.ruleId,
+            level: SARIF_LEVEL[f.severity] ?? 'warning',
+            message: { text: `${f.description} (${f.preview})` },
+            locations: [
+              {
+                physicalLocation: {
+                  artifactLocation: { uri: 'input' },
+                  region: { startLine: f.line, startColumn: f.column },
+                },
+              },
+            ],
+          })),
+        },
+      ],
+    };
+    return { mimeType: 'application/sarif+json', extension: 'sarif', body: JSON.stringify(sarif, null, 2) };
+  },
+};
+
+/**
+ * `secret.export.redacted` (Pro) — the original text with every detected
+ * secret replaced by `[REDACTED:<ruleId>]`. Safe to paste into a ticket.
+ */
+export const redactedExporter: Exporter<SecretArtifact> = {
+  version: 1,
+  id: 'secret.export.redacted',
+  toolId: TOOL_ID,
+  target: 'plaintext',
+  accepts: SECRET_REPORT_EXPORT_KINDS,
+  producesMimeType: 'text/plain',
+  producesExtension: 'txt',
+  export({ artifacts }) {
+    const body = pickReport(artifacts)?.value.redactedText ?? '';
+    return { mimeType: 'text/plain', extension: 'txt', body };
+  },
+};
+
+export const proExporters: readonly Exporter<SecretArtifact>[] = [sarifExporter, redactedExporter];

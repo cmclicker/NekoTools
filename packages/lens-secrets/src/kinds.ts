@@ -39,6 +39,12 @@ export interface SecretFinding {
 export interface SecretReport {
   readonly findingCount: number;
   readonly findings: readonly SecretFinding[];
+  /**
+   * The input with every detected secret span replaced by
+   * `[REDACTED:<ruleId>]`. Safe to persist/share — it contains no raw
+   * secret. Consumed by the Pro `secret.export.redacted` exporter.
+   */
+  readonly redactedText: string;
 }
 
 export type SecretReportArtifact = Artifact<'secret.report', SecretReport>;

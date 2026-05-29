@@ -46,4 +46,38 @@ describe('SecretsApp', () => {
     await waitFor(() => expect(writes).toHaveLength(1));
     expect(writes[0]).toContain('# NekoSecrets export');
   });
+
+  it('locks the SARIF Pro view when free', () => {
+    render(<SecretsApp initialInput={'aws=AKIAIOSFODNN7EXAMPLE'} initialUiState={{ viewMode: 'sarif' }} />);
+    expect(screen.getByTestId('secrets-locked')).toBeInTheDocument();
+    expect(screen.queryByTestId('secrets-output')).not.toBeInTheDocument();
+  });
+
+  it('unlocks SARIF + redacted via the dev Pro toggle', () => {
+    render(<SecretsApp initialInput={'aws=AKIAIOSFODNN7EXAMPLE'} initialUiState={{ viewMode: 'sarif' }} />);
+    fireEvent.click(screen.getByTestId('secrets-pro-toggle'));
+    const out = screen.getByTestId('secrets-output').textContent ?? '';
+    expect(JSON.parse(out).version).toBe('2.1.0');
+  });
+
+  it('unlocks via an injected Pro entitlement (no dev toggle shown)', () => {
+    render(
+      <SecretsApp
+        initialInput={'aws=AKIAIOSFODNN7EXAMPLE'}
+        initialUiState={{ viewMode: 'redacted' }}
+        entitlement={{
+          version: 1,
+          licenseId: 'X',
+          licensee: 'Buyer',
+          tier: 'pro',
+          features: ['*'],
+          issuedAt: '2026-01-01T00:00:00.000Z',
+          expiresAt: null,
+          signature: 's',
+        }}
+      />,
+    );
+    expect(screen.queryByTestId('secrets-pro-toggle')).not.toBeInTheDocument();
+    expect(screen.getByTestId('secrets-output').textContent).toContain('[REDACTED:aws.access-key]');
+  });
 });

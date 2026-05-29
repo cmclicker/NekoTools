@@ -68,7 +68,7 @@ function scan(input: ParserInput, deps: SecretTextParserDeps): ParserResult<Secr
       makeDiagnostic(diagIds(), 'info', SECRET_DIAGNOSTIC_CODES.emptyInput, 'input is empty'),
     );
     return {
-      artifacts: [makeArtifact(artIds(), producedAt, input, { findingCount: 0, findings: [] })],
+      artifacts: [makeArtifact(artIds(), producedAt, input, { findingCount: 0, findings: [], redactedText: raw })],
       diagnostics,
     };
   }
@@ -152,8 +152,26 @@ function scan(input: ParserInput, deps: SecretTextParserDeps): ParserResult<Secr
     );
   }
 
-  const report: SecretReport = { findingCount: findings.length, findings };
+  const report: SecretReport = {
+    findingCount: findings.length,
+    findings,
+    redactedText: redact(raw, hits),
+  };
   return { artifacts: [makeArtifact(artIds(), producedAt, input, report)], diagnostics };
+}
+
+/** Replace each detected secret span with `[REDACTED:<ruleId>]`. Overlapping
+ * hits are coalesced; the result contains no raw secret. */
+function redact(raw: string, hits: readonly RawHit[]): string {
+  const sorted = [...hits].sort((a, b) => a.start - b.start || b.end - a.end);
+  let out = '';
+  let cursor = 0;
+  for (const h of sorted) {
+    if (h.start < cursor) continue; // overlaps an already-redacted span
+    out += raw.slice(cursor, h.start) + `[REDACTED:${h.ruleId}]`;
+    cursor = h.end;
+  }
+  return out + raw.slice(cursor);
 }
 
 /** first 4 + bullets + last 2, all bullets for short matches. Never reveals the body. */

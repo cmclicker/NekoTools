@@ -1,13 +1,16 @@
 import type {
   Artifact,
   Diagnostic,
+  Entitlement,
   ExportInput,
   ExportResult,
   Parser,
   ParserInput,
   ParserResult,
 } from '@nekotools/contracts';
+import { FREE_ENTITLEMENT } from '@nekotools/contracts';
 
+import { EntitlementError, grantsFeature } from './license.js';
 import type { ToolRegistry } from './registry.js';
 
 /**
@@ -63,11 +66,21 @@ export function runExporter(
   toolId: string,
   exporterId: string,
   input: ExportInput,
+  entitlement: Entitlement = FREE_ENTITLEMENT,
 ): ExportResult {
   const tool = registry.get(toolId);
   if (!tool) throw new Error(`unknown tool: ${toolId}`);
-  const exporter = tool.exporters.find((e) => e.id === exporterId);
+
+  const freeExporter = tool.exporters.find((e) => e.id === exporterId);
+  const proExporter = tool.proExporters?.find((e) => e.id === exporterId);
+  const exporter = freeExporter ?? proExporter;
   if (!exporter) throw new Error(`unknown exporter: ${toolId}/${exporterId}`);
+
+  // Single-build gating: a Pro exporter ships in the binary but only runs
+  // for a valid entitlement that grants it. Free callers get a clear error.
+  if (proExporter !== undefined && !grantsFeature(entitlement, exporterId)) {
+    throw new EntitlementError(`exporter "${exporterId}" requires a Pro license`, exporterId);
+  }
 
   for (const artifact of input.artifacts) {
     if (!exporter.accepts.includes(artifact.kind)) {
