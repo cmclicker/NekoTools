@@ -29,6 +29,7 @@
     "@nekotools/lens-time": "workspace:*",
     "@nekotools/lens-toml": "workspace:*",
     "@nekotools/lens-url": "workspace:*",
+    "@nekotools/lens-xml": "workspace:*",
     "@nekotools/lens-yaml": "workspace:*",
     "@nekotools/schemas": "workspace:*",
     "@nekotools/tool-runtime": "workspace:*",

@@ -16,6 +16,7 @@ import { PackageApp, type PackageAppProps } from './PackageApp.js';
 import { BinaryApp, type BinaryAppProps } from './BinaryApp.js';
 import { CsvApp, type CsvAppProps } from './CsvApp.js';
 import { TomlApp, type TomlAppProps } from './TomlApp.js';
+import { XmlApp, type XmlAppProps } from './XmlApp.js';
 import { ProSurface } from './ProSurface.js';
 import { TOOL_CATEGORIES, toolById, toolsByCategory, type ActiveTool } from './tools.js';
 
@@ -33,6 +34,7 @@ export type { NekoPackageUiState } from './PackageApp.js';
 export type { NekoBinaryUiState } from './BinaryApp.js';
 export type { NekoCsvUiState } from './CsvApp.js';
 export type { TomlViewMode, NekoTomlUiState } from './TomlApp.js';
+export type { XmlViewMode, NekoXmlUiState } from './XmlApp.js';
 export type { ActiveTool } from './tools.js';
 
 export interface AppProps extends JsonAppProps {
@@ -72,6 +74,8 @@ export interface AppProps extends JsonAppProps {
   readonly csvApp?: CsvAppProps;
   /** NekoTOML slice props forwarded to the NekoTOML sub-app. */
   readonly tomlApp?: TomlAppProps;
+  /** NekoXML slice props forwarded to the NekoXML sub-app. */
+  readonly xmlApp?: XmlAppProps;
 }
 
 /**
@@ -107,6 +111,7 @@ export function App({
   binaryApp,
   csvApp,
   tomlApp,
+  xmlApp,
   ...jsonAppProps
 }: AppProps = {}): JSX.Element {
   const [activeTool, setActiveTool] = useState<ActiveTool>(initialTool ?? 'json');
@@ -234,6 +239,9 @@ export function App({
       </div>
       <div hidden={activeTool !== 'toml'} data-testid="tool-panel-toml">
         <TomlApp {...tomlApp} />
+      </div>
+      <div hidden={activeTool !== 'xml'} data-testid="tool-panel-xml">
+        <XmlApp {...xmlApp} />
       </div>
 
       <footer className="suite__footer">

@@ -15,6 +15,7 @@ import { packageManifest } from '@nekotools/lens-package';
 import { binaryManifest } from '@nekotools/lens-binary';
 import { csvManifest } from '@nekotools/lens-csv';
 import { tomlManifest } from '@nekotools/lens-toml';
+import { xmlManifest } from '@nekotools/lens-xml';
 
 /**
  * The unified workbench tool registry.
@@ -41,7 +42,8 @@ export type ActiveTool =
   | 'package'
   | 'binary'
   | 'csv'
-  | 'toml';
+  | 'toml'
+  | 'xml';
 
 export type ToolCategoryId = 'data' | 'web' | 'text' | 'project' | 'utility';
 
@@ -72,6 +74,7 @@ export const TOOLS: readonly ToolDescriptor[] = [
   { id: 'yaml', label: 'NekoYAML', category: 'data', manifest: yamlManifest },
   { id: 'csv', label: 'NekoCSV', category: 'data', manifest: csvManifest },
   { id: 'toml', label: 'NekoTOML', category: 'data', manifest: tomlManifest },
+  { id: 'xml', label: 'NekoXML', category: 'data', manifest: xmlManifest },
   { id: 'jwt', label: 'NekoJWT', category: 'web', manifest: jwtManifest },
   { id: 'url', label: 'NekoURL', category: 'web', manifest: urlManifest },
   { id: 'headers', label: 'NekoHeaders', category: 'web', manifest: headersManifest },

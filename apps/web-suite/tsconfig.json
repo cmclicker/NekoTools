@@ -30,6 +30,7 @@
     { "path": "../../packages/lens-regex" },
     { "path": "../../packages/lens-diff" },
     { "path": "../../packages/lens-package" },
-    { "path": "../../packages/lens-toml" }
+    { "path": "../../packages/lens-toml" },
+    { "path": "../../packages/lens-xml" }
   ]
 }
