@@ -2252,20 +2252,28 @@ code {
     align-items: stretch;
   }
 
-  /* Each pane fills the column height and scrolls its own overflow, so a
-     textarea can be dragged down to the bottom bar — and past it (the pane
-     scrolls) — without ever scrolling the page. */
-  .tool--cols > .paste,
+  /* The results pane scrolls its own (potentially long) output. */
   .tool--cols > .results {
     min-height: 0;
     overflow: auto;
   }
 
-  /* A roomy default for the main input. It stays user-resizable (NOT
-     flex-filled) so its resize handle works — consistent with secondary
-     textareas like NekoJWT's verify box. */
+  /* The input pane is a fixed-height flex column that DOES NOT scroll: the
+     main textarea flexes to fit it exactly (always reaching the bottom bar),
+     and secondary inputs (NekoJWT's verify box) keep a fixed size. Textareas
+     still scroll their own text natively; the pane itself never does — so
+     neither the pane nor the page can be scrolled by sizing inputs. */
+  .tool--cols > .paste {
+    min-height: 0;
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+  }
+
   .tool--cols > .paste > .paste__textarea {
-    min-height: 16rem;
+    flex: 1 1 auto;
+    min-height: 5rem;
+    resize: none;
   }
 }
 
@@ -2456,6 +2464,13 @@ code {
   gap: var(--gap);
   flex-wrap: wrap;
   margin: var(--gap) 0;
+}
+
+/* Fixed size so it can't be dragged into a pane/page scroll; long keys
+   scroll inside the textarea natively. */
+.jwt-verify .paste__textarea {
+  flex: 0 0 auto;
+  resize: none;
 }
 
 .viewmode__select {
