@@ -135,7 +135,7 @@ export function JwtApp({
   }, [buildKey, verify, input]);
 
   return (
-    <section className="tool tool--jwt" aria-label="NekoJWT workbench">
+    <section className="tool tool--jwt tool--cols" aria-label="NekoJWT workbench">
       <section className="paste card">
         <label htmlFor="jwt-paste" className="paste__label">
           Paste JWT here:
@@ -359,9 +359,9 @@ export function JwtApp({
             No JWT yet. Paste a JWT above (or check the diagnostics below).
           </div>
         ) : null}
-      </section>
 
-      <Diagnostics diagnostics={parsed.diagnostics} />
+        <Diagnostics diagnostics={parsed.diagnostics} />
+      </section>
     </section>
   );
 }

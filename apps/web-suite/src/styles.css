@@ -2198,31 +2198,36 @@ code {
 
 /* ---- NekoSecrets ---------------------------------------------------- */
 
-/* Two-column workbench on wide screens: sticky input panel | results. */
-.tool--secrets {
+/* Two-column workbench (the standard layout): a sticky input panel beside
+   the results panel on wide screens, collapsing to one column below. Any
+   tool opts in by adding `tool--cols` and rendering exactly two children:
+   a `.paste` card and a `.results` card (diagnostics live inside results). */
+.tool--cols {
   display: grid;
   gap: var(--gap);
   grid-template-columns: minmax(0, 1fr);
 }
 
-.tool--secrets > .paste,
-.tool--secrets > .results {
+.tool--cols > .paste,
+.tool--cols > .results {
   margin: 0;
 }
 
 @media (min-width: 1000px) {
-  .tool--secrets {
+  .tool--cols {
     grid-template-columns: minmax(360px, 30%) minmax(0, 1fr);
     align-items: start;
   }
 
-  .tool--secrets > .paste {
+  .tool--cols > .paste {
     position: sticky;
     top: var(--gap);
   }
 
-  .tool--secrets .paste__textarea {
-    min-height: 340px;
+  /* Only the main input textarea fills the column — not nested ones
+     (e.g. NekoJWT's verify-key box). */
+  .tool--cols > .paste > .paste__textarea {
+    min-height: 320px;
   }
 }
 

@@ -260,7 +260,7 @@ export function SecretsApp({
   const copyDisabled = isProView ? !proUnlocked || copyText === '' : copyText === '';
 
   return (
-    <section className="tool tool--secrets" aria-label="NekoSecrets workbench">
+    <section className="tool tool--secrets tool--cols" aria-label="NekoSecrets workbench">
       <section className="paste card">
         <div className="paste__head">
           <label htmlFor="secrets-paste" className="paste__label">
