@@ -20,6 +20,7 @@ import { XmlApp, type XmlAppProps } from './XmlApp.js';
 import { CookiesApp, type CookiesAppProps } from './CookiesApp.js';
 import { SecretsApp, type SecretsAppProps } from './SecretsApp.js';
 import { CronApp, type CronAppProps } from './CronApp.js';
+import { UuidApp, type UuidAppProps } from './UuidApp.js';
 import { ProSurface } from './ProSurface.js';
 import { TOOL_CATEGORIES, toolById, toolsByCategory, type ActiveTool } from './tools.js';
 
@@ -41,6 +42,7 @@ export type { XmlViewMode, NekoXmlUiState } from './XmlApp.js';
 export type { CookiesViewMode, NekoCookiesUiState } from './CookiesApp.js';
 export type { SecretsViewMode, NekoSecretsUiState } from './SecretsApp.js';
 export type { CronViewMode, NekoCronUiState } from './CronApp.js';
+export type { UuidViewMode, NekoUuidUiState } from './UuidApp.js';
 export type { ActiveTool } from './tools.js';
 
 export interface AppProps extends JsonAppProps {
@@ -88,6 +90,8 @@ export interface AppProps extends JsonAppProps {
   readonly secretsApp?: SecretsAppProps;
   /** NekoCron slice props forwarded to the NekoCron sub-app. */
   readonly cronApp?: CronAppProps;
+  /** NekoUUID slice props forwarded to the NekoUUID sub-app. */
+  readonly uuidApp?: UuidAppProps;
 }
 
 /**
@@ -127,6 +131,7 @@ export function App({
   cookiesApp,
   secretsApp,
   cronApp,
+  uuidApp,
   ...jsonAppProps
 }: AppProps = {}): JSX.Element {
   const [activeTool, setActiveTool] = useState<ActiveTool>(initialTool ?? 'json');
@@ -266,6 +271,9 @@ export function App({
       </div>
       <div hidden={activeTool !== 'cron'} data-testid="tool-panel-cron">
         <CronApp {...cronApp} />
+      </div>
+      <div hidden={activeTool !== 'uuid'} data-testid="tool-panel-uuid">
+        <UuidApp {...uuidApp} />
       </div>
 
       <footer className="suite__footer">

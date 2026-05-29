@@ -30,6 +30,7 @@
     { "path": "./packages/lens-cookies" },
     { "path": "./packages/lens-secrets" },
     { "path": "./packages/lens-cron" },
+    { "path": "./packages/lens-uuid" },
     { "path": "./apps/web-suite" }
   ]
 }

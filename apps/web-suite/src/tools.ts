@@ -19,6 +19,7 @@ import { xmlManifest } from '@nekotools/lens-xml';
 import { cookiesManifest } from '@nekotools/lens-cookies';
 import { secretsManifest } from '@nekotools/lens-secrets';
 import { cronManifest } from '@nekotools/lens-cron';
+import { uuidManifest } from '@nekotools/lens-uuid';
 
 /**
  * The unified workbench tool registry.
@@ -49,7 +50,8 @@ export type ActiveTool =
   | 'xml'
   | 'cookies'
   | 'secrets'
-  | 'cron';
+  | 'cron'
+  | 'uuid';
 
 export type ToolCategoryId = 'data' | 'web' | 'text' | 'project' | 'utility' | 'security';
 
@@ -94,6 +96,7 @@ export const TOOLS: readonly ToolDescriptor[] = [
   { id: 'hash', label: 'NekoHash', category: 'utility', manifest: hashManifest },
   { id: 'time', label: 'NekoTime', category: 'utility', manifest: timeManifest },
   { id: 'cron', label: 'NekoCron', category: 'utility', manifest: cronManifest },
+  { id: 'uuid', label: 'NekoUUID', category: 'utility', manifest: uuidManifest },
   { id: 'secrets', label: 'NekoSecrets', category: 'security', manifest: secretsManifest },
 ];
 
