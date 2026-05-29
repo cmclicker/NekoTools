@@ -42,6 +42,7 @@
     { "path": "./packages/lens-case" },
     { "path": "./packages/lens-sort" },
     { "path": "./packages/lens-unicode" },
+    { "path": "./packages/lens-hex" },
     { "path": "./apps/web-suite" }
   ]
 }

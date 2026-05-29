@@ -31,6 +31,7 @@ import { durationManifest } from '@nekotools/lens-duration';
 import { caseManifest } from '@nekotools/lens-case';
 import { sortManifest } from '@nekotools/lens-sort';
 import { unicodeManifest } from '@nekotools/lens-unicode';
+import { hexManifest } from '@nekotools/lens-hex';
 
 /**
  * The unified workbench tool registry.
@@ -73,7 +74,8 @@ export type ActiveTool =
   | 'duration'
   | 'case'
   | 'sort'
-  | 'unicode';
+  | 'unicode'
+  | 'hex';
 
 export type ToolCategoryId = 'data' | 'web' | 'text' | 'project' | 'utility' | 'security';
 
@@ -128,6 +130,7 @@ export const TOOLS: readonly ToolDescriptor[] = [
   { id: 'semver', label: 'NekoSemver', category: 'utility', manifest: semverManifest },
   { id: 'color', label: 'NekoColor', category: 'utility', manifest: colorManifest },
   { id: 'unicode', label: 'NekoUnicode', category: 'utility', manifest: unicodeManifest },
+  { id: 'hex', label: 'NekoHex', category: 'utility', manifest: hexManifest },
   { id: 'duration', label: 'NekoDuration', category: 'utility', manifest: durationManifest },
   { id: 'secrets', label: 'NekoSecrets', category: 'security', manifest: secretsManifest },
   { id: 'password', label: 'NekoPassword', category: 'security', manifest: passwordManifest },

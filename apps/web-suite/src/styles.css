@@ -1960,3 +1960,9 @@ code {
   gap: 0.5rem 1rem;
   align-items: center;
 }
+
+/* NekoHex — preserve dump alignment (no wrapping). */
+.hex-dump {
+  white-space: pre;
+  overflow-x: auto;
+}

@@ -26,6 +26,7 @@
     "@nekotools/lens-env": "workspace:*",
     "@nekotools/lens-gitignore": "workspace:*",
     "@nekotools/lens-hash": "workspace:*",
+    "@nekotools/lens-hex": "workspace:*",
     "@nekotools/lens-headers": "workspace:*",
     "@nekotools/lens-ini": "workspace:*",
     "@nekotools/lens-json": "workspace:*",
