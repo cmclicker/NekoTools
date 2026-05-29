@@ -1,12 +1,24 @@
 import { describe, expect, it } from 'vitest';
-import type { Workspace } from '@nekotools/contracts';
+import type { Entitlement, Workspace } from '@nekotools/contracts';
 import {
+  EntitlementError,
   ToolRegistry,
   jsonWorkspaceSerializer,
   runExporter,
   runParser,
   validateManifest,
 } from '@nekotools/tool-runtime';
+
+const PRO: Entitlement = {
+  version: 1,
+  licenseId: 'TEST',
+  licensee: 'Test User',
+  tier: 'pro',
+  features: ['*'],
+  issuedAt: '2026-01-01T00:00:00.000Z',
+  expiresAt: null,
+  signature: 'test',
+};
 
 import {
   buildJwtRegistration,
@@ -79,30 +91,43 @@ describe('NekoJWT: manifest', () => {
   });
 });
 
-describe('NekoJWT: monetization safety', () => {
-  const registration = buildJwtRegistration(clock);
-  const proExporterIds = ['jwt.export.verify.jwks', 'jwt.export.verify.offline', 'jwt.export.claims.policy'];
+describe('NekoJWT: monetization gating (single-build, entitlement-gated)', () => {
+  const proExporterIds = ['jwt.export.claims.policy', 'jwt.export.sarif'];
 
-  it('no Pro exporter is registered in the free build', () => {
-    const registered = new Set(registration.exporters.map((e) => e.id));
-    for (const id of proExporterIds) expect(registered.has(id)).toBe(false);
-  });
-
-  it('runExporter throws "unknown exporter" for every Pro exporter id', () => {
-    const r = registry();
-    for (const id of proExporterIds) {
-      expect(() => runExporter(r, 'jwt', id, { artifacts: [], diagnostics: [] })).toThrow(
-        /unknown exporter/,
-      );
-    }
-  });
-
-  it('the manifest declares Pro exporters that are NOT in the registered set', () => {
-    const registered = new Set(registration.exporters.map((e) => e.id));
+  it('Pro exporters are declared AND registered as proExporters, not free', () => {
+    const reg = buildJwtRegistration(clock);
+    const proIds = new Set((reg.proExporters ?? []).map((e) => e.id));
     for (const id of proExporterIds) {
       expect(jwtManifest.exporters).toContain(id);
-      expect(registered.has(id)).toBe(false);
+      expect(proIds.has(id)).toBe(true);
+      expect(reg.exporters.some((e) => e.id === id)).toBe(false);
     }
+  });
+
+  it('a free caller (default entitlement) is refused with EntitlementError', () => {
+    const r = registry();
+    const parsed = parseText(VALID_JWT);
+    for (const id of proExporterIds) {
+      expect(() => runExporter(r, 'jwt', id, parsed)).toThrow(EntitlementError);
+    }
+  });
+
+  it('a Pro entitlement unlocks the audit + SARIF exporters', () => {
+    const r = registry();
+    const parsed = parseText(EXPIRED_JWT);
+    const audit = String(runExporter(r, 'jwt', 'jwt.export.claims.policy', parsed, PRO).body);
+    expect(audit).toContain('# NekoJWT claims & security audit');
+    expect(audit).toContain('jwt.token_expired');
+
+    const sarif = JSON.parse(String(runExporter(r, 'jwt', 'jwt.export.sarif', parsed, PRO).body));
+    expect(sarif.version).toBe('2.1.0');
+    expect(sarif.runs[0].results.some((x: { ruleId: string }) => x.ruleId === 'jwt.token_expired')).toBe(true);
+  });
+
+  it('a truly unknown exporter id still throws "unknown exporter"', () => {
+    expect(() => runExporter(registry(), 'jwt', 'jwt.export.nope', { artifacts: [], diagnostics: [] }, PRO)).toThrow(
+      /unknown exporter/,
+    );
   });
 });
 
