@@ -169,4 +169,105 @@ export const redactedExporter: Exporter<SecretArtifact> = {
   },
 };
 
-export const proExporters: readonly Exporter<SecretArtifact>[] = [sarifExporter, redactedExporter];
+function htmlEscape(s: string): string {
+  return s
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;');
+}
+
+/**
+ * `secret.export.html` (Pro) — a self-contained, offline HTML report
+ * (inline CSS, no remote assets) suitable for attaching to a ticket or
+ * archiving. Carries masked previews only.
+ */
+export const htmlReportExporter: Exporter<SecretArtifact> = {
+  version: 1,
+  id: 'secret.export.html',
+  toolId: TOOL_ID,
+  target: 'html',
+  accepts: SECRET_REPORT_EXPORT_KINDS,
+  producesMimeType: 'text/html',
+  producesExtension: 'html',
+  export({ artifacts }) {
+    const findings = pickReport(artifacts)?.value.findings ?? [];
+    const counts = { high: 0, medium: 0, low: 0 };
+    for (const f of findings) counts[f.severity] += 1;
+    const rows = findings
+      .map(
+        (f) =>
+          `<tr class="sev sev--${f.severity}"><td>${f.severity}</td><td><code>${htmlEscape(
+            f.ruleId,
+          )}</code></td><td>${f.line}:${f.column}</td><td>${f.length}</td><td><code>${htmlEscape(
+            f.preview,
+          )}</code></td></tr>`,
+      )
+      .join('\n');
+    const body = `<!doctype html>
+<html lang="en"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>NekoSecrets report</title>
+<style>
+  body { font: 14px/1.5 system-ui, sans-serif; margin: 2rem; color: #1a1a1a; }
+  h1 { font-size: 1.3rem; }
+  .summary { display: flex; gap: 1rem; margin: 1rem 0; }
+  .pill { padding: .25rem .6rem; border-radius: 999px; font-weight: 600; }
+  .pill--high { background: #fde2e1; color: #8a1c13; }
+  .pill--medium { background: #fdefcf; color: #8a5a00; }
+  .pill--low { background: #e8e8ec; color: #444; }
+  table { border-collapse: collapse; width: 100%; }
+  th, td { text-align: left; padding: .4rem .6rem; border-bottom: 1px solid #e2e2e6; }
+  .sev--high td:first-child { color: #b00020; font-weight: 700; }
+  .sev--medium td:first-child { color: #8a5a00; font-weight: 700; }
+  .note { color: #666; margin-top: 1.5rem; font-size: .85rem; }
+</style></head><body>
+<h1>NekoSecrets report</h1>
+<div class="summary">
+  <span class="pill pill--high">high: ${counts.high}</span>
+  <span class="pill pill--medium">medium: ${counts.medium}</span>
+  <span class="pill pill--low">low: ${counts.low}</span>
+</div>
+<table><thead><tr><th>severity</th><th>rule</th><th>line:col</th><th>length</th><th>preview (masked)</th></tr></thead>
+<tbody>
+${rows || '<tr><td colspan="5">No secrets detected.</td></tr>'}
+</tbody></table>
+<p class="note">Previews are masked — the raw secret is never stored. Generated locally by NekoSecrets; nothing was uploaded.</p>
+</body></html>`;
+    return { mimeType: 'text/html', extension: 'html', body };
+  },
+};
+
+/**
+ * `secret.export.baseline` (Pro) — a stable JSON baseline of finding
+ * fingerprints (ruleId + location, masked). Commit it so CI can suppress
+ * already-reviewed findings and fail only on NEW ones. Deterministic (no
+ * timestamps) so it diffs cleanly in version control.
+ */
+export const baselineExporter: Exporter<SecretArtifact> = {
+  version: 1,
+  id: 'secret.export.baseline',
+  toolId: TOOL_ID,
+  target: 'json',
+  accepts: SECRET_REPORT_EXPORT_KINDS,
+  producesMimeType: 'application/json',
+  producesExtension: 'json',
+  export({ artifacts }) {
+    const findings = pickReport(artifacts)?.value.findings ?? [];
+    const baseline = {
+      version: 1,
+      tool: 'NekoSecrets',
+      fingerprints: findings
+        .map((f) => `${f.ruleId}:${f.line}:${f.column}:${f.length}`)
+        .sort((a, b) => a.localeCompare(b)),
+    };
+    return { mimeType: 'application/json', extension: 'json', body: JSON.stringify(baseline, null, 2) };
+  },
+};
+
+export const proExporters: readonly Exporter<SecretArtifact>[] = [
+  sarifExporter,
+  redactedExporter,
+  htmlReportExporter,
+  baselineExporter,
+];

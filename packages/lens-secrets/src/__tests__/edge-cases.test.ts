@@ -67,6 +67,8 @@ function everyExport(raw: string): string[] {
     String(runExporter(r, 'secrets', 'secret.export.markdown.summary', payload).body),
     String(runExporter(r, 'secrets', 'secret.export.sarif', payload, PRO).body),
     String(runExporter(r, 'secrets', 'secret.export.redacted', payload, PRO).body),
+    String(runExporter(r, 'secrets', 'secret.export.html', payload, PRO).body),
+    String(runExporter(r, 'secrets', 'secret.export.baseline', payload, PRO).body),
   ];
 }
 

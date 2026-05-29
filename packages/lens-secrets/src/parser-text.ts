@@ -9,7 +9,7 @@ import {
   type SecretReport,
   type SecretReportArtifact,
 } from './kinds.js';
-import { SECRET_RULES } from './rules.js';
+import { ENTROPY_RULE_ID, SECRET_RULES } from './rules.js';
 
 const TOOL_ID = 'secrets';
 const PARSER_ID = 'secret.text';
@@ -76,16 +76,15 @@ function scan(input: ParserInput, deps: SecretTextParserDeps): ParserResult<Secr
   const threshold = deps.entropyThreshold ?? DEFAULT_ENTROPY_THRESHOLD;
   const minLen = deps.entropyMinLength ?? DEFAULT_ENTROPY_MIN_LENGTH;
 
-  const hits: RawHit[] = [];
-
   // 1. Pattern rules.
+  const ruleHits: RawHit[] = [];
   for (const rule of SECRET_RULES) {
     for (const m of raw.matchAll(rule.regex)) {
       const whole = m[0];
       const secret = rule.group !== undefined ? (m[rule.group] ?? '') : whole;
       if (secret === '') continue;
       const start = (m.index ?? 0) + (rule.group !== undefined ? whole.lastIndexOf(secret) : 0);
-      hits.push({
+      ruleHits.push({
         ruleId: rule.id,
         description: rule.description,
         severity: rule.severity,
@@ -97,6 +96,11 @@ function scan(input: ParserInput, deps: SecretTextParserDeps): ParserResult<Secr
     }
   }
 
+  // 1b. Collapse identical spans (two providers matching the same bytes,
+  // e.g. a key that is both a provider pattern and a generic assignment)
+  // to a single finding — keep the highest-severity rule.
+  const hits = dedupeSpans(ruleHits);
+
   // 2. Entropy fallback for high-randomness tokens not already covered.
   for (const m of raw.matchAll(ENTROPY_TOKEN_RE)) {
     const token = m[0];
@@ -107,7 +111,7 @@ function scan(input: ParserInput, deps: SecretTextParserDeps): ParserResult<Secr
     const entropy = shannonEntropy(token);
     if (entropy < threshold) continue;
     hits.push({
-      ruleId: 'entropy.high',
+      ruleId: ENTROPY_RULE_ID,
       description: 'High-entropy string (possible secret)',
       severity: 'low',
       start,
@@ -158,6 +162,21 @@ function scan(input: ParserInput, deps: SecretTextParserDeps): ParserResult<Secr
     redactedText: redact(raw, hits),
   };
   return { artifacts: [makeArtifact(artIds(), producedAt, input, report)], diagnostics };
+}
+
+const SEVERITY_RANK: Record<SecretFinding['severity'], number> = { high: 0, medium: 1, low: 2 };
+
+/** Keep one hit per exact [start,end) span, preferring the highest severity. */
+function dedupeSpans(hits: readonly RawHit[]): RawHit[] {
+  const bySpan = new Map<string, RawHit>();
+  for (const h of hits) {
+    const key = `${h.start}:${h.end}`;
+    const prev = bySpan.get(key);
+    if (prev === undefined || SEVERITY_RANK[h.severity] < SEVERITY_RANK[prev.severity]) {
+      bySpan.set(key, h);
+    }
+  }
+  return [...bySpan.values()];
 }
 
 /** Replace each detected secret span with `[REDACTED:<ruleId>]`. Overlapping

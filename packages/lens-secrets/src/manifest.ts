@@ -31,9 +31,11 @@ export const secretsManifest: ToolManifest = {
     'secret.export.json',
     'secret.export.csv',
     'secret.export.markdown.summary',
-    // Pro — declared as advertising, NOT registered in the free build.
+    // Pro — registered in this build but gated behind a valid entitlement.
     'secret.export.sarif',
     'secret.export.redacted',
+    'secret.export.html',
+    'secret.export.baseline',
   ],
   offlinePolicy: DEFAULT_OFFLINE_POLICY,
   capabilities: {
@@ -60,10 +62,12 @@ export const secretsManifest: ToolManifest = {
       'allowlist.manage',
       'scan.git-history',
       'baseline.diff',
+      'baseline.export',
       'entropy.tuning',
       'redact.document',
       'export.sarif',
       'export.redacted',
+      'export.html',
       'workspace.snapshots',
     ],
   },

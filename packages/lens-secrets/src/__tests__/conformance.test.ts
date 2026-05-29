@@ -78,7 +78,12 @@ describe('NekoSecrets: manifest', () => {
 });
 
 describe('NekoSecrets: monetization gating (single-build, entitlement-gated)', () => {
-  const proExporterIds = ['secret.export.sarif', 'secret.export.redacted'];
+  const proExporterIds = [
+    'secret.export.sarif',
+    'secret.export.redacted',
+    'secret.export.html',
+    'secret.export.baseline',
+  ];
 
   it('Pro exporters are declared AND registered as proExporters', () => {
     const reg = buildSecretsRegistration(clock);
@@ -121,6 +126,37 @@ describe('NekoSecrets: monetization gating (single-build, entitlement-gated)', (
     expect(() =>
       runExporter(registry(), 'secrets', 'secret.export.nope', { artifacts: [], diagnostics: [] }, PRO),
     ).toThrow(/unknown exporter/);
+  });
+
+  it('the Pro HTML report is self-contained, masked, and leaks no raw secret', () => {
+    const r = registry();
+    const parsed = scan('aws=AKIAIOSFODNN7EXAMPLE');
+    const html = String(
+      runExporter(r, 'secrets', 'secret.export.html', { artifacts: parsed.artifacts, diagnostics: [] }, PRO).body,
+    );
+    expect(html).toContain('<!doctype html>');
+    expect(html).toContain('aws.access-key');
+    expect(html).not.toContain('AKIAIOSFODNN7EXAMPLE'); // masked
+    expect(html).not.toContain('http://'); // no remote assets
+    expect(html).not.toContain('https://');
+  });
+
+  it('the Pro baseline emits sorted, deterministic fingerprints', () => {
+    const r = registry();
+    const parsed = scan('aws=AKIAIOSFODNN7EXAMPLE\ntoken=ghp_' + 'a'.repeat(36));
+    const run = () =>
+      String(
+        runExporter(r, 'secrets', 'secret.export.baseline', { artifacts: parsed.artifacts, diagnostics: [] }, PRO).body,
+      );
+    const baseline = JSON.parse(run());
+    expect(baseline.tool).toBe('NekoSecrets');
+    expect(Array.isArray(baseline.fingerprints)).toBe(true);
+    expect(baseline.fingerprints.length).toBe(2);
+    expect([...baseline.fingerprints]).toEqual([...baseline.fingerprints].sort());
+    // No raw secret in the fingerprints.
+    expect(run()).not.toContain('AKIAIOSFODNN7EXAMPLE');
+    // Deterministic across runs (commit-friendly).
+    expect(run()).toBe(run());
   });
 });
 
