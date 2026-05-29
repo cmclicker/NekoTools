@@ -38,6 +38,7 @@
     "@nekotools/lens-regex": "workspace:*",
     "@nekotools/lens-secrets": "workspace:*",
     "@nekotools/lens-semver": "workspace:*",
+    "@nekotools/lens-sort": "workspace:*",
     "@nekotools/lens-time": "workspace:*",
     "@nekotools/lens-toml": "workspace:*",
     "@nekotools/lens-url": "workspace:*",

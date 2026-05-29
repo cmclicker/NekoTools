@@ -29,6 +29,7 @@ import { gitignoreManifest } from '@nekotools/lens-gitignore';
 import { mimeManifest } from '@nekotools/lens-mime';
 import { durationManifest } from '@nekotools/lens-duration';
 import { caseManifest } from '@nekotools/lens-case';
+import { sortManifest } from '@nekotools/lens-sort';
 
 /**
  * The unified workbench tool registry.
@@ -69,7 +70,8 @@ export type ActiveTool =
   | 'gitignore'
   | 'mime'
   | 'duration'
-  | 'case';
+  | 'case'
+  | 'sort';
 
 export type ToolCategoryId = 'data' | 'web' | 'text' | 'project' | 'utility' | 'security';
 
@@ -113,6 +115,7 @@ export const TOOLS: readonly ToolDescriptor[] = [
   { id: 'regex', label: 'NekoRegex', category: 'text', manifest: regexManifest },
   { id: 'diff', label: 'NekoDiff', category: 'text', manifest: diffManifest },
   { id: 'case', label: 'NekoCase', category: 'text', manifest: caseManifest },
+  { id: 'sort', label: 'NekoSort', category: 'text', manifest: sortManifest },
   { id: 'package', label: 'NekoPackage', category: 'project', manifest: packageManifest },
   { id: 'gitignore', label: 'NekoGitignore', category: 'project', manifest: gitignoreManifest },
   { id: 'binary', label: 'NekoBinary', category: 'utility', manifest: binaryManifest },

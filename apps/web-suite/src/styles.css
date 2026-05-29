@@ -1953,3 +1953,10 @@ code {
     border-color: rgba(255, 255, 255, 0.2);
   }
 }
+
+/* NekoSort — option toggles row wraps. */
+.sort-options {
+  flex-wrap: wrap;
+  gap: 0.5rem 1rem;
+  align-items: center;
+}
