@@ -27,6 +27,7 @@ import { passwordManifest } from '@nekotools/lens-password';
 import { colorManifest } from '@nekotools/lens-color';
 import { gitignoreManifest } from '@nekotools/lens-gitignore';
 import { mimeManifest } from '@nekotools/lens-mime';
+import { durationManifest } from '@nekotools/lens-duration';
 
 /**
  * The unified workbench tool registry.
@@ -65,7 +66,8 @@ export type ActiveTool =
   | 'password'
   | 'color'
   | 'gitignore'
-  | 'mime';
+  | 'mime'
+  | 'duration';
 
 export type ToolCategoryId = 'data' | 'web' | 'text' | 'project' | 'utility' | 'security';
 
@@ -117,6 +119,7 @@ export const TOOLS: readonly ToolDescriptor[] = [
   { id: 'uuid', label: 'NekoUUID', category: 'utility', manifest: uuidManifest },
   { id: 'semver', label: 'NekoSemver', category: 'utility', manifest: semverManifest },
   { id: 'color', label: 'NekoColor', category: 'utility', manifest: colorManifest },
+  { id: 'duration', label: 'NekoDuration', category: 'utility', manifest: durationManifest },
   { id: 'secrets', label: 'NekoSecrets', category: 'security', manifest: secretsManifest },
   { id: 'password', label: 'NekoPassword', category: 'security', manifest: passwordManifest },
 ];

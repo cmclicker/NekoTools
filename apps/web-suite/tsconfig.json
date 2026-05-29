@@ -42,6 +42,7 @@
     { "path": "../../packages/lens-password" },
     { "path": "../../packages/lens-color" },
     { "path": "../../packages/lens-gitignore" },
-    { "path": "../../packages/lens-mime" }
+    { "path": "../../packages/lens-mime" },
+    { "path": "../../packages/lens-duration" }
   ]
 }

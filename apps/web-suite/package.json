@@ -21,6 +21,7 @@
     "@nekotools/lens-cron": "workspace:*",
     "@nekotools/lens-csv": "workspace:*",
     "@nekotools/lens-diff": "workspace:*",
+    "@nekotools/lens-duration": "workspace:*",
     "@nekotools/lens-env": "workspace:*",
     "@nekotools/lens-gitignore": "workspace:*",
     "@nekotools/lens-hash": "workspace:*",
