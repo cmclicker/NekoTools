@@ -32,6 +32,7 @@ import { caseManifest } from '@nekotools/lens-case';
 import { sortManifest } from '@nekotools/lens-sort';
 import { unicodeManifest } from '@nekotools/lens-unicode';
 import { hexManifest } from '@nekotools/lens-hex';
+import { cspManifest } from '@nekotools/lens-csp';
 
 /**
  * The unified workbench tool registry.
@@ -75,7 +76,8 @@ export type ActiveTool =
   | 'case'
   | 'sort'
   | 'unicode'
-  | 'hex';
+  | 'hex'
+  | 'csp';
 
 export type ToolCategoryId = 'data' | 'web' | 'text' | 'project' | 'utility' | 'security';
 
@@ -115,6 +117,7 @@ export const TOOLS: readonly ToolDescriptor[] = [
   { id: 'headers', label: 'NekoHeaders', category: 'web', manifest: headersManifest },
   { id: 'cookies', label: 'NekoCookies', category: 'web', manifest: cookiesManifest },
   { id: 'mime', label: 'NekoMIME', category: 'web', manifest: mimeManifest },
+  { id: 'csp', label: 'NekoCSP', category: 'web', manifest: cspManifest },
   { id: 'codec', label: 'NekoCodec', category: 'text', manifest: codecManifest },
   { id: 'regex', label: 'NekoRegex', category: 'text', manifest: regexManifest },
   { id: 'diff', label: 'NekoDiff', category: 'text', manifest: diffManifest },

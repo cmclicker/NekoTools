@@ -43,6 +43,7 @@
     { "path": "./packages/lens-sort" },
     { "path": "./packages/lens-unicode" },
     { "path": "./packages/lens-hex" },
+    { "path": "./packages/lens-csp" },
     { "path": "./apps/web-suite" }
   ]
 }

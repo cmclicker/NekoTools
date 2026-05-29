@@ -19,6 +19,7 @@
     "@nekotools/lens-cookies": "workspace:*",
     "@nekotools/lens-codec": "workspace:*",
     "@nekotools/lens-color": "workspace:*",
+    "@nekotools/lens-csp": "workspace:*",
     "@nekotools/lens-cron": "workspace:*",
     "@nekotools/lens-csv": "workspace:*",
     "@nekotools/lens-diff": "workspace:*",

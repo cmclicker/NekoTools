@@ -1,0 +1,168 @@
+import { describe, expect, it } from 'vitest';
+import type { Artifact, Workspace } from '@nekotools/contracts';
+import {
+  ToolRegistry,
+  jsonWorkspaceSerializer,
+  runExporter,
+  runParser,
+  validateManifest,
+} from '@nekotools/tool-runtime';
+import { validate } from '@nekotools/schemas';
+
+import { FIXED_CLOCK, buildCspRegistration, cspManifest } from '../index.js';
+import type { CspParsedArtifact } from '../kinds.js';
+
+const clock = FIXED_CLOCK('2026-05-28T00:00:00.000Z');
+
+function registry(): ToolRegistry {
+  const r = new ToolRegistry();
+  r.register(buildCspRegistration(clock));
+  return r;
+}
+
+function parse(raw: string) {
+  return runParser(registry(), 'csp', 'csp.text', {
+    raw,
+    source: { kind: 'paste', bytes: raw.length },
+  });
+}
+
+function report(raw: string) {
+  return (parse(raw).artifacts[0] as CspParsedArtifact).value;
+}
+
+function codes(raw: string): string[] {
+  return parse(raw).diagnostics.map((d) => d.code);
+}
+
+describe('NekoCSP: manifest', () => {
+  it('passes schema + cross-field validation', () => {
+    expect(validateManifest(cspManifest).ok).toBe(true);
+  });
+  it('declares network-forbidden offline policy', () => {
+    expect(cspManifest.offlinePolicy.networkPolicy).toBe('network-forbidden');
+  });
+  it('free entitlements match the implemented slice', () => {
+    expect(new Set(cspManifest.entitlements.free)).toEqual(
+      new Set([
+        'parse',
+        'inspect.directives',
+        'audit.findings',
+        'diagnostics.security',
+        'export.json',
+        'export.normalized',
+        'export.markdown.summary',
+        'copy.output',
+        'workspace.save',
+      ]),
+    );
+  });
+});
+
+describe('NekoCSP: monetization safety', () => {
+  const registration = buildCspRegistration(clock);
+  const proExporterIds = ['csp.export.report', 'csp.export.hardened'];
+  it('no Pro exporter is registered, and each throws "unknown exporter"', () => {
+    const registered = new Set(registration.exporters.map((e) => e.id));
+    const r = registry();
+    for (const id of proExporterIds) {
+      expect(registered.has(id)).toBe(false);
+      expect(cspManifest.exporters).toContain(id);
+      expect(() => runExporter(r, 'csp', id, { artifacts: [], diagnostics: [] })).toThrow(
+        /unknown exporter/,
+      );
+    }
+  });
+});
+
+describe('NekoCSP: parsing', () => {
+  it('parses directives + sources', () => {
+    const v = report("default-src 'self'; script-src 'self' https://cdn.example.com");
+    expect(v.directiveCount).toBe(2);
+    expect(v.directives[0]).toEqual({ name: 'default-src', sources: ["'self'"] });
+    expect(v.directives[1]!.sources).toContain('https://cdn.example.com');
+  });
+
+  it('strips a Content-Security-Policy: header prefix', () => {
+    expect(report("Content-Security-Policy: default-src 'self'").directiveCount).toBe(1);
+  });
+
+  it('lowercases directive names', () => {
+    expect(report("Script-Src 'self'").directives[0]!.name).toBe('script-src');
+  });
+});
+
+describe('NekoCSP: security findings', () => {
+  it('flags unsafe-inline in script-src as high', () => {
+    expect(codes("script-src 'self' 'unsafe-inline'")).toContain('csp.unsafe_inline');
+  });
+  it('flags unsafe-eval', () => {
+    expect(codes("script-src 'unsafe-eval'")).toContain('csp.unsafe_eval');
+  });
+  it('flags a wildcard source', () => {
+    expect(codes('img-src *')).toContain('csp.wildcard');
+  });
+  it('flags data: in script-src', () => {
+    expect(codes('script-src data:')).toContain('csp.data_uri');
+  });
+  it('flags a duplicate directive', () => {
+    expect(codes("script-src 'self'; script-src 'none'")).toContain('csp.duplicate');
+  });
+  it('notes missing default-src / object-src / frame-ancestors', () => {
+    const c = codes("script-src 'self'");
+    expect(c.filter((x) => x === 'csp.missing_directive').length).toBeGreaterThanOrEqual(1);
+  });
+  it('a locked-down policy has no high/medium findings for those checks', () => {
+    const v = report("default-src 'none'; script-src 'self'; object-src 'none'; frame-ancestors 'none'");
+    expect(v.findings.every((f) => f.severity === 'low' || f.severity === undefined)).toBe(true);
+  });
+  it('emits csp.empty_input for empty input', () => {
+    expect(codes('   ')).toContain('csp.empty_input');
+  });
+  it('produces a schema-valid artifact', () => {
+    expect(validate('artifact', parse("default-src 'self'").artifacts[0] as Artifact).ok).toBe(true);
+  });
+});
+
+describe('NekoCSP: exporters', () => {
+  it('csp.export.normalized re-serializes one directive per line', () => {
+    const out = runExporter(registry(), 'csp', 'csp.export.normalized', {
+      artifacts: parse("default-src 'self'; img-src *").artifacts,
+      diagnostics: [],
+    });
+    expect(String(out.body)).toBe("default-src 'self';\nimg-src *");
+  });
+  it('csp.export.markdown.summary lists directives + findings', () => {
+    const out = runExporter(registry(), 'csp', 'csp.export.markdown.summary', {
+      artifacts: parse("script-src 'unsafe-inline'").artifacts,
+      diagnostics: [],
+    });
+    expect(String(out.body)).toContain('# NekoCSP export');
+    expect(String(out.body)).toContain('unsafe-inline');
+  });
+  it('refuses a foreign artifact kind', () => {
+    const foreign = { ...(parse("default-src 'self'").artifacts[0] as Artifact), kind: 'json.value' } as Artifact;
+    expect(() =>
+      runExporter(registry(), 'csp', 'csp.export.json', { artifacts: [foreign], diagnostics: [] }),
+    ).toThrow(/does not accept artifact kind/);
+  });
+});
+
+describe('NekoCSP: workspace round-trip', () => {
+  it('round-trips losslessly', () => {
+    const parsed = parse("default-src 'self'; script-src 'self' 'unsafe-inline'");
+    const ws: Workspace = {
+      version: 1,
+      id: 'ws_csp_single',
+      toolId: 'csp',
+      toolVersion: 1,
+      createdAt: '2026-05-28T00:00:00.000Z',
+      updatedAt: '2026-05-28T00:00:00.000Z',
+      artifacts: parsed.artifacts,
+      diagnostics: parsed.diagnostics,
+      uiState: { viewMode: 'directives' },
+    };
+    const back = jsonWorkspaceSerializer.deserialize(jsonWorkspaceSerializer.serialize(ws));
+    expect(back).toEqual(ws);
+  });
+});
