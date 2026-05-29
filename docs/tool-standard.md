@@ -168,6 +168,14 @@ into SARIF without ever leaking the secret*).
    trace its output to a consumer a user can actually reach. A result that an
    engine computes but no export or view surfaces is an *island*: either wire it
    through or cut it. "It's implemented" is not "it's reachable."
+   - An *island* is **implemented but unreachable** (a bug). It is distinct from
+     an **advertised-future** Pro id: a `manifest.exporters` / `entitlements.pro`
+     entry that is intentionally *not yet implemented* (no `proExporters` entry,
+     so `runExporter` throws `unknown exporter`). Advertised-future is allowed by
+     §3 and is **not** an island — the engine computes nothing for it. The
+     islands check only fires when an engine *does* produce a result that no
+     export or view consumes. (Only `lens-jwt` and `lens-secrets` ship an
+     implemented Pro wedge today; every other tool's Pro is advertised-future.)
 
 The flagship test and the islands check are **review gates**, not optional
 polish. A reviewer (human or AI) signs off on the wedge being provably wired,
