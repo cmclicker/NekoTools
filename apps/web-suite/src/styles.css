@@ -32,17 +32,22 @@ body {
 }
 
 .suite {
-  /* Fill the viewport edge-to-edge with a thin responsive gutter — no
-     fixed max-width cap, so wide/ultrawide monitors are used fully. A
-     flex column with min-height:100vh lets the panels grow so the sticky
-     bottom bar anchors to the screen bottom even on short content. */
-  --suite-gutter: clamp(0.75rem, 1.2vw, 1.25rem);
+  /* Fill the viewport edge-to-edge; flex column + min-height:100vh lets the
+     panels grow so the sticky bottom bar anchors to the screen bottom.
+
+     Two spacing tokens, used everywhere for 1000%-consistent density:
+       --gap  the buffer BETWEEN cards / sections / panels (and the edge).
+       --pad  the internal padding WITHIN a card. */
+  --gap: 2px;
+  --pad: 0.45rem;
+  --suite-gutter: var(--gap);
   width: 100%;
   min-height: 100vh;
   margin: 0;
-  padding: 1.5rem var(--suite-gutter) 0;
+  padding: var(--gap) var(--suite-gutter) 0;
   display: flex;
   flex-direction: column;
+  gap: var(--gap);
 }
 
 .suite__panels {
@@ -54,8 +59,8 @@ body {
 .suite__bottombar {
   position: sticky;
   bottom: 0;
-  margin: 1.5rem calc(-1 * var(--suite-gutter)) 0;
-  padding: 0.6rem var(--suite-gutter);
+  margin: 0 calc(-1 * var(--suite-gutter));
+  padding: var(--pad) var(--suite-gutter);
   background: #fafaf9;
   border-top: 1px solid rgba(0, 0, 0, 0.12);
 }
@@ -65,7 +70,7 @@ body {
 }
 
 .suite__bottombar .suite__footer {
-  margin-top: 0.5rem;
+  margin-top: var(--gap);
 }
 
 @media (prefers-color-scheme: dark) {
@@ -82,7 +87,7 @@ body {
 }
 
 .suite__header {
-  margin-bottom: 1rem;
+  margin-bottom: 0;
 }
 
 .suite__header h1 {
@@ -214,15 +219,9 @@ body {
 
 .card {
   border: 1px solid rgba(0, 0, 0, 0.1);
-  border-radius: 8px;
+  border-radius: 6px;
   background: white;
-  padding: 1.25rem 1.5rem;
-}
-
-@media (max-width: 640px) {
-  .card {
-    padding: 1rem;
-  }
+  padding: var(--pad);
 }
 
 @media (prefers-color-scheme: dark) {
@@ -337,13 +336,13 @@ code {
 }
 
 .paste {
-  margin-top: 1.5rem;
+  margin-top: var(--gap);
 }
 
 .paste__label {
   display: block;
   font-weight: 600;
-  margin-bottom: 0.5rem;
+  margin-bottom: var(--gap);
 }
 
 .paste__textarea {
@@ -366,21 +365,21 @@ code {
 }
 
 .paste__hint {
-  margin: 0.5rem 0 0;
+  margin: var(--gap) 0 0;
   font-size: 0.8125rem;
-  opacity: 0.55;
+  opacity: 0.7;
 }
 
 .results {
-  margin-top: 1rem;
+  margin-top: var(--gap);
 }
 
 .results__toolbar {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 1rem;
-  margin-bottom: 1rem;
+  gap: var(--gap);
+  margin-bottom: var(--gap);
   flex-wrap: wrap;
 }
 
@@ -883,20 +882,20 @@ code {
 .suite__tools {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(12rem, 1fr));
-  gap: 0.75rem;
+  gap: var(--gap);
   margin-bottom: 0;
 }
 
 .suite__toolGroup {
   min-width: 0;
-  padding: 0.625rem;
+  padding: var(--pad);
   border: 1px solid rgba(0, 0, 0, 0.08);
-  border-radius: 8px;
+  border-radius: 6px;
   background: rgba(255, 255, 255, 0.6);
 }
 
 .suite__toolGroupLabel {
-  margin: 0 0 0.45rem;
+  margin: 0 0 var(--gap);
   font-size: 0.6875rem;
   font-weight: 700;
   text-transform: uppercase;
@@ -909,7 +908,7 @@ code {
 .suite__toolButtons {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(5.5rem, 1fr));
-  gap: 0.375rem;
+  gap: var(--gap);
 }
 
 .suite__tool {
@@ -1414,27 +1413,11 @@ code {
 /* Wave 1 — unified shell: Free / Pro entitlement surface (Pro-lock).  */
 /* ------------------------------------------------------------------ */
 
+/* The Pro surface lives inside the sticky bottom bar, which provides the
+   container chrome — so it's just a plain disclosure here (no nested box). */
 .pro-surface {
-  margin: 0 0 1.5rem;
-  padding: 0.75rem 1rem;
-  border: 1px solid rgba(0, 0, 0, 0.1);
-  border-radius: 8px;
-  background: rgba(0, 0, 0, 0.02);
-  overflow: hidden;
-}
-
-@media (max-width: 640px) {
-  .pro-surface {
-    margin-bottom: 1rem;
-    padding: 0.75rem;
-  }
-}
-
-@media (prefers-color-scheme: dark) {
-  .pro-surface {
-    border-color: rgba(255, 255, 255, 0.08);
-    background: rgba(255, 255, 255, 0.03);
-  }
+  margin: 0;
+  padding: 0;
 }
 
 .pro-surface__summary {
@@ -1474,11 +1457,11 @@ code {
 }
 
 .pro-surface__body {
-  margin-top: 0.75rem;
+  margin-top: var(--gap);
 }
 
 .pro-surface__heading {
-  margin: 0.5rem 0 0.4rem;
+  margin: var(--gap) 0;
   font-size: 0.8125rem;
   text-transform: uppercase;
   letter-spacing: 0.05em;
@@ -1974,7 +1957,7 @@ code {
    .copy__btn language; the output <pre> mirrors .url-output. */
 .toml-output {
   margin: 0;
-  padding: 0.75rem;
+  padding: var(--pad);
   border: 1px solid rgba(0, 0, 0, 0.08);
   border-radius: 4px;
   max-height: 360px;
@@ -1989,8 +1972,8 @@ code {
 .toml-stats {
   display: flex;
   flex-wrap: wrap;
-  gap: 0.5rem 1rem;
-  margin: 0 0 0.75rem;
+  gap: var(--gap);
+  margin: 0 0 var(--gap);
   padding: 0;
   list-style: none;
   font-size: 0.8125rem;
@@ -2218,7 +2201,7 @@ code {
 /* Two-column workbench on wide screens: sticky input panel | results. */
 .tool--secrets {
   display: grid;
-  gap: 1.25rem;
+  gap: var(--gap);
   grid-template-columns: minmax(0, 1fr);
 }
 
@@ -2235,7 +2218,7 @@ code {
 
   .tool--secrets > .paste {
     position: sticky;
-    top: 1rem;
+    top: var(--gap);
   }
 
   .tool--secrets .paste__textarea {
@@ -2296,8 +2279,8 @@ code {
   flex-wrap: wrap;
   border: 1px solid rgba(0, 0, 0, 0.12);
   border-radius: 6px;
-  padding: 0.4rem 0.75rem;
-  margin: 0 0 0.75rem;
+  padding: var(--pad);
+  margin: 0 0 var(--gap);
 }
 
 .secrets-filter legend {

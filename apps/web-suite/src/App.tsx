@@ -230,7 +230,9 @@ export function App({
           </div>
           <LicenseBadge />
         </div>
-        <p className="suite__phase">
+        {/* Redundant with the highlighted tab visually; kept as a polite
+            live region so screen readers still announce the active tool. */}
+        <p className="suite__phase visually-hidden" aria-live="polite">
           Now viewing <strong>{activeManifest.name}</strong>.
         </p>
         <div className="suite__mobileTools">
