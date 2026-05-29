@@ -29,6 +29,7 @@ import { ColorApp, type ColorAppProps } from './ColorApp.js';
 import { GitignoreApp, type GitignoreAppProps } from './GitignoreApp.js';
 import { MimeApp, type MimeAppProps } from './MimeApp.js';
 import { DurationApp, type DurationAppProps } from './DurationApp.js';
+import { CaseApp, type CaseAppProps } from './CaseApp.js';
 import { ProSurface } from './ProSurface.js';
 import { TOOL_CATEGORIES, toolById, toolsByCategory, type ActiveTool } from './tools.js';
 
@@ -59,6 +60,7 @@ export type { ColorViewMode, NekoColorUiState } from './ColorApp.js';
 export type { GitignoreViewMode, NekoGitignoreUiState } from './GitignoreApp.js';
 export type { MimeViewMode, NekoMimeUiState } from './MimeApp.js';
 export type { DurationViewMode, NekoDurationUiState } from './DurationApp.js';
+export type { CaseViewMode, NekoCaseUiState } from './CaseApp.js';
 export type { ActiveTool } from './tools.js';
 
 export interface AppProps extends JsonAppProps {
@@ -124,6 +126,8 @@ export interface AppProps extends JsonAppProps {
   readonly mimeApp?: MimeAppProps;
   /** NekoDuration slice props forwarded to the NekoDuration sub-app. */
   readonly durationApp?: DurationAppProps;
+  /** NekoCase slice props forwarded to the NekoCase sub-app. */
+  readonly caseApp?: CaseAppProps;
 }
 
 /**
@@ -172,6 +176,7 @@ export function App({
   gitignoreApp,
   mimeApp,
   durationApp,
+  caseApp,
   ...jsonAppProps
 }: AppProps = {}): JSX.Element {
   const [activeTool, setActiveTool] = useState<ActiveTool>(initialTool ?? 'json');
@@ -338,6 +343,9 @@ export function App({
       </div>
       <div hidden={activeTool !== 'duration'} data-testid="tool-panel-duration">
         <DurationApp {...durationApp} />
+      </div>
+      <div hidden={activeTool !== 'case'} data-testid="tool-panel-case">
+        <CaseApp {...caseApp} />
       </div>
 
       <footer className="suite__footer">

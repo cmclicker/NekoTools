@@ -39,6 +39,7 @@
     { "path": "./packages/lens-gitignore" },
     { "path": "./packages/lens-mime" },
     { "path": "./packages/lens-duration" },
+    { "path": "./packages/lens-case" },
     { "path": "./apps/web-suite" }
   ]
 }

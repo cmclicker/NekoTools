@@ -15,6 +15,7 @@
   "dependencies": {
     "@nekotools/contracts": "workspace:*",
     "@nekotools/lens-binary": "workspace:*",
+    "@nekotools/lens-case": "workspace:*",
     "@nekotools/lens-cookies": "workspace:*",
     "@nekotools/lens-codec": "workspace:*",
     "@nekotools/lens-color": "workspace:*",
