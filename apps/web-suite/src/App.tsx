@@ -222,7 +222,7 @@ export function App({
     <main className="suite">
       <header className="suite__header">
         <div className="suite__titlebar">
-          <div>
+          <div className="suite__brand">
             <h1>NekoTools</h1>
             <p className="suite__tagline">
               Local-only, air-gapped-capable, zero-telemetry developer workbenches.
