@@ -31,6 +31,7 @@
     { "path": "./packages/lens-secrets" },
     { "path": "./packages/lens-cron" },
     { "path": "./packages/lens-uuid" },
+    { "path": "./packages/lens-semver" },
     { "path": "./apps/web-suite" }
   ]
 }

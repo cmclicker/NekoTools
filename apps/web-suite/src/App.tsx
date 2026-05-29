@@ -21,6 +21,7 @@ import { CookiesApp, type CookiesAppProps } from './CookiesApp.js';
 import { SecretsApp, type SecretsAppProps } from './SecretsApp.js';
 import { CronApp, type CronAppProps } from './CronApp.js';
 import { UuidApp, type UuidAppProps } from './UuidApp.js';
+import { SemverApp, type SemverAppProps } from './SemverApp.js';
 import { ProSurface } from './ProSurface.js';
 import { TOOL_CATEGORIES, toolById, toolsByCategory, type ActiveTool } from './tools.js';
 
@@ -43,6 +44,7 @@ export type { CookiesViewMode, NekoCookiesUiState } from './CookiesApp.js';
 export type { SecretsViewMode, NekoSecretsUiState } from './SecretsApp.js';
 export type { CronViewMode, NekoCronUiState } from './CronApp.js';
 export type { UuidViewMode, NekoUuidUiState } from './UuidApp.js';
+export type { SemverViewMode, NekoSemverUiState } from './SemverApp.js';
 export type { ActiveTool } from './tools.js';
 
 export interface AppProps extends JsonAppProps {
@@ -92,6 +94,8 @@ export interface AppProps extends JsonAppProps {
   readonly cronApp?: CronAppProps;
   /** NekoUUID slice props forwarded to the NekoUUID sub-app. */
   readonly uuidApp?: UuidAppProps;
+  /** NekoSemver slice props forwarded to the NekoSemver sub-app. */
+  readonly semverApp?: SemverAppProps;
 }
 
 /**
@@ -132,6 +136,7 @@ export function App({
   secretsApp,
   cronApp,
   uuidApp,
+  semverApp,
   ...jsonAppProps
 }: AppProps = {}): JSX.Element {
   const [activeTool, setActiveTool] = useState<ActiveTool>(initialTool ?? 'json');
@@ -274,6 +279,9 @@ export function App({
       </div>
       <div hidden={activeTool !== 'uuid'} data-testid="tool-panel-uuid">
         <UuidApp {...uuidApp} />
+      </div>
+      <div hidden={activeTool !== 'semver'} data-testid="tool-panel-semver">
+        <SemverApp {...semverApp} />
       </div>
 
       <footer className="suite__footer">
