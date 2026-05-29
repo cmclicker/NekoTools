@@ -29,15 +29,16 @@ body {
 }
 
 .suite {
-  width: min(1920px, calc(100% - 4rem));
-  margin: 0 auto;
-  padding: 2rem 0;
+  /* Fill the viewport edge-to-edge with a thin responsive gutter — no
+     fixed max-width cap, so wide/ultrawide monitors are used fully. */
+  width: 100%;
+  margin: 0;
+  padding: 1.5rem clamp(0.75rem, 1.2vw, 1.25rem);
 }
 
 @media (max-width: 640px) {
   .suite {
-    width: calc(100% - 0.75rem);
-    padding: 0.75rem 0;
+    padding: 0.75rem;
   }
 }
 
