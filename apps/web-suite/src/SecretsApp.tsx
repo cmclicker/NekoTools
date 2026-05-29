@@ -409,6 +409,7 @@ export function SecretsApp({
                   <tr>
                     <th scope="col">severity</th>
                     <th scope="col">rule</th>
+                    <th scope="col">what</th>
                     <th scope="col">line:col</th>
                     <th scope="col">preview (masked)</th>
                   </tr>
@@ -419,11 +420,16 @@ export function SecretsApp({
                       <td data-testid={`secrets-sev-${i}`}>
                         <span className={`sev-badge sev-badge--${f.severity}`}>{f.severity}</span>
                       </td>
-                      <td>{f.ruleId}</td>
+                      <td>
+                        <code>{f.ruleId}</code>
+                      </td>
+                      <td className="secrets-table__desc">{f.description}</td>
                       <td>
                         {f.line}:{f.column}
                       </td>
-                      <td data-testid={`secrets-preview-${i}`}>{f.preview}</td>
+                      <td data-testid={`secrets-preview-${i}`}>
+                        <code>{f.preview}</code>
+                      </td>
                     </tr>
                   ))}
                 </tbody>

@@ -1380,6 +1380,46 @@ code {
   }
 }
 
+.pro-surface__summary {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  cursor: pointer;
+  font-size: 0.875rem;
+  list-style: none;
+}
+
+.pro-surface__summary::-webkit-details-marker {
+  display: none;
+}
+
+.pro-surface__summary::before {
+  content: '▸';
+  opacity: 0.5;
+  font-size: 0.75rem;
+}
+
+.pro-surface[open] .pro-surface__summary::before {
+  content: '▾';
+}
+
+.pro-surface__summaryLabel {
+  font-weight: 600;
+}
+
+.pro-surface__counts {
+  opacity: 0.6;
+  font-size: 0.8125rem;
+}
+
+.pro-surface__summary .pro-badge {
+  margin-left: auto;
+}
+
+.pro-surface__body {
+  margin-top: 0.75rem;
+}
+
 .pro-surface__heading {
   margin: 0.5rem 0 0.4rem;
   font-size: 0.8125rem;
@@ -1392,10 +1432,24 @@ code {
   font-size: 0.6875rem;
   font-weight: 700;
   letter-spacing: 0.04em;
-  padding: 0.05rem 0.4rem;
+  padding: 0.1rem 0.5rem;
   border-radius: 999px;
   background: rgba(0, 0, 0, 0.08);
-  opacity: 0.7;
+  opacity: 0.8;
+}
+
+.pro-badge--unlocked {
+  background: rgba(22, 130, 60, 0.16);
+  color: #157038;
+  opacity: 1;
+}
+
+/* When unlocked, Pro features read as available, not greyed/locked. */
+.entitlements--unlocked li {
+  opacity: 1;
+}
+.entitlements--unlocked .pro-tag {
+  background: #157038;
 }
 
 .entitlements__locked {
@@ -1429,6 +1483,13 @@ code {
 @media (prefers-color-scheme: dark) {
   .pro-badge {
     background: rgba(255, 255, 255, 0.12);
+  }
+  .pro-badge--unlocked {
+    background: rgba(60, 200, 110, 0.2);
+    color: #6ee79f;
+  }
+  .entitlements--unlocked .pro-tag {
+    background: #2f9e57;
   }
 }
 
@@ -2221,10 +2282,20 @@ code {
   color: #444;
 }
 
-/* Findings table: severity row accents + horizontal scroll on narrow screens. */
+/* Findings table: fills its column; severity row accents. */
 .secrets-table {
-  display: block;
-  overflow-x: auto;
+  width: 100%;
+  table-layout: auto;
+}
+.secrets-table td,
+.secrets-table th {
+  overflow-wrap: anywhere;
+}
+.secrets-table__desc {
+  opacity: 0.75;
+}
+.secrets-table code {
+  font-size: 0.8125rem;
 }
 .secrets-table tr[data-severity='high'] {
   background: rgba(176, 0, 32, 0.05);

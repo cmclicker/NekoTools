@@ -27,10 +27,13 @@ describe('ProSurface', () => {
     );
   });
 
-  it('states that Pro is not bundled in the local build', () => {
+  it('shows Pro as locked and explains local-only unlock when free', () => {
     render(<ProSurface manifest={jsonManifest} />);
-    expect(
-      screen.getByTestId(`pro-surface-${jsonManifest.id}`).textContent,
-    ).toMatch(/not bundled in this local build/i);
+    const surface = screen.getByTestId(`pro-surface-${jsonManifest.id}`);
+    expect(within(surface).getByTestId(`pro-status-${jsonManifest.id}`).textContent).toMatch(
+      /Pro locked/i,
+    );
+    expect(surface.textContent).toMatch(/verified locally/i);
+    expect(surface.textContent).toMatch(/no telemetry/i);
   });
 });

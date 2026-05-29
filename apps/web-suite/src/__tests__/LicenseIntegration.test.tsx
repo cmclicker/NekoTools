@@ -34,9 +34,10 @@ describe('suite license integration', () => {
       />,
     );
 
-    // SARIF is a Pro view: locked while Free.
+    // SARIF is a Pro view: locked while Free, and the Pro surface says so.
     expect(screen.getByTestId('secrets-locked')).toBeInTheDocument();
     expect(screen.queryByTestId('secrets-output')).not.toBeInTheDocument();
+    expect(screen.getByTestId('pro-status-secrets').textContent).toMatch(/Pro locked/i);
 
     // Apply a valid license in the shell header…
     fireEvent.change(screen.getByTestId('suite-license-input'), {
@@ -52,5 +53,7 @@ describe('suite license integration', () => {
     );
     // The per-tool dev toggle disappears once a real license is active.
     expect(screen.queryByTestId('secrets-pro-toggle')).not.toBeInTheDocument();
+    // And the Pro surface now reflects the unlock (the bug fix).
+    expect(screen.getByTestId('pro-status-secrets').textContent).toMatch(/Pro unlocked/i);
   });
 });
