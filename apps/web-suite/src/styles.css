@@ -2383,3 +2383,76 @@ code {
     background: rgba(230, 164, 23, 0.12);
   }
 }
+
+/* ---- NekoJWT ------------------------------------------------------- */
+
+.jwt-output {
+  margin: 0;
+  padding: var(--pad);
+  border: 1px solid rgba(0, 0, 0, 0.08);
+  border-radius: 4px;
+  max-height: 360px;
+  overflow: auto;
+  background: white;
+  font-family: ui-monospace, 'SF Mono', 'Cascadia Code', 'Roboto Mono', monospace;
+  font-size: 0.8125rem;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+/* Pro offline signature-verify panel. */
+.jwt-verify {
+  margin-top: var(--gap);
+  padding-top: var(--gap);
+  border-top: 1px solid rgba(0, 0, 0, 0.12);
+}
+
+.jwt-verify__row {
+  display: flex;
+  align-items: center;
+  gap: var(--gap);
+  flex-wrap: wrap;
+  margin: var(--gap) 0;
+}
+
+.viewmode__select {
+  font: inherit;
+  font-size: 0.8125rem;
+  padding: 0.25rem 0.4rem;
+  border: 1px solid rgba(0, 0, 0, 0.2);
+  border-radius: 6px;
+  background: white;
+  color: inherit;
+}
+
+.jwt-verify__result {
+  margin: var(--gap) 0 0;
+  font-size: 0.85rem;
+  font-weight: 600;
+}
+.jwt-verify__result--ok {
+  color: #157038;
+}
+.jwt-verify__result--fail {
+  color: #b00020;
+}
+
+@media (prefers-color-scheme: dark) {
+  .jwt-output {
+    background: #0f0f0f;
+    border-color: rgba(255, 255, 255, 0.08);
+  }
+  .jwt-verify {
+    border-top-color: rgba(255, 255, 255, 0.12);
+  }
+  .viewmode__select {
+    background: rgba(255, 255, 255, 0.06);
+    border-color: rgba(255, 255, 255, 0.2);
+  }
+  .jwt-verify__result--ok {
+    color: #6ee79f;
+  }
+  .jwt-verify__result--fail {
+    color: #ff8a90;
+  }
+}
