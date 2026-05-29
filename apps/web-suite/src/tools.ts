@@ -18,6 +18,7 @@ import { tomlManifest } from '@nekotools/lens-toml';
 import { xmlManifest } from '@nekotools/lens-xml';
 import { cookiesManifest } from '@nekotools/lens-cookies';
 import { secretsManifest } from '@nekotools/lens-secrets';
+import { cronManifest } from '@nekotools/lens-cron';
 
 /**
  * The unified workbench tool registry.
@@ -47,7 +48,8 @@ export type ActiveTool =
   | 'toml'
   | 'xml'
   | 'cookies'
-  | 'secrets';
+  | 'secrets'
+  | 'cron';
 
 export type ToolCategoryId = 'data' | 'web' | 'text' | 'project' | 'utility' | 'security';
 
@@ -91,6 +93,7 @@ export const TOOLS: readonly ToolDescriptor[] = [
   { id: 'binary', label: 'NekoBinary', category: 'utility', manifest: binaryManifest },
   { id: 'hash', label: 'NekoHash', category: 'utility', manifest: hashManifest },
   { id: 'time', label: 'NekoTime', category: 'utility', manifest: timeManifest },
+  { id: 'cron', label: 'NekoCron', category: 'utility', manifest: cronManifest },
   { id: 'secrets', label: 'NekoSecrets', category: 'security', manifest: secretsManifest },
 ];
 

@@ -19,6 +19,7 @@ import { TomlApp, type TomlAppProps } from './TomlApp.js';
 import { XmlApp, type XmlAppProps } from './XmlApp.js';
 import { CookiesApp, type CookiesAppProps } from './CookiesApp.js';
 import { SecretsApp, type SecretsAppProps } from './SecretsApp.js';
+import { CronApp, type CronAppProps } from './CronApp.js';
 import { ProSurface } from './ProSurface.js';
 import { TOOL_CATEGORIES, toolById, toolsByCategory, type ActiveTool } from './tools.js';
 
@@ -39,6 +40,7 @@ export type { TomlViewMode, NekoTomlUiState } from './TomlApp.js';
 export type { XmlViewMode, NekoXmlUiState } from './XmlApp.js';
 export type { CookiesViewMode, NekoCookiesUiState } from './CookiesApp.js';
 export type { SecretsViewMode, NekoSecretsUiState } from './SecretsApp.js';
+export type { CronViewMode, NekoCronUiState } from './CronApp.js';
 export type { ActiveTool } from './tools.js';
 
 export interface AppProps extends JsonAppProps {
@@ -84,6 +86,8 @@ export interface AppProps extends JsonAppProps {
   readonly cookiesApp?: CookiesAppProps;
   /** NekoSecrets slice props forwarded to the NekoSecrets sub-app. */
   readonly secretsApp?: SecretsAppProps;
+  /** NekoCron slice props forwarded to the NekoCron sub-app. */
+  readonly cronApp?: CronAppProps;
 }
 
 /**
@@ -122,6 +126,7 @@ export function App({
   xmlApp,
   cookiesApp,
   secretsApp,
+  cronApp,
   ...jsonAppProps
 }: AppProps = {}): JSX.Element {
   const [activeTool, setActiveTool] = useState<ActiveTool>(initialTool ?? 'json');
@@ -258,6 +263,9 @@ export function App({
       </div>
       <div hidden={activeTool !== 'secrets'} data-testid="tool-panel-secrets">
         <SecretsApp {...secretsApp} />
+      </div>
+      <div hidden={activeTool !== 'cron'} data-testid="tool-panel-cron">
+        <CronApp {...cronApp} />
       </div>
 
       <footer className="suite__footer">

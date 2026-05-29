@@ -1804,3 +1804,22 @@ code {
 .cookies-mask input {
   margin: 0;
 }
+
+/* NekoCron — description + next-run list; reuses shared .url-fields / .toml-output. */
+.cron-description {
+  margin: 0 0 1rem;
+  font-size: 1rem;
+  font-weight: 600;
+}
+
+.cron-next-runs {
+  margin: 0;
+  padding-left: 1.25rem;
+  display: grid;
+  gap: 0.25rem;
+}
+
+.cron-next-runs code {
+  font-family: ui-monospace, 'SF Mono', 'Cascadia Code', 'Roboto Mono', monospace;
+  font-size: 0.875rem;
+}

@@ -33,6 +33,7 @@
     { "path": "../../packages/lens-toml" },
     { "path": "../../packages/lens-xml" },
     { "path": "../../packages/lens-cookies" },
-    { "path": "../../packages/lens-secrets" }
+    { "path": "../../packages/lens-secrets" },
+    { "path": "../../packages/lens-cron" }
   ]
 }
