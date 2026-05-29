@@ -29,9 +29,20 @@ body {
 }
 
 .suite {
-  max-width: 720px;
+  width: min(1180px, calc(100% - 2rem));
   margin: 0 auto;
-  padding: 2rem 1rem;
+  padding: 2rem 0;
+}
+
+@media (max-width: 640px) {
+  .suite {
+    width: calc(100% - 0.75rem);
+    padding: 0.75rem 0;
+  }
+}
+
+.suite__header {
+  margin-bottom: 1.5rem;
 }
 
 .suite__header h1 {
@@ -42,10 +53,11 @@ body {
 .suite__tagline {
   margin: 0 0 0.25rem;
   opacity: 0.75;
+  overflow-wrap: anywhere;
 }
 
 .suite__phase {
-  margin: 0 0 1.5rem;
+  margin: 0 0 1rem;
   font-size: 0.875rem;
   opacity: 0.6;
 }
@@ -55,6 +67,12 @@ body {
   border-radius: 8px;
   background: white;
   padding: 1.25rem 1.5rem;
+}
+
+@media (max-width: 640px) {
+  .card {
+    padding: 1rem;
+  }
 }
 
 @media (prefers-color-scheme: dark) {
@@ -105,6 +123,7 @@ body {
 
 .caps,
 .entitlements {
+  min-width: 0;
   list-style: none;
   padding: 0;
   margin: 0;
@@ -115,10 +134,15 @@ body {
 
 .caps li,
 .entitlements li {
+  min-width: 0;
+  max-width: 100%;
   font-size: 0.875rem;
   padding: 0.125rem 0.5rem;
   border-radius: 4px;
   background: rgba(0, 0, 0, 0.05);
+  overflow-wrap: anywhere;
+  word-break: break-word;
+  white-space: normal;
 }
 
 @media (prefers-color-scheme: dark) {
@@ -701,21 +725,53 @@ code {
 
 /* Phase 2.2 — tool tabs + env-specific bits */
 
+.suite__mobileTools {
+  display: none;
+}
+
 .suite__tools {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(12rem, 1fr));
+  gap: 0.75rem;
+  margin-bottom: 0;
+}
+
+.suite__toolGroup {
+  min-width: 0;
+  padding: 0.625rem;
+  border: 1px solid rgba(0, 0, 0, 0.08);
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.6);
+}
+
+.suite__toolGroupLabel {
+  margin: 0 0 0.45rem;
+  font-size: 0.6875rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0;
+  opacity: 0.62;
+}
+
+.suite__toolButtons {
   display: flex;
-  gap: 0.5rem;
-  margin-bottom: 1.5rem;
+  flex-wrap: wrap;
+  gap: 0.375rem;
 }
 
 .suite__tool {
-  padding: 0.4rem 1rem;
+  min-height: 2rem;
+  padding: 0.35rem 0.65rem;
   border: 1px solid rgba(0, 0, 0, 0.15);
-  border-radius: 999px;
+  border-radius: 6px;
   background: transparent;
   color: inherit;
   font: inherit;
+  font-size: 0.8125rem;
+  line-height: 1.15;
   cursor: pointer;
   opacity: 0.7;
+  white-space: nowrap;
 }
 
 .suite__tool--active {
@@ -726,8 +782,61 @@ code {
 }
 
 @media (prefers-color-scheme: dark) {
+  .suite__toolGroup {
+    background: rgba(255, 255, 255, 0.035);
+    border-color: rgba(255, 255, 255, 0.08);
+  }
+
   .suite__tool {
     border-color: rgba(255, 255, 255, 0.2);
+  }
+}
+
+@media (max-width: 960px) {
+  .suite__tools {
+    grid-template-columns: repeat(auto-fit, minmax(11rem, 1fr));
+  }
+}
+
+@media (max-width: 640px) {
+  .suite__tools {
+    display: none;
+  }
+
+  .suite__mobileTools {
+    display: grid;
+    grid-template-columns: max-content minmax(0, 1fr);
+    align-items: center;
+    gap: 0.75rem;
+  }
+
+  .suite__mobileToolsLabel {
+    font-size: 0.8125rem;
+    font-weight: 700;
+    opacity: 0.7;
+  }
+
+  .suite__toolSelect {
+    min-height: 2.5rem;
+    width: 100%;
+    min-width: 0;
+    padding: 0.45rem 0.6rem;
+    border: 1px solid rgba(0, 0, 0, 0.18);
+    border-radius: 6px;
+    background: white;
+    color: inherit;
+    font: inherit;
+  }
+
+  .suite__phase {
+    margin-bottom: 0.75rem;
+  }
+}
+
+@media (max-width: 640px) and (prefers-color-scheme: dark) {
+  .suite__toolSelect {
+    background: #0f0f0f;
+    border-color: rgba(255, 255, 255, 0.15);
   }
 }
 
@@ -1152,6 +1261,14 @@ code {
   border: 1px solid rgba(0, 0, 0, 0.1);
   border-radius: 8px;
   background: rgba(0, 0, 0, 0.02);
+  overflow: hidden;
+}
+
+@media (max-width: 640px) {
+  .pro-surface {
+    margin-bottom: 1rem;
+    padding: 0.75rem;
+  }
 }
 
 @media (prefers-color-scheme: dark) {
@@ -1182,10 +1299,13 @@ code {
 .entitlements__locked {
   display: inline-flex;
   align-items: baseline;
+  flex-wrap: wrap;
   gap: 0.35rem;
+  min-width: 0;
 }
 
 .pro-tag {
+  flex: 0 0 auto;
   font-size: 0.6875rem;
   font-weight: 700;
   letter-spacing: 0.03em;
@@ -1201,6 +1321,7 @@ code {
   margin: 0.6rem 0 0;
   font-size: 0.8125rem;
   opacity: 0.6;
+  overflow-wrap: anywhere;
 }
 
 @media (prefers-color-scheme: dark) {
@@ -1321,5 +1442,352 @@ code {
   .url-params th,
   .url-params td {
     border-color: rgba(255, 255, 255, 0.08);
+  }
+}
+
+/* NekoCodec output pane. */
+
+.codec-output {
+  margin: 0;
+  padding: 0.75rem;
+  border: 1px solid rgba(0, 0, 0, 0.08);
+  border-radius: 4px;
+  max-height: 360px;
+  overflow: auto;
+  background: white;
+  font-family: ui-monospace, 'SF Mono', 'Cascadia Code', 'Roboto Mono', monospace;
+  font-size: 0.875rem;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+@media (prefers-color-scheme: dark) {
+  .codec-output {
+    background: #0f0f0f;
+    border-color: rgba(255, 255, 255, 0.08);
+  }
+}
+
+/* NekoTime timestamp input row and resolved-instant summary. */
+
+.time-input-row {
+  display: flex;
+  gap: 0.5rem;
+  align-items: center;
+}
+
+.time-input {
+  flex: 1;
+  font-family: ui-monospace, 'SF Mono', 'Cascadia Code', 'Roboto Mono', monospace;
+  font-size: 0.9375rem;
+  border: 1px solid rgba(0, 0, 0, 0.15);
+  border-radius: 4px;
+  padding: 0.4rem 0.5rem;
+  background: white;
+  color: inherit;
+}
+
+@media (prefers-color-scheme: dark) {
+  .time-input {
+    background: #0f0f0f;
+    border-color: rgba(255, 255, 255, 0.12);
+  }
+}
+
+.time-interpretation {
+  font-size: 0.75rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  padding: 0.1rem 0.5rem;
+  border-radius: 999px;
+  background: rgba(37, 99, 235, 0.12);
+  color: #2563eb;
+}
+
+@media (prefers-color-scheme: dark) {
+  .time-interpretation {
+    color: #6cb6ff;
+    background: rgba(108, 182, 255, 0.14);
+  }
+}
+
+.time-summary {
+  margin-top: 0.5rem;
+  align-items: baseline;
+}
+
+.time-summary dd code {
+  font-size: 0.9375rem;
+}
+
+.time-offset {
+  opacity: 0.65;
+  font-size: 0.875rem;
+}
+
+.time-copy-inline {
+  font: inherit;
+  font-size: 0.6875rem;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  padding: 0 0.3rem;
+  margin-left: 0.25rem;
+  border: 1px solid rgba(0, 0, 0, 0.15);
+  border-radius: 4px;
+  background: transparent;
+  color: inherit;
+  cursor: pointer;
+  opacity: 0.6;
+}
+
+.time-copy-inline:hover {
+  opacity: 1;
+}
+
+@media (prefers-color-scheme: dark) {
+  .time-copy-inline {
+    border-color: rgba(255, 255, 255, 0.15);
+  }
+}
+
+/* NekoDiff two-pane input and unified diff output. */
+
+.diff-inputs {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 1rem;
+}
+
+@media (max-width: 540px) {
+  .diff-inputs {
+    grid-template-columns: 1fr;
+  }
+}
+
+.diff-summary {
+  margin: 0 0 0.75rem;
+  font-size: 0.875rem;
+  opacity: 0.85;
+}
+
+.diff-output {
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: 0.875rem;
+}
+
+.diff-output__header {
+  display: flex;
+  flex-direction: column;
+  margin-bottom: 0.5rem;
+  opacity: 0.75;
+}
+
+.diff-output__minus {
+  color: #dc2626;
+}
+
+.diff-output__plus {
+  color: #059669;
+}
+
+.diff-output__hunks {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  border: 1px solid rgba(0, 0, 0, 0.08);
+  border-radius: 6px;
+  overflow: auto;
+  max-height: 360px;
+}
+
+@media (prefers-color-scheme: dark) {
+  .diff-output__hunks {
+    border-color: rgba(255, 255, 255, 0.08);
+  }
+}
+
+.diff-output__hunk {
+  display: flex;
+  gap: 0.5rem;
+  padding: 0.1rem 0.5rem;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+.diff-output__hunk--add {
+  background: rgba(5, 150, 105, 0.12);
+}
+
+.diff-output__hunk--remove {
+  background: rgba(220, 38, 38, 0.12);
+}
+
+.diff-output__marker {
+  width: 1ch;
+  opacity: 0.6;
+  flex: 0 0 auto;
+}
+
+/* NekoPackage manifest summary, dependency/script tables. */
+
+.package-metadata {
+  margin-bottom: 1rem;
+}
+
+.package-counts {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(7rem, 1fr));
+  gap: 0.5rem;
+  margin: 0 0 1rem;
+}
+
+.package-counts dt {
+  font-size: 0.75rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  opacity: 0.6;
+}
+
+.package-counts dd {
+  margin: 0;
+  font-size: 1.15rem;
+  font-weight: 700;
+}
+
+.package-section {
+  margin-top: 1rem;
+}
+
+.package-section__heading {
+  margin: 0 0 0.5rem;
+  font-size: 0.95rem;
+}
+
+.package-table td {
+  overflow-wrap: anywhere;
+}
+
+.package-empty {
+  margin: 0;
+  font-size: 0.875rem;
+  opacity: 0.65;
+}
+
+/* NekoBinary conversion summary. */
+
+.binary-summary {
+  margin-bottom: 1rem;
+}
+
+.binary-summary dd {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.binary-preview {
+  max-height: 10rem;
+  overflow: auto;
+  white-space: pre-wrap;
+  font-family: ui-monospace, 'SF Mono', 'Cascadia Code', 'Roboto Mono', monospace;
+  font-size: 0.875rem;
+}
+
+/* NekoCSV table summary. */
+
+.csv-header {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  font-size: 0.875rem;
+  padding: 0.25rem 0.625rem;
+  border: 1px solid rgba(0, 0, 0, 0.15);
+  border-radius: 4px;
+}
+
+.csv-header--active {
+  background: rgba(0, 0, 0, 0.07);
+  font-weight: 600;
+}
+
+.csv-counts {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(7rem, 1fr));
+  gap: 0.5rem;
+  margin: 0 0 1rem;
+}
+
+.csv-counts dt {
+  font-size: 0.75rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  opacity: 0.6;
+}
+
+.csv-counts dd {
+  margin: 0;
+  font-size: 1.15rem;
+  font-weight: 700;
+}
+
+.csv-cell {
+  overflow-wrap: anywhere;
+}
+
+.csv-empty {
+  margin: 0;
+  font-size: 0.875rem;
+  opacity: 0.65;
+}
+
+@media (prefers-color-scheme: dark) {
+  .csv-header {
+    border-color: rgba(255, 255, 255, 0.12);
+  }
+
+  .csv-header--active {
+    background: rgba(255, 255, 255, 0.08);
+  }
+}
+
+/* NekoTOML — reuses the shared .card / .paste / .results / .viewmode /
+   .copy__btn language; the output <pre> mirrors .url-output. */
+.toml-output {
+  margin: 0;
+  padding: 0.75rem;
+  border: 1px solid rgba(0, 0, 0, 0.08);
+  border-radius: 4px;
+  max-height: 360px;
+  overflow: auto;
+  background: white;
+  font-family: ui-monospace, 'SF Mono', 'Cascadia Code', 'Roboto Mono', monospace;
+  font-size: 0.875rem;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+.toml-stats {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem 1rem;
+  margin: 0 0 0.75rem;
+  padding: 0;
+  list-style: none;
+  font-size: 0.8125rem;
+}
+
+.toml-stats li {
+  font-family: ui-monospace, 'SF Mono', 'Cascadia Code', 'Roboto Mono', monospace;
+  opacity: 0.8;
+}
+
+.toml-stats strong {
+  opacity: 1;
+}
+
+@media (prefers-color-scheme: dark) {
+  .toml-output {
+    border-color: rgba(255, 255, 255, 0.12);
+    background: rgba(255, 255, 255, 0.04);
   }
 }

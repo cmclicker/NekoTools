@@ -12,6 +12,7 @@ import { validate } from '@nekotools/schemas';
 import { FIXED_CLOCK, binaryManifest, buildBinaryRegistration } from '../index.js';
 
 const clock = FIXED_CLOCK('2026-05-19T00:00:00.000Z');
+const PRO_EXPORTER_IDS = ['binary.export.batch.report', 'binary.export.byte-map'];
 
 function registry(): ToolRegistry {
   const r = new ToolRegistry();
@@ -25,13 +26,24 @@ describe('NekoBinary: manifest', () => {
     expect(result.ok, result.errors.join('; ')).toBe(true);
   });
 
-  it('declares network-forbidden and no pro features', () => {
+  it('declares network-forbidden and a Pro boundary', () => {
     expect(binaryManifest.offlinePolicy.networkPolicy).toBe('network-forbidden');
-    expect(binaryManifest.entitlements.pro).toEqual([]);
+    expect(binaryManifest.entitlements.pro).toContain('batch.convert');
+    expect(binaryManifest.entitlements.pro).toContain('inspect.byte-map');
+    expect(binaryManifest.entitlements.pro).toContain('inspect.magic-signature');
   });
 
   it('declares an explicit outOfScope', () => {
     expect(binaryManifest.outOfScope.length).toBeGreaterThan(0);
+  });
+
+  it('keeps Pro exporters advertised but unregistered in the free build', () => {
+    const registration = buildBinaryRegistration(clock);
+    const registered = new Set(registration.exporters.map((exporter) => exporter.id));
+    for (const id of PRO_EXPORTER_IDS) {
+      expect(binaryManifest.exporters).toContain(id);
+      expect(registered.has(id)).toBe(false);
+    }
   });
 });
 

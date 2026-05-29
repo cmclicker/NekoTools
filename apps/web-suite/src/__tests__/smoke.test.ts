@@ -1,6 +1,17 @@
 import { describe, expect, it } from 'vitest';
+import { binaryManifest, buildBinaryRegistration } from '@nekotools/lens-binary';
+import { buildCodecRegistration, codecManifest } from '@nekotools/lens-codec';
+import { buildCsvRegistration, csvManifest } from '@nekotools/lens-csv';
+import { buildDiffRegistration, diffManifest } from '@nekotools/lens-diff';
 import { buildEnvRegistration, envManifest } from '@nekotools/lens-env';
+import { buildHashRegistration, hashManifest } from '@nekotools/lens-hash';
+import { buildHeadersRegistration, headersManifest } from '@nekotools/lens-headers';
 import { buildJsonRegistration, jsonManifest } from '@nekotools/lens-json';
+import { buildPackageRegistration, packageManifest } from '@nekotools/lens-package';
+import { buildRegexRegistration, regexManifest } from '@nekotools/lens-regex';
+import { buildTimeRegistration, timeManifest } from '@nekotools/lens-time';
+
+import { TOOLS } from '../tools.js';
 
 /**
  * Web-suite shell smoke test. After Phase 2.2 the shell hosts two
@@ -68,5 +79,56 @@ describe('apps/web-suite scaffold', () => {
     expect(reg.manifest.id).toBe('env');
     expect(reg.parsers.length).toBeGreaterThan(0);
     expect(reg.exporters.length).toBeGreaterThan(0);
+  });
+
+  it('imports every integrated slice manifest through workspace aliases', () => {
+    expect(headersManifest.name).toBe('NekoHeaders');
+    expect(codecManifest.name).toBe('NekoCodec');
+    expect(hashManifest.name).toBe('NekoHash');
+    expect(timeManifest.name).toBe('NekoTime');
+    expect(regexManifest.name).toBe('NekoRegex');
+    expect(diffManifest.name).toBe('NekoDiff');
+    expect(packageManifest.name).toBe('NekoPackage');
+    expect(binaryManifest.name).toBe('NekoBinary');
+    expect(csvManifest.name).toBe('NekoCSV');
+    for (const manifest of [
+      binaryManifest,
+      headersManifest,
+      codecManifest,
+      csvManifest,
+      hashManifest,
+      timeManifest,
+      regexManifest,
+      diffManifest,
+      packageManifest,
+    ]) {
+      expect(manifest.offlinePolicy.networkPolicy).toBe('network-forbidden');
+      expect(manifest.entitlements.free.length).toBeGreaterThan(0);
+    }
+  });
+
+  it('exposes runtime registrations for every integrated slice', () => {
+    for (const registration of [
+      buildBinaryRegistration(),
+      buildHeadersRegistration(),
+      buildCodecRegistration(),
+      buildCsvRegistration(),
+      buildHashRegistration(),
+      buildTimeRegistration(),
+      buildRegexRegistration(),
+      buildDiffRegistration(),
+      buildPackageRegistration(),
+    ]) {
+      expect(registration.parsers.length).toBeGreaterThan(0);
+      expect(registration.exporters.length).toBeGreaterThan(0);
+    }
+  });
+
+  it('every mounted tool declares a Pro surface', () => {
+    for (const tool of TOOLS) {
+      expect(tool.manifest.entitlements.pro.length, `${tool.id} Pro entitlements`).toBeGreaterThan(
+        0,
+      );
+    }
   });
 });

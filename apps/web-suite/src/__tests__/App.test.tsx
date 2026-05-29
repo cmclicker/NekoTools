@@ -440,10 +440,109 @@ describe('App integration', () => {
     expect(within(proList).getByText('batch.audit')).toBeInTheDocument();
   });
 
-  it('NekoURL slice: all five tool tabs remain rendered (existing tabs unaffected)', () => {
+  it('tool slice integration: all tool tabs remain rendered', () => {
     render(<App initialInput='{"a":1}' />);
-    for (const id of ['json', 'env', 'logs', 'yaml', 'url']) {
+    for (const id of [
+      'json',
+      'env',
+      'logs',
+      'yaml',
+      'csv',
+      'jwt',
+      'url',
+      'headers',
+      'codec',
+      'hash',
+      'time',
+      'regex',
+      'diff',
+      'package',
+      'binary',
+    ]) {
       expect(screen.getByTestId(`tool-tab-${id}`)).toBeInTheDocument();
+    }
+  });
+
+  it('toolbox shell: groups the growing tool set into launcher categories', () => {
+    render(<App initialInput='{"a":1}' />);
+
+    const expectedGroups = {
+      data: ['json', 'env', 'logs', 'yaml', 'csv'],
+      web: ['jwt', 'url', 'headers'],
+      text: ['codec', 'regex', 'diff'],
+      project: ['package'],
+      utility: ['binary', 'hash', 'time'],
+    } as const;
+
+    for (const [groupId, toolIds] of Object.entries(expectedGroups)) {
+      const group = screen.getByTestId(`tool-group-${groupId}`);
+      for (const toolId of toolIds) {
+        expect(within(group).getByTestId(`tool-tab-${toolId}`)).toBeInTheDocument();
+      }
+    }
+
+    const compactPicker = screen.getByTestId('tool-select') as HTMLSelectElement;
+    expect(compactPicker).toHaveValue('json');
+    expect(within(compactPicker).getByRole('option', { name: 'NekoDiff' })).toHaveValue('diff');
+    expect(within(compactPicker).getByRole('option', { name: 'NekoPackage' })).toHaveValue(
+      'package',
+    );
+    expect(within(compactPicker).getByRole('option', { name: 'NekoBinary' })).toHaveValue(
+      'binary',
+    );
+    expect(within(compactPicker).getByRole('option', { name: 'NekoCSV' })).toHaveValue('csv');
+  });
+
+  it('toolbox shell: compact picker switches tools for narrow viewports', () => {
+    render(<App initialInput='{"a":1}' />);
+    fireEvent.change(screen.getByTestId('tool-select'), { target: { value: 'diff' } });
+
+    expect(screen.getByTestId('tool-tab-diff')).toHaveAttribute('aria-pressed', 'true');
+    expect(screen.getByTestId('tool-panel-diff')).toBeVisible();
+    expect(screen.getByTestId('tool-panel-json')).not.toBeVisible();
+    const phase = document.querySelector('.suite__phase');
+    expect(phase?.textContent).toMatch(/Now viewing\s+NekoDiff/);
+  });
+
+  it('tool slice integration: new slice tabs toggle mounted panels and Pro surfaces', () => {
+    render(<App initialInput='{"a":1}' />);
+    for (const [id, label] of [
+      ['headers', 'NekoHeaders'],
+      ['codec', 'NekoCodec'],
+      ['hash', 'NekoHash'],
+      ['time', 'NekoTime'],
+      ['regex', 'NekoRegex'],
+      ['diff', 'NekoDiff'],
+      ['package', 'NekoPackage'],
+      ['binary', 'NekoBinary'],
+      ['csv', 'NekoCSV'],
+    ] as const) {
+      fireEvent.click(screen.getByTestId(`tool-tab-${id}`));
+      expect(screen.getByTestId(`tool-tab-${id}`)).toHaveAttribute('aria-pressed', 'true');
+      expect(screen.getByTestId(`tool-panel-${id}`)).toBeVisible();
+      expect(screen.getByTestId('tool-panel-json')).not.toBeVisible();
+      expect(screen.getByTestId(`pro-surface-${id}`)).toBeInTheDocument();
+      const phase = document.querySelector('.suite__phase');
+      expect(phase?.textContent).toMatch(new RegExp(`Now viewing\\s+${label}`));
+    }
+  });
+
+  it('tool slice integration: initialTool can open every new slice directly', () => {
+    for (const id of [
+      'headers',
+      'codec',
+      'hash',
+      'time',
+      'regex',
+      'diff',
+      'package',
+      'binary',
+      'csv',
+    ] as const) {
+      const { unmount } = render(<App initialTool={id} />);
+      expect(screen.getByTestId(`tool-panel-${id}`)).toBeVisible();
+      expect(screen.getByTestId('tool-panel-json')).not.toBeVisible();
+      unmount();
     }
   });
 });

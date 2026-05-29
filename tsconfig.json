@@ -15,8 +15,17 @@
     { "path": "./packages/lens-env" },
     { "path": "./packages/lens-logs" },
     { "path": "./packages/lens-yaml" },
+    { "path": "./packages/lens-csv" },
     { "path": "./packages/lens-jwt" },
     { "path": "./packages/lens-url" },
+    { "path": "./packages/lens-headers" },
+    { "path": "./packages/lens-codec" },
+    { "path": "./packages/lens-hash" },
+    { "path": "./packages/lens-time" },
+    { "path": "./packages/lens-regex" },
+    { "path": "./packages/lens-diff" },
+    { "path": "./packages/lens-package" },
+    { "path": "./packages/lens-toml" },
     { "path": "./apps/web-suite" }
   ]
 }

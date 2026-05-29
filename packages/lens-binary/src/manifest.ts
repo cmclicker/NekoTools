@@ -18,7 +18,13 @@ export const binaryManifest: ToolManifest = {
     'binary.base64',
     'binary.utf8',
   ],
-  exporters: ['binary.export.json', 'binary.export.markdown', 'binary.export.plaintext'],
+  exporters: [
+    'binary.export.json',
+    'binary.export.markdown',
+    'binary.export.plaintext',
+    'binary.export.batch.report',
+    'binary.export.byte-map',
+  ],
   offlinePolicy: DEFAULT_OFFLINE_POLICY,
   capabilities: {
     canSaveWorkspace: true,
@@ -38,7 +44,15 @@ export const binaryManifest: ToolManifest = {
       'export.plaintext',
       'workspace.save',
     ],
-    pro: [],
+    pro: [
+      'batch.convert',
+      'inspect.byte-map',
+      'inspect.magic-signature',
+      'inspect.endianness',
+      'export.batch.report',
+      'export.byte-map',
+      'workspace.snapshots',
+    ],
   },
   outOfScope: [
     'fetching live data from the network',

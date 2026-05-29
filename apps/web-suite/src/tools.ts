@@ -5,6 +5,16 @@ import { logsManifest } from '@nekotools/lens-logs';
 import { yamlManifest } from '@nekotools/lens-yaml';
 import { jwtManifest } from '@nekotools/lens-jwt';
 import { urlManifest } from '@nekotools/lens-url';
+import { headersManifest } from '@nekotools/lens-headers';
+import { codecManifest } from '@nekotools/lens-codec';
+import { hashManifest } from '@nekotools/lens-hash';
+import { timeManifest } from '@nekotools/lens-time';
+import { regexManifest } from '@nekotools/lens-regex';
+import { diffManifest } from '@nekotools/lens-diff';
+import { packageManifest } from '@nekotools/lens-package';
+import { binaryManifest } from '@nekotools/lens-binary';
+import { csvManifest } from '@nekotools/lens-csv';
+import { tomlManifest } from '@nekotools/lens-toml';
 
 /**
  * The unified workbench tool registry.
@@ -15,22 +25,68 @@ import { urlManifest } from '@nekotools/lens-url';
  * because the sub-apps have bespoke props / test seams; new tools add a
  * `TOOLS` entry plus their panel together.)
  */
-export type ActiveTool = 'json' | 'env' | 'logs' | 'yaml' | 'jwt' | 'url';
+export type ActiveTool =
+  | 'json'
+  | 'env'
+  | 'logs'
+  | 'yaml'
+  | 'jwt'
+  | 'url'
+  | 'headers'
+  | 'codec'
+  | 'hash'
+  | 'time'
+  | 'regex'
+  | 'diff'
+  | 'package'
+  | 'binary'
+  | 'csv'
+  | 'toml';
+
+export type ToolCategoryId = 'data' | 'web' | 'text' | 'project' | 'utility';
+
+export interface ToolCategory {
+  readonly id: ToolCategoryId;
+  readonly label: string;
+}
 
 export interface ToolDescriptor {
   readonly id: ActiveTool;
   readonly label: string;
+  readonly category: ToolCategoryId;
   readonly manifest: ToolManifest;
 }
 
-export const TOOLS: readonly ToolDescriptor[] = [
-  { id: 'json', label: 'NekoJSON', manifest: jsonManifest },
-  { id: 'env', label: 'NekoEnv', manifest: envManifest },
-  { id: 'logs', label: 'NekoLogs', manifest: logsManifest },
-  { id: 'yaml', label: 'NekoYAML', manifest: yamlManifest },
-  { id: 'jwt', label: 'NekoJWT', manifest: jwtManifest },
-  { id: 'url', label: 'NekoURL', manifest: urlManifest },
+export const TOOL_CATEGORIES: readonly ToolCategory[] = [
+  { id: 'data', label: 'Data' },
+  { id: 'web', label: 'Web' },
+  { id: 'text', label: 'Text' },
+  { id: 'project', label: 'Project' },
+  { id: 'utility', label: 'Utility' },
 ];
+
+export const TOOLS: readonly ToolDescriptor[] = [
+  { id: 'json', label: 'NekoJSON', category: 'data', manifest: jsonManifest },
+  { id: 'env', label: 'NekoEnv', category: 'data', manifest: envManifest },
+  { id: 'logs', label: 'NekoLogs', category: 'data', manifest: logsManifest },
+  { id: 'yaml', label: 'NekoYAML', category: 'data', manifest: yamlManifest },
+  { id: 'csv', label: 'NekoCSV', category: 'data', manifest: csvManifest },
+  { id: 'toml', label: 'NekoTOML', category: 'data', manifest: tomlManifest },
+  { id: 'jwt', label: 'NekoJWT', category: 'web', manifest: jwtManifest },
+  { id: 'url', label: 'NekoURL', category: 'web', manifest: urlManifest },
+  { id: 'headers', label: 'NekoHeaders', category: 'web', manifest: headersManifest },
+  { id: 'codec', label: 'NekoCodec', category: 'text', manifest: codecManifest },
+  { id: 'regex', label: 'NekoRegex', category: 'text', manifest: regexManifest },
+  { id: 'diff', label: 'NekoDiff', category: 'text', manifest: diffManifest },
+  { id: 'package', label: 'NekoPackage', category: 'project', manifest: packageManifest },
+  { id: 'binary', label: 'NekoBinary', category: 'utility', manifest: binaryManifest },
+  { id: 'hash', label: 'NekoHash', category: 'utility', manifest: hashManifest },
+  { id: 'time', label: 'NekoTime', category: 'utility', manifest: timeManifest },
+];
+
+export function toolsByCategory(category: ToolCategoryId): readonly ToolDescriptor[] {
+  return TOOLS.filter((tool) => tool.category === category);
+}
 
 export function toolById(id: ActiveTool): ToolDescriptor {
   const found = TOOLS.find((tool) => tool.id === id);

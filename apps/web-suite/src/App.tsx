@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, type ChangeEvent } from 'react';
 
 import { EnvApp, type EnvAppProps } from './EnvApp.js';
 import { JsonApp, type JsonAppProps } from './JsonApp.js';
@@ -6,8 +6,18 @@ import { LogsApp, type LogsAppProps } from './LogsApp.js';
 import { YamlApp, type YamlAppProps } from './YamlApp.js';
 import { JwtApp, type JwtAppProps } from './JwtApp.js';
 import { UrlApp, type UrlAppProps } from './UrlApp.js';
+import { HeadersApp, type HeadersAppProps } from './HeadersApp.js';
+import { CodecApp, type CodecAppProps } from './CodecApp.js';
+import { HashApp, type HashAppProps } from './HashApp.js';
+import { TimeApp, type TimeAppProps } from './TimeApp.js';
+import { RegexApp, type RegexAppProps } from './RegexApp.js';
+import { DiffApp, type DiffAppProps } from './DiffApp.js';
+import { PackageApp, type PackageAppProps } from './PackageApp.js';
+import { BinaryApp, type BinaryAppProps } from './BinaryApp.js';
+import { CsvApp, type CsvAppProps } from './CsvApp.js';
+import { TomlApp, type TomlAppProps } from './TomlApp.js';
 import { ProSurface } from './ProSurface.js';
-import { TOOLS, toolById, type ActiveTool } from './tools.js';
+import { TOOL_CATEGORIES, toolById, toolsByCategory, type ActiveTool } from './tools.js';
 
 export type { NekoJsonUiState, ViewMode } from './JsonApp.js';
 export type { EnvViewMode, NekoEnvUiState } from './EnvApp.js';
@@ -15,6 +25,14 @@ export type { LogViewMode, NekoLogsUiState } from './LogsApp.js';
 export type { YamlViewMode, NekoYamlUiState } from './YamlApp.js';
 export type { JwtViewMode, NekoJwtUiState } from './JwtApp.js';
 export type { UrlViewMode, NekoUrlUiState } from './UrlApp.js';
+export type { HeadersViewMode, NekoHeadersUiState } from './HeadersApp.js';
+export type { NekoCodecUiState } from './CodecApp.js';
+export type { HashSourceMode, NekoHashUiState } from './HashApp.js';
+export type { DiffMode, NekoDiffUiState } from './DiffApp.js';
+export type { NekoPackageUiState } from './PackageApp.js';
+export type { NekoBinaryUiState } from './BinaryApp.js';
+export type { NekoCsvUiState } from './CsvApp.js';
+export type { TomlViewMode, NekoTomlUiState } from './TomlApp.js';
 export type { ActiveTool } from './tools.js';
 
 export interface AppProps extends JsonAppProps {
@@ -34,6 +52,26 @@ export interface AppProps extends JsonAppProps {
   readonly jwtApp?: JwtAppProps;
   /** NekoURL slice — props forwarded to the NekoURL sub-app. */
   readonly urlApp?: UrlAppProps;
+  /** NekoHeaders slice props forwarded to the NekoHeaders sub-app. */
+  readonly headersApp?: HeadersAppProps;
+  /** NekoCodec slice props forwarded to the NekoCodec sub-app. */
+  readonly codecApp?: CodecAppProps;
+  /** NekoHash slice props forwarded to the NekoHash sub-app. */
+  readonly hashApp?: HashAppProps;
+  /** NekoTime slice props forwarded to the NekoTime sub-app. */
+  readonly timeApp?: TimeAppProps;
+  /** NekoRegex slice props forwarded to the NekoRegex sub-app. */
+  readonly regexApp?: RegexAppProps;
+  /** NekoDiff slice props forwarded to the NekoDiff sub-app. */
+  readonly diffApp?: DiffAppProps;
+  /** NekoPackage slice props forwarded to the NekoPackage sub-app. */
+  readonly packageApp?: PackageAppProps;
+  /** NekoBinary slice props forwarded to the NekoBinary sub-app. */
+  readonly binaryApp?: BinaryAppProps;
+  /** NekoCSV slice props forwarded to the NekoCSV sub-app. */
+  readonly csvApp?: CsvAppProps;
+  /** NekoTOML slice props forwarded to the NekoTOML sub-app. */
+  readonly tomlApp?: TomlAppProps;
 }
 
 /**
@@ -59,11 +97,25 @@ export function App({
   yamlApp,
   jwtApp,
   urlApp,
+  headersApp,
+  codecApp,
+  hashApp,
+  timeApp,
+  regexApp,
+  diffApp,
+  packageApp,
+  binaryApp,
+  csvApp,
+  tomlApp,
   ...jsonAppProps
 }: AppProps = {}): JSX.Element {
   const [activeTool, setActiveTool] = useState<ActiveTool>(initialTool ?? 'json');
 
   const activeManifest = toolById(activeTool).manifest;
+
+  const handleToolSelect = (event: ChangeEvent<HTMLSelectElement>): void => {
+    setActiveTool(event.currentTarget.value as ActiveTool);
+  };
 
   return (
     <main className="suite">
@@ -75,18 +127,52 @@ export function App({
         <p className="suite__phase">
           Now viewing <strong>{activeManifest.name}</strong>.
         </p>
+        <div className="suite__mobileTools">
+          <label htmlFor="tool-select" className="suite__mobileToolsLabel">
+            Tool
+          </label>
+          <select
+            id="tool-select"
+            className="suite__toolSelect"
+            value={activeTool}
+            onChange={handleToolSelect}
+            data-testid="tool-select"
+          >
+            {TOOL_CATEGORIES.map((category) => (
+              <optgroup key={category.id} label={category.label}>
+                {toolsByCategory(category.id).map((tool) => (
+                  <option key={tool.id} value={tool.id}>
+                    {tool.label}
+                  </option>
+                ))}
+              </optgroup>
+            ))}
+          </select>
+        </div>
         <nav className="suite__tools" aria-label="Tool selector">
-          {TOOLS.map((tool) => (
-            <button
-              key={tool.id}
-              type="button"
-              className={`suite__tool${activeTool === tool.id ? ' suite__tool--active' : ''}`}
-              onClick={() => setActiveTool(tool.id)}
-              aria-pressed={activeTool === tool.id}
-              data-testid={`tool-tab-${tool.id}`}
+          {TOOL_CATEGORIES.map((category) => (
+            <section
+              key={category.id}
+              className="suite__toolGroup"
+              aria-label={`${category.label} tools`}
+              data-testid={`tool-group-${category.id}`}
             >
-              {tool.label}
-            </button>
+              <h2 className="suite__toolGroupLabel">{category.label}</h2>
+              <div className="suite__toolButtons">
+                {toolsByCategory(category.id).map((tool) => (
+                  <button
+                    key={tool.id}
+                    type="button"
+                    className={`suite__tool${activeTool === tool.id ? ' suite__tool--active' : ''}`}
+                    onClick={() => setActiveTool(tool.id)}
+                    aria-pressed={activeTool === tool.id}
+                    data-testid={`tool-tab-${tool.id}`}
+                  >
+                    {tool.label}
+                  </button>
+                ))}
+              </div>
+            </section>
           ))}
         </nav>
       </header>
@@ -118,6 +204,36 @@ export function App({
       </div>
       <div hidden={activeTool !== 'url'} data-testid="tool-panel-url">
         <UrlApp {...urlApp} />
+      </div>
+      <div hidden={activeTool !== 'headers'} data-testid="tool-panel-headers">
+        <HeadersApp {...headersApp} />
+      </div>
+      <div hidden={activeTool !== 'codec'} data-testid="tool-panel-codec">
+        <CodecApp {...codecApp} />
+      </div>
+      <div hidden={activeTool !== 'hash'} data-testid="tool-panel-hash">
+        <HashApp {...hashApp} />
+      </div>
+      <div hidden={activeTool !== 'time'} data-testid="tool-panel-time">
+        <TimeApp {...timeApp} />
+      </div>
+      <div hidden={activeTool !== 'regex'} data-testid="tool-panel-regex">
+        <RegexApp {...regexApp} />
+      </div>
+      <div hidden={activeTool !== 'diff'} data-testid="tool-panel-diff">
+        <DiffApp {...diffApp} />
+      </div>
+      <div hidden={activeTool !== 'package'} data-testid="tool-panel-package">
+        <PackageApp {...packageApp} />
+      </div>
+      <div hidden={activeTool !== 'binary'} data-testid="tool-panel-binary">
+        <BinaryApp {...binaryApp} />
+      </div>
+      <div hidden={activeTool !== 'csv'} data-testid="tool-panel-csv">
+        <CsvApp {...csvApp} />
+      </div>
+      <div hidden={activeTool !== 'toml'} data-testid="tool-panel-toml">
+        <TomlApp {...tomlApp} />
       </div>
 
       <footer className="suite__footer">
