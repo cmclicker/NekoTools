@@ -25,6 +25,7 @@ import { ndjsonManifest } from '@nekotools/lens-ndjson';
 import { iniManifest } from '@nekotools/lens-ini';
 import { passwordManifest } from '@nekotools/lens-password';
 import { colorManifest } from '@nekotools/lens-color';
+import { gitignoreManifest } from '@nekotools/lens-gitignore';
 
 /**
  * The unified workbench tool registry.
@@ -61,7 +62,8 @@ export type ActiveTool =
   | 'ndjson'
   | 'ini'
   | 'password'
-  | 'color';
+  | 'color'
+  | 'gitignore';
 
 export type ToolCategoryId = 'data' | 'web' | 'text' | 'project' | 'utility' | 'security';
 
@@ -104,6 +106,7 @@ export const TOOLS: readonly ToolDescriptor[] = [
   { id: 'regex', label: 'NekoRegex', category: 'text', manifest: regexManifest },
   { id: 'diff', label: 'NekoDiff', category: 'text', manifest: diffManifest },
   { id: 'package', label: 'NekoPackage', category: 'project', manifest: packageManifest },
+  { id: 'gitignore', label: 'NekoGitignore', category: 'project', manifest: gitignoreManifest },
   { id: 'binary', label: 'NekoBinary', category: 'utility', manifest: binaryManifest },
   { id: 'hash', label: 'NekoHash', category: 'utility', manifest: hashManifest },
   { id: 'time', label: 'NekoTime', category: 'utility', manifest: timeManifest },

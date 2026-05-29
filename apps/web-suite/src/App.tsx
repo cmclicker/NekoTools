@@ -26,6 +26,7 @@ import { NdjsonApp, type NdjsonAppProps } from './NdjsonApp.js';
 import { IniApp, type IniAppProps } from './IniApp.js';
 import { PasswordApp, type PasswordAppProps } from './PasswordApp.js';
 import { ColorApp, type ColorAppProps } from './ColorApp.js';
+import { GitignoreApp, type GitignoreAppProps } from './GitignoreApp.js';
 import { ProSurface } from './ProSurface.js';
 import { TOOL_CATEGORIES, toolById, toolsByCategory, type ActiveTool } from './tools.js';
 
@@ -53,6 +54,7 @@ export type { NdjsonViewMode, NekoNdjsonUiState } from './NdjsonApp.js';
 export type { IniViewMode, NekoIniUiState } from './IniApp.js';
 export type { PasswordViewMode, NekoPasswordUiState } from './PasswordApp.js';
 export type { ColorViewMode, NekoColorUiState } from './ColorApp.js';
+export type { GitignoreViewMode, NekoGitignoreUiState } from './GitignoreApp.js';
 export type { ActiveTool } from './tools.js';
 
 export interface AppProps extends JsonAppProps {
@@ -112,6 +114,8 @@ export interface AppProps extends JsonAppProps {
   readonly passwordApp?: PasswordAppProps;
   /** NekoColor slice props forwarded to the NekoColor sub-app. */
   readonly colorApp?: ColorAppProps;
+  /** NekoGitignore slice props forwarded to the NekoGitignore sub-app. */
+  readonly gitignoreApp?: GitignoreAppProps;
 }
 
 /**
@@ -157,6 +161,7 @@ export function App({
   iniApp,
   passwordApp,
   colorApp,
+  gitignoreApp,
   ...jsonAppProps
 }: AppProps = {}): JSX.Element {
   const [activeTool, setActiveTool] = useState<ActiveTool>(initialTool ?? 'json');
@@ -314,6 +319,9 @@ export function App({
       </div>
       <div hidden={activeTool !== 'color'} data-testid="tool-panel-color">
         <ColorApp {...colorApp} />
+      </div>
+      <div hidden={activeTool !== 'gitignore'} data-testid="tool-panel-gitignore">
+        <GitignoreApp {...gitignoreApp} />
       </div>
 
       <footer className="suite__footer">
