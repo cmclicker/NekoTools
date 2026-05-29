@@ -5,14 +5,26 @@
 
 ## Status board
 
+> **Reconciliation note (2026-05-29).** This board and the Active Next Queue
+> below had fallen badly out of sync with `origin/main`. The parallel
+> slice-builder fleet shipped breadth far beyond the tracked queue: **35 tools
+> are now on `main`, wired into `apps/web-suite` across 6 categories** (see
+> [Reconciled shipped inventory](#reconciled-shipped-inventory)). The queue's
+> former "Next" (NekoYAML engine) shipped long ago. Breadth (Phases 1, 2, 2B)
+> is delivered and overshot; the live frontier is **depth / monetization**
+> (turning advertised-future Pro into implemented, gated wedges). The forward
+> queue below is **re-proposed and awaiting owner ratification** — it does not
+> authorize implementation.
+
 | Phase   | State                       | Notes |
 | ------- | --------------------------- | ----- |
 | Phase 0   | **Complete** (commit `93efaa5`) | Platform spine + audit patches landed. |
 | Phase 1.0 | **Complete** (PR #2, commit `324115c`) | Engine MVP merged. No UI, no diff, no search — those land in Phase 1.1+ follow-up PRs. |
 | Phase 1.1 | **Complete** (PR #11, commit `248761c`) | All charter-declared free engine + UI capabilities shipped: diff (1.1a), large-doc threshold (1.1b), tokenizer (1.1c), duplicate-key + trailing-comma (1.1d), UI shell (1.1e), tree + text (1.1f), table + search (1.1g), copy.path + copy.value (1.1h). |
-| Phase 2   | **Active**                  | NekoEnv shipped (PR #12/#13/#14; free tier closed at `a442233`). NekoLogs charter merged (PR #15 / `03b5853`); NekoLogs engine MVP + `@nekotools/lens-kit` extraction shipped (PR #16 / `bdc3f1e`); NekoLogs UI shipped (PR #54 / `23c9ce2`) — third tool tab; NekoLogs free tier closed. |
-| Phase 3   | Not started                 | Premium engines (graph, semantic diff, migration). |
-| Phase 4   | Not started                 | Heavier tools (YAML, API Lens, Headers, Types, RBAC). |
+| Phase 2   | **Complete**                | NekoEnv (PR #12/#13/#14; free tier closed at `a442233`) + NekoLogs (PR #15/#16/#54; `@nekotools/lens-kit` extracted) shipped engine + UI. |
+| Phase 2B  | **Delivered + overshot**    | Tool breadth. The ratified 2B sequence (NekoYAML, NekoGitignore, NekoHeaders, NekoDiff, NekoJWT, NekoPackage) all shipped — and the fleet carried breadth to **35 tools total** (Data/Web/Text/Project/Utility/Security). All on `main` with engine + UI + conformance/edge tests. |
+| Phase 3   | **Active (frontier)**       | Depth / monetization: implemented, gated Pro per tool. Offline Ed25519 license layer shipped; NekoSecrets real gated Pro shipped; the **§5.1 wedge gate** + NekoJWT verify→audit/SARIF wiring is in-flight (PR #88). Most tools' Pro is still advertised-future. |
+| Phase 4   | Superseded by Phase 2B      | NekoYAML / NekoHeaders shipped (promoted in 2B). NekoAPI Lens, NekoTypes, NekoRBAC remain future candidates. |
 | Phase 5   | Not started                 | Expansion packs. |
 
 ## Active Next Queue
@@ -44,10 +56,61 @@ previous row `Done`.
 | 14    | Phase 2 / NekoLogs 2.x.1 | Implementation | `@nekotools/lens-logs` engine MVP: `log.text` (JSON-per-line / logfmt / plaintext detection) + `log.filter` parsers, diagnostics, summary + basic histogram, text/messages/json/csv/markdown exporters, workspace round-trip + conformance tests. **Extracts `@nekotools/lens-kit`** (clock + id-factory) and re-points lens-binary/json/env/logs at it — the 3rd-reuse trigger from NekoJSON charter §7. No UI. | Done (PR #16 / `bdc3f1e`) |
 | 15    | Phase 2 / NekoLogs 2.x.2 | Implementation | NekoLogs UI: table + text + summary views + structured-filter control + search + copy.line / copy.message. Wires `@nekotools/lens-logs` into `apps/web-suite` as the third tool tab and flips the UI entitlements into `manifest.entitlements.free`. **NekoLogs free tier closes here.** | Done (PR #54 / `23c9ce2`) |
 | 16    | Phase 2B / NekoYAML 2B.0 | Charter | NekoYAML charter PR (10-question reuse gate). Charter doc only — no implementation. First ratified Phase 2B breadth target ([nekoyaml.md](tools/nekoyaml.md)). | Done (PR #73 / `f47241e`) |
-| 17    | Phase 2B / NekoYAML 2B.1 | Engine | `@nekotools/lens-yaml` engine MVP **only**: `yaml.text` parser (multi-document) + diagnostics + exporters (YAML↔JSON, normalized YAML, paths, markdown summary) + workspace round-trip + conformance / monetization-safety tests. **No UI** (separate later PR). Charter: [nekoyaml.md](tools/nekoyaml.md). **This row only queues the engine; the engine PR itself is separately owner-authorized and is not authorized by this closeout.** | **Next** |
+| 17    | Phase 2B / NekoYAML 2B.1 | Engine | `@nekotools/lens-yaml` engine MVP: `yaml.text` parser (multi-document) + diagnostics + exporters (YAML↔JSON, normalized YAML, paths, markdown summary) + workspace round-trip + conformance / monetization-safety tests. | Done (engine PR #78; UI PR #79). |
 
-`Later` rows are intentionally not in the queue order — they are
-candidates for promotion to `Queued` after Phase 1 is fully closed.
+> **Queue superseded — reconciled 2026-05-29.** Rows 1–17 are all `Done`. The
+> slice-builder fleet shipped ~25 tools beyond row 17 without threading them
+> through this table, so the row-by-row queue stopped reflecting reality. The
+> factual shipped state is captured in
+> [Reconciled shipped inventory](#reconciled-shipped-inventory); the forward
+> work is re-proposed as the **Proposed next queue** below.
+
+### Proposed next queue (awaiting owner ratification)
+
+Breadth is delivered (35 tools). The remaining product risk is **depth**: most
+tools advertise Pro in their manifest but ship no implemented gated wedge —
+only NekoSecrets (and NekoJWT, in-flight PR #88) have real Pro. The proposed
+order rolls the NekoSecrets/NekoJWT template (real gated `proExporters` +
+flagship test + islands check, per [tool-standard.md](tool-standard.md) §5.1)
+to the tools with the clearest paid wedge first. **This is proposed direction,
+not authorization** — each row still needs charter/scope → branch → PR →
+Validation → owner merge.
+
+| Order | Scope | Wedge | Status |
+| ----- | ----- | ----- | ------ |
+| P1 | Land the **§5.1 wedge gate** + NekoJWT verify→audit/SARIF + NekoSecrets flagship | Encodes "done = wedge proven", brings both security tools into compliance | In review (PR #88) |
+| P2 | **NekoPassword** real gated Pro | Strength/policy audit → SARIF + CI baseline (security category, natural sibling to Secrets) | Proposed |
+| P3 | **NekoHeaders / NekoCSP** real gated Pro | Security-posture audit of headers/CSP → SARIF for CI | Proposed |
+| P4 | **NekoPackage** real gated Pro | Dependency/license-risk report → SARIF + policy export (largest commercial wedge) | Proposed |
+| P5 | Sweep remaining tools: confirm each is genuinely *advertised-future* or give it a wedge + flagship | Keeps the suite honest against §5.1 as Pro fills in | Proposed |
+
+`Later` rows from the original plan (NekoAPI Lens, NekoTypes, NekoRBAC,
+expansion packs) remain future candidates; they enter the queue via the normal
+charter flow when promoted.
+
+## Reconciled shipped inventory
+
+Source of truth: `apps/web-suite/src/tools.ts` (the tab registry) +
+`packages/lens-*`. **35 tools** are on `main`, each with an engine package
+(parser + diagnostics + exporters + manifest + conformance tests) and a wired
+web-suite tab. `@nekotools/lens-kit` is a shared helper, not a tool.
+
+| Category | Count | Tools |
+| --- | ---: | --- |
+| Data     | 9  | NekoJSON, NekoEnv, NekoLogs, NekoYAML, NekoCSV, NekoNDJSON, NekoTOML, NekoXML, NekoINI |
+| Web      | 6  | NekoJWT, NekoURL, NekoHeaders, NekoCookies, NekoMIME, NekoCSP |
+| Text     | 5  | NekoCodec, NekoRegex, NekoDiff, NekoCase, NekoSort |
+| Project  | 3  | NekoPackage, NekoGitignore, NekoLicense |
+| Utility  | 10 | NekoBinary, NekoHash, NekoTime, NekoCron, NekoUUID, NekoSemver, NekoColor, NekoUnicode, NekoHex, NekoDuration |
+| Security | 2  | NekoSecrets, NekoPassword |
+
+**Monetization status (the depth gap):** every tool *advertises* Pro in its
+manifest, but only **NekoSecrets** ships an implemented, gated Pro wedge today
+(SARIF / redacted / HTML / baseline exporters). **NekoJWT**'s gated audit +
+SARIF is in-flight (PR #88). All other tools' Pro entries are *advertised-future*
+(declared, intentionally unimplemented — `runExporter` throws `unknown
+exporter`), which the doctrine permits. Closing that gap is the Proposed next
+queue above.
 
 ## Phase 0 — Platform spine — COMPLETE
 
@@ -166,6 +229,14 @@ in its engine PR.
 > sets direction and order; it does **not** authorize implementation.
 
 ## Phase 2B — Tool Breadth (RATIFIED — owner-approved direction)
+
+> **DELIVERED (reconciled 2026-05-29).** The ratified 2B sequence below
+> (NekoYAML → NekoGitignore → NekoHeaders → NekoDiff → NekoJWT → NekoPackage)
+> has **all shipped**, and breadth was carried well past it to 35 tools (see
+> [Reconciled shipped inventory](#reconciled-shipped-inventory)). The
+> direction-setting text below is retained as the historical ratification
+> record; references to NekoYAML being "Next" are superseded by the reconciled
+> Active Next Queue above.
 
 > **Status: owner-ratified roadmap direction.** This section converts the
 > candidate surface in [docs/product/tool-ideals.md](product/tool-ideals.md)
