@@ -2252,23 +2252,20 @@ code {
     align-items: stretch;
   }
 
+  /* Each pane fills the column height and scrolls its own overflow, so a
+     textarea can be dragged down to the bottom bar — and past it (the pane
+     scrolls) — without ever scrolling the page. */
   .tool--cols > .paste,
   .tool--cols > .results {
     min-height: 0;
     overflow: auto;
   }
 
-  /* The input pane is a flex column so its main textarea fills down to the
-     bottom bar; nested textareas (e.g. NekoJWT's verify box) keep their
-     own size. */
-  .tool--cols > .paste {
-    display: flex;
-    flex-direction: column;
-  }
-
+  /* A roomy default for the main input. It stays user-resizable (NOT
+     flex-filled) so its resize handle works — consistent with secondary
+     textareas like NekoJWT's verify box. */
   .tool--cols > .paste > .paste__textarea {
-    flex: 1 1 auto;
-    min-height: 8rem;
+    min-height: 16rem;
   }
 }
 
