@@ -22,6 +22,7 @@ import { cronManifest } from '@nekotools/lens-cron';
 import { uuidManifest } from '@nekotools/lens-uuid';
 import { semverManifest } from '@nekotools/lens-semver';
 import { ndjsonManifest } from '@nekotools/lens-ndjson';
+import { iniManifest } from '@nekotools/lens-ini';
 
 /**
  * The unified workbench tool registry.
@@ -55,7 +56,8 @@ export type ActiveTool =
   | 'cron'
   | 'uuid'
   | 'semver'
-  | 'ndjson';
+  | 'ndjson'
+  | 'ini';
 
 export type ToolCategoryId = 'data' | 'web' | 'text' | 'project' | 'utility' | 'security';
 
@@ -89,6 +91,7 @@ export const TOOLS: readonly ToolDescriptor[] = [
   { id: 'ndjson', label: 'NekoNDJSON', category: 'data', manifest: ndjsonManifest },
   { id: 'toml', label: 'NekoTOML', category: 'data', manifest: tomlManifest },
   { id: 'xml', label: 'NekoXML', category: 'data', manifest: xmlManifest },
+  { id: 'ini', label: 'NekoINI', category: 'data', manifest: iniManifest },
   { id: 'jwt', label: 'NekoJWT', category: 'web', manifest: jwtManifest },
   { id: 'url', label: 'NekoURL', category: 'web', manifest: urlManifest },
   { id: 'headers', label: 'NekoHeaders', category: 'web', manifest: headersManifest },

@@ -23,6 +23,7 @@
     "@nekotools/lens-env": "workspace:*",
     "@nekotools/lens-hash": "workspace:*",
     "@nekotools/lens-headers": "workspace:*",
+    "@nekotools/lens-ini": "workspace:*",
     "@nekotools/lens-json": "workspace:*",
     "@nekotools/lens-jwt": "workspace:*",
     "@nekotools/lens-logs": "workspace:*",

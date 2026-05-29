@@ -1842,3 +1842,15 @@ code {
     color: inherit;
   }
 }
+
+/* NekoINI — per-section grouping; reuses shared .url-fields for entries. */
+.ini-section {
+  margin: 0 0 1rem;
+}
+
+.ini-section__name {
+  margin: 0 0 0.4rem;
+  font-family: ui-monospace, 'SF Mono', 'Cascadia Code', 'Roboto Mono', monospace;
+  font-size: 0.9375rem;
+  opacity: 0.85;
+}
