@@ -7,6 +7,7 @@ import {
   type SortParsedArtifact,
   type SortReport,
 } from './kinds.js';
+import { toFrequencyCsv } from './codegen.js';
 
 const TOOL_ID = 'sort';
 
@@ -76,3 +77,30 @@ export const freeExporters: readonly Exporter<SortArtifact>[] = [
   normalizedExporter,
   markdownSummaryExporter,
 ];
+
+// --- Pro exporters (registered in the binary, gated by entitlement) --------
+//
+// Backs ONE of the two declared Pro exporter ids — `export.frequency` — a
+// pure count over the result lines. Generator in `codegen.ts`. The other
+// declared id, `sort.export.diff` (`export.diff`), would diff the original
+// input vs the output, but the sort.parsed artifact retains only the output
+// lines (not the pre-transform input), so it stays advertising-only and is
+// NOT registered — still throws "unknown exporter".
+
+/** `sort.export.frequency` (Pro) — count per result line, most frequent first. */
+export const frequencyExporter: Exporter<SortArtifact> = {
+  version: 1,
+  id: 'sort.export.frequency',
+  toolId: TOOL_ID,
+  target: 'csv',
+  accepts: SORT_PARSED_EXPORT_KINDS,
+  producesMimeType: 'text/csv',
+  producesExtension: 'csv',
+  export({ artifacts }) {
+    const value = pickParsed(artifacts)?.value;
+    const body = value === undefined ? 'count,line' : toFrequencyCsv(value);
+    return { mimeType: 'text/csv', extension: 'csv', body };
+  },
+};
+
+export const proExporters: readonly Exporter<SortArtifact>[] = [frequencyExporter];
