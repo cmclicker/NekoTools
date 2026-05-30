@@ -3,6 +3,17 @@ import { fireEvent, render, screen, waitFor, within } from '@testing-library/rea
 
 import { CookiesApp } from '../CookiesApp.js';
 
+const PRO = {
+  version: 1 as const,
+  licenseId: 'X',
+  licensee: 'Buyer',
+  tier: 'pro' as const,
+  features: ['*'],
+  issuedAt: '2026-01-01T00:00:00.000Z',
+  expiresAt: null,
+  signature: 's',
+};
+
 describe('CookiesApp', () => {
   it('parses a Set-Cookie and renders the attribute table', () => {
     render(<CookiesApp initialInput={'sid=abc123; Domain=example.com; Path=/; Secure; HttpOnly; SameSite=Lax'} />);
@@ -48,5 +59,33 @@ describe('CookiesApp', () => {
     fireEvent.click(screen.getByTestId('cookies-copy-output'));
     await waitFor(() => expect(writes).toHaveLength(1));
     expect(JSON.parse(writes[0] ?? '[]')[0]).toMatchObject({ name: 'sid' });
+  });
+
+  it('locks the audit + SARIF Pro views when free', () => {
+    render(<CookiesApp initialInput={'sid=x'} initialUiState={{ viewMode: 'audit' }} />);
+    expect(screen.getByTestId('cookies-locked')).toBeInTheDocument();
+    expect(screen.queryByTestId('cookies-output')).not.toBeInTheDocument();
+  });
+
+  it('unlocks the security audit via an injected Pro entitlement', () => {
+    render(
+      <CookiesApp
+        initialInput={'sid=x; SameSite=None'}
+        initialUiState={{ viewMode: 'audit' }}
+        entitlement={PRO}
+      />,
+    );
+    const out = screen.getByTestId('cookies-output').textContent ?? '';
+    expect(out).toContain('# NekoCookies security audit');
+    expect(out).toContain('cookie.insecure');
+  });
+
+  it('renders SARIF 2.1.0 in the SARIF view when Pro', () => {
+    render(
+      <CookiesApp initialInput={'sid=x'} initialUiState={{ viewMode: 'sarif' }} entitlement={PRO} />,
+    );
+    expect(JSON.parse(screen.getByTestId('cookies-output').textContent ?? '{}').version).toBe(
+      '2.1.0',
+    );
   });
 });
