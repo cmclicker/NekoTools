@@ -7,6 +7,7 @@ import {
   type NdjsonParsedArtifact,
   type NdjsonReport,
 } from './kinds.js';
+import { inferRecordSchema, toCsv } from './codegen.js';
 
 const TOOL_ID = 'ndjson';
 
@@ -83,4 +84,48 @@ export const freeExporters: readonly Exporter<NdjsonArtifact>[] = [
   jsonArrayExporter,
   ndjsonExporter,
   markdownSummaryExporter,
+];
+
+// --- Pro exporters (registered in the binary, gated by entitlement) --------
+//
+// These back the manifest's declared Pro exporter ids (`infer.schema` /
+// `flatten.csv`). Both derive purely from the already-parsed `ndjson.parsed`
+// report — no network, no premium-engine dependency. Code generation lives in
+// `codegen.ts`.
+
+/** `ndjson.export.schema.json` (Pro) — inferred JSON Schema for one record. */
+export const schemaJsonExporter: Exporter<NdjsonArtifact> = {
+  version: 1,
+  id: 'ndjson.export.schema.json',
+  toolId: TOOL_ID,
+  target: 'json',
+  accepts: NDJSON_PARSED_EXPORT_KINDS,
+  producesMimeType: 'application/schema+json',
+  producesExtension: 'json',
+  export({ artifacts }) {
+    const value = pickParsed(artifacts)?.value;
+    const schema = value === undefined ? { $schema: 'https://json-schema.org/draft/2020-12/schema' } : inferRecordSchema(value);
+    return { mimeType: 'application/schema+json', extension: 'json', body: JSON.stringify(schema, null, 2) };
+  },
+};
+
+/** `ndjson.export.csv` (Pro) — valid object records flattened to a CSV grid. */
+export const csvExporter: Exporter<NdjsonArtifact> = {
+  version: 1,
+  id: 'ndjson.export.csv',
+  toolId: TOOL_ID,
+  target: 'plaintext',
+  accepts: NDJSON_PARSED_EXPORT_KINDS,
+  producesMimeType: 'text/csv',
+  producesExtension: 'csv',
+  export({ artifacts }) {
+    const value = pickParsed(artifacts)?.value;
+    const body = value === undefined ? '' : toCsv(value);
+    return { mimeType: 'text/csv', extension: 'csv', body };
+  },
+};
+
+export const proExporters: readonly Exporter<NdjsonArtifact>[] = [
+  schemaJsonExporter,
+  csvExporter,
 ];
