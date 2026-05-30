@@ -1,5 +1,6 @@
 import type { Exporter } from '@nekotools/contracts';
 
+import { auditGitignore, type GitignoreAuditSeverity } from './audit.js';
 import {
   GITIGNORE_KIND_PARSED,
   GITIGNORE_PARSED_EXPORT_KINDS,
@@ -86,4 +87,100 @@ export const freeExporters: readonly Exporter<GitignoreArtifact>[] = [
   jsonExporter,
   normalizedExporter,
   markdownSummaryExporter,
+];
+
+// --- Pro exporters (registered in the binary, gated by entitlement) --------
+
+const SARIF_LEVEL: Record<GitignoreAuditSeverity, string> = {
+  high: 'error',
+  medium: 'warning',
+  low: 'note',
+  info: 'note',
+};
+
+/**
+ * `gitignore.export.audit.report` (Pro) — a secret-leak coverage & hygiene
+ * report: every ruleId-keyed finding (uncovered secret/credential paths,
+ * uncovered junk artifacts, duplicate patterns) with its severity. Pure +
+ * local.
+ */
+export const auditReportExporter: Exporter<GitignoreArtifact> = {
+  version: 1,
+  id: 'gitignore.export.audit.report',
+  toolId: TOOL_ID,
+  target: 'markdown',
+  accepts: GITIGNORE_PARSED_EXPORT_KINDS,
+  producesMimeType: 'text/markdown',
+  producesExtension: 'md',
+  export({ artifacts }) {
+    const report = pickParsed(artifacts)?.value;
+    const findings = auditGitignore(report);
+    const counts = { high: 0, medium: 0, low: 0, info: 0 };
+    for (const f of findings) counts[f.severity] += 1;
+
+    const lines: string[] = ['# NekoGitignore secret-coverage audit', ''];
+    lines.push(
+      `- patterns: ${report?.patternCount ?? 0}`,
+      `- findings: ${findings.length} (high: ${counts.high}, medium: ${counts.medium}, low: ${counts.low}, info: ${counts.info})`,
+      '',
+    );
+    if (findings.length > 0) {
+      lines.push('| severity | rule | target | detail |', '| --- | --- | --- | --- |');
+      for (const f of findings) {
+        lines.push(`| ${f.severity} | \`${f.ruleId}\` | ${f.target ? `\`${f.target}\`` : '—'} | ${f.detail} |`);
+      }
+    } else {
+      lines.push('No coverage gaps or hygiene issues detected.');
+    }
+    return { mimeType: 'text/markdown', extension: 'md', body: lines.join('\n') };
+  },
+};
+
+/**
+ * `gitignore.export.sarif` (Pro) — SARIF 2.1.0 of the coverage audit so a
+ * .gitignore review drops into CI code-scanning (gate that secret paths are
+ * ignored). Carries no secret material.
+ */
+export const sarifExporter: Exporter<GitignoreArtifact> = {
+  version: 1,
+  id: 'gitignore.export.sarif',
+  toolId: TOOL_ID,
+  target: 'json',
+  accepts: GITIGNORE_PARSED_EXPORT_KINDS,
+  producesMimeType: 'application/sarif+json',
+  producesExtension: 'sarif',
+  export({ artifacts }) {
+    const findings = auditGitignore(pickParsed(artifacts)?.value);
+    const ruleIds = [...new Set(findings.map((f) => f.ruleId))];
+    const sarif = {
+      version: '2.1.0',
+      $schema: 'https://json.schemastore.org/sarif-2.1.0.json',
+      runs: [
+        {
+          tool: {
+            driver: {
+              name: 'NekoGitignore',
+              informationUri: 'https://nekotools.local',
+              rules: ruleIds.map((id) => ({ id })),
+            },
+          },
+          results: findings.map((f) => ({
+            ruleId: f.ruleId,
+            level: SARIF_LEVEL[f.severity],
+            message: { text: f.target ? `[${f.target}] ${f.detail}` : f.detail },
+          })),
+        },
+      ],
+    };
+    return {
+      mimeType: 'application/sarif+json',
+      extension: 'sarif',
+      body: JSON.stringify(sarif, null, 2),
+    };
+  },
+};
+
+export const proExporters: readonly Exporter<GitignoreArtifact>[] = [
+  auditReportExporter,
+  sarifExporter,
 ];
