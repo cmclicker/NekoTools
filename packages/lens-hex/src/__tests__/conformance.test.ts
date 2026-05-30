@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
-import type { Artifact, Workspace } from '@nekotools/contracts';
+import type { Artifact, Entitlement, Workspace } from '@nekotools/contracts';
 import {
+  EntitlementError,
   ToolRegistry,
   jsonWorkspaceSerializer,
   runExporter,
@@ -13,6 +14,17 @@ import { FIXED_CLOCK, buildHexRegistration, decodeHex, dumpRows, hexManifest, te
 import type { HexParsedArtifact } from '../kinds.js';
 
 const clock = FIXED_CLOCK('2026-05-28T00:00:00.000Z');
+
+const PRO: Entitlement = {
+  version: 1,
+  licenseId: 'TEST',
+  licensee: 'Test User',
+  tier: 'pro',
+  features: ['*'],
+  issuedAt: '2026-01-01T00:00:00.000Z',
+  expiresAt: null,
+  signature: 'test',
+};
 
 function registry(): ToolRegistry {
   const r = new ToolRegistry();
@@ -56,19 +68,45 @@ describe('NekoHex: manifest', () => {
   });
 });
 
-describe('NekoHex: monetization safety', () => {
+describe('NekoHex: monetization gating (single-build, entitlement-gated)', () => {
   const registration = buildHexRegistration(clock);
   const proExporterIds = ['hex.export.c-array', 'hex.export.base64'];
-  it('no Pro exporter is registered, and each throws "unknown exporter"', () => {
-    const registered = new Set(registration.exporters.map((e) => e.id));
-    const r = registry();
+
+  it('Pro exporters are declared AND registered as proExporters, not free', () => {
+    const free = new Set(registration.exporters.map((e) => e.id));
+    const pro = new Set((registration.proExporters ?? []).map((e) => e.id));
     for (const id of proExporterIds) {
-      expect(registered.has(id)).toBe(false);
       expect(hexManifest.exporters).toContain(id);
-      expect(() => runExporter(r, 'hex', id, { artifacts: [], diagnostics: [] })).toThrow(
-        /unknown exporter/,
-      );
+      expect(pro.has(id)).toBe(true);
+      expect(free.has(id)).toBe(false);
     }
+  });
+
+  it('a free caller (default entitlement) is refused with EntitlementError', () => {
+    const r = registry();
+    const parsed = parse('ABC'); // bytes 41 42 43
+    for (const id of proExporterIds) {
+      expect(() => runExporter(r, 'hex', id, parsed)).toThrow(EntitlementError);
+    }
+  });
+
+  it('a Pro entitlement unlocks the C-array + base64 exporters', () => {
+    const r = registry();
+    const parsed = parse('ABC'); // 0x41 0x42 0x43 → base64 "QUJD"
+
+    const carray = String(runExporter(r, 'hex', 'hex.export.c-array', parsed, PRO).body);
+    expect(carray).toContain('unsigned char data[] = {');
+    expect(carray).toContain('0x41, 0x42, 0x43');
+    expect(carray).toContain('data_len = 3;');
+
+    const b64 = String(runExporter(r, 'hex', 'hex.export.base64', parsed, PRO).body);
+    expect(b64).toBe('QUJD');
+  });
+
+  it('a truly unknown exporter id still throws "unknown exporter"', () => {
+    expect(() =>
+      runExporter(registry(), 'hex', 'hex.export.nope', { artifacts: [], diagnostics: [] }, PRO),
+    ).toThrow(/unknown exporter/);
   });
 });
 

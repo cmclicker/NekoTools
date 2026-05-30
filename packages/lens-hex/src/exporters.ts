@@ -8,6 +8,7 @@ import {
   type HexParsedArtifact,
   type HexReport,
 } from './kinds.js';
+import { toBase64, toCArray } from './codegen.js';
 
 const TOOL_ID = 'hex';
 
@@ -72,3 +73,44 @@ export const freeExporters: readonly Exporter<HexArtifact>[] = [
   normalizedExporter,
   markdownSummaryExporter,
 ];
+
+// --- Pro exporters (registered in the binary, gated by entitlement) --------
+//
+// These back the manifest's declared Pro exporter ids (`export.c-array` /
+// `export.base64`). Both are pure re-encodings of the parsed bytes (recovered
+// from the report's hex string) — no network, no premium engine. Generators
+// live in `codegen.ts`. The byte-diff / edit / search / struct-decode Pro
+// features stay advertising-only (they need an interactive editor engine).
+
+/** `hex.export.c-array` (Pro) — the bytes as a C unsigned-char array literal. */
+export const cArrayExporter: Exporter<HexArtifact> = {
+  version: 1,
+  id: 'hex.export.c-array',
+  toolId: TOOL_ID,
+  target: 'plaintext',
+  accepts: HEX_PARSED_EXPORT_KINDS,
+  producesMimeType: 'text/plain',
+  producesExtension: 'h',
+  export({ artifacts }) {
+    const value = pickParsed(artifacts)?.value;
+    const body = value === undefined ? 'unsigned char data[] = {};\nunsigned int data_len = 0;' : toCArray(value);
+    return { mimeType: 'text/plain', extension: 'h', body };
+  },
+};
+
+/** `hex.export.base64` (Pro) — the bytes as a standard base64 string. */
+export const base64Exporter: Exporter<HexArtifact> = {
+  version: 1,
+  id: 'hex.export.base64',
+  toolId: TOOL_ID,
+  target: 'plaintext',
+  accepts: HEX_PARSED_EXPORT_KINDS,
+  producesMimeType: 'text/plain',
+  producesExtension: 'txt',
+  export({ artifacts }) {
+    const value = pickParsed(artifacts)?.value;
+    return { mimeType: 'text/plain', extension: 'txt', body: value === undefined ? '' : toBase64(value) };
+  },
+};
+
+export const proExporters: readonly Exporter<HexArtifact>[] = [cArrayExporter, base64Exporter];
