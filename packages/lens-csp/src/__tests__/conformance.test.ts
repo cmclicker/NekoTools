@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
-import type { Artifact, Workspace } from '@nekotools/contracts';
+import type { Artifact, Entitlement, Workspace } from '@nekotools/contracts';
 import {
+  EntitlementError,
   ToolRegistry,
   jsonWorkspaceSerializer,
   runExporter,
@@ -9,8 +10,19 @@ import {
 } from '@nekotools/tool-runtime';
 import { validate } from '@nekotools/schemas';
 
-import { FIXED_CLOCK, buildCspRegistration, cspManifest } from '../index.js';
+import { FIXED_CLOCK, auditCsp, buildCspRegistration, cspManifest } from '../index.js';
 import type { CspParsedArtifact } from '../kinds.js';
+
+const PRO: Entitlement = {
+  version: 1,
+  licenseId: 'TEST',
+  licensee: 'Test User',
+  tier: 'pro',
+  features: ['*'],
+  issuedAt: '2026-01-01T00:00:00.000Z',
+  expiresAt: null,
+  signature: 'test',
+};
 
 const clock = FIXED_CLOCK('2026-05-28T00:00:00.000Z');
 
@@ -59,19 +71,88 @@ describe('NekoCSP: manifest', () => {
   });
 });
 
-describe('NekoCSP: monetization safety', () => {
-  const registration = buildCspRegistration(clock);
-  const proExporterIds = ['csp.export.report', 'csp.export.hardened'];
-  it('no Pro exporter is registered, and each throws "unknown exporter"', () => {
-    const registered = new Set(registration.exporters.map((e) => e.id));
-    const r = registry();
+describe('NekoCSP: monetization gating (single-build, entitlement-gated)', () => {
+  const proExporterIds = ['csp.export.report', 'csp.export.sarif'];
+
+  it('Pro exporters are declared AND registered as proExporters, not free', () => {
+    const reg = buildCspRegistration(clock);
+    const proIds = new Set((reg.proExporters ?? []).map((e) => e.id));
     for (const id of proExporterIds) {
-      expect(registered.has(id)).toBe(false);
       expect(cspManifest.exporters).toContain(id);
-      expect(() => runExporter(r, 'csp', id, { artifacts: [], diagnostics: [] })).toThrow(
-        /unknown exporter/,
-      );
+      expect(proIds.has(id)).toBe(true);
+      expect(reg.exporters.some((e) => e.id === id)).toBe(false);
     }
+  });
+
+  it('does not advertise the future hardened-policy generator as a registered exporter', () => {
+    expect(cspManifest.exporters).not.toContain('csp.export.hardened');
+    expect(cspManifest.entitlements.pro).toContain('export.hardened');
+  });
+
+  it('a free caller (default entitlement) is refused with EntitlementError', () => {
+    const r = registry();
+    const parsed = parse("script-src 'unsafe-inline'");
+    for (const id of proExporterIds) {
+      expect(() => runExporter(r, 'csp', id, parsed)).toThrow(EntitlementError);
+    }
+  });
+
+  it('a Pro entitlement unlocks the audit report + SARIF exporters', () => {
+    const r = registry();
+    const parsed = parse("script-src 'unsafe-inline' 'unsafe-eval'; img-src *");
+
+    const report = String(runExporter(r, 'csp', 'csp.export.report', parsed, PRO).body);
+    expect(report).toContain('# NekoCSP posture audit');
+    expect(report).toContain('csp.unsafe_inline');
+
+    const sarifResult = runExporter(r, 'csp', 'csp.export.sarif', parsed, PRO);
+    expect(sarifResult.mimeType).toBe('application/sarif+json');
+    expect(sarifResult.extension).toBe('sarif');
+    const sarif = JSON.parse(String(sarifResult.body));
+    expect(sarif.version).toBe('2.1.0');
+    expect(sarif.runs[0].tool.driver.name).toBe('NekoCSP');
+    expect(sarif.runs[0].results.some((x: { ruleId: string }) => x.ruleId === 'csp.unsafe_eval')).toBe(true);
+  });
+
+  it('a truly unknown exporter id still throws "unknown exporter"', () => {
+    expect(() =>
+      runExporter(registry(), 'csp', 'csp.export.nope', { artifacts: [], diagnostics: [] }, PRO),
+    ).toThrow(/unknown exporter/);
+  });
+});
+
+describe('NekoCSP: posture audit', () => {
+  it('reuses the diagnostic codes and ranks unsafe-eval as high', () => {
+    const f = auditCsp(report("script-src 'unsafe-eval'")).find((x) => x.ruleId === 'csp.unsafe_eval');
+    expect(f?.severity).toBe('high');
+  });
+
+  it('adds posture rules the free parser does not run', () => {
+    const ids = auditCsp(report("default-src 'self'; object-src 'none'; frame-ancestors 'none'")).map(
+      (f) => f.ruleId,
+    );
+    expect(ids).toContain('csp.missing_base_uri');
+    expect(ids).toContain('csp.missing_form_action');
+    expect(ids).toContain('csp.no_reporting');
+  });
+
+  it('flags an insecure (non-TLS) scheme source', () => {
+    expect(auditCsp(report('img-src http://cdn.example.com')).map((f) => f.ruleId)).toContain(
+      'csp.insecure_scheme',
+    );
+  });
+
+  it('a hardened policy yields no high/medium findings', () => {
+    const findings = auditCsp(
+      report(
+        "default-src 'none'; script-src 'self'; object-src 'none'; base-uri 'none'; form-action 'self'; frame-ancestors 'none'; report-uri /csp",
+      ),
+    );
+    expect(findings.every((f) => f.severity === 'low' || f.severity === 'info')).toBe(true);
+  });
+
+  it('returns nothing for an absent report', () => {
+    expect(auditCsp(undefined)).toEqual([]);
   });
 });
 
