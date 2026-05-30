@@ -34,9 +34,10 @@ export interface PackageRun {
 
 /**
  * Run `package.json` over raw input and render the engine's exporters. The
- * free summaries always render; the Pro policy report + SARIF render only for
- * a Pro entitlement (otherwise null — `runExporter` throws EntitlementError,
- * surfaced here as null so the UI shows the Pro-lock). Pure-local; no network.
+ * free summaries always render; the Pro policy report + CI guard render only
+ * for a Pro entitlement (otherwise null — `runExporter` throws
+ * EntitlementError, surfaced as null so the UI shows the Pro-lock). Pure-local;
+ * no network.
  */
 export function runPackage(raw: string, entitlement: Entitlement = FREE_ENTITLEMENT): PackageRun {
   const bytes = utf8ByteLength(raw);
