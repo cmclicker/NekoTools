@@ -7,6 +7,7 @@ import {
   type PasswordReport,
   type PasswordReportArtifact,
 } from './kinds.js';
+import { auditPassword, DEFAULT_PASSWORD_POLICY } from './policy.js';
 
 const TOOL_ID = 'password';
 
@@ -87,4 +88,75 @@ export const freeExporters: readonly Exporter<PasswordArtifact>[] = [
   jsonExporter,
   crackTimesExporter,
   markdownSummaryExporter,
+];
+
+// --- Pro exporters (registered in the binary, gated by entitlement) --------
+
+/**
+ * `password.export.policy.report` (Pro) — a markdown policy-compliance audit:
+ * the strength report scored against `DEFAULT_PASSWORD_POLICY`, as a pass/fail
+ * verdict with stable rule ids. Carries derived metrics only — never the
+ * password.
+ */
+export const policyReportExporter: Exporter<PasswordArtifact> = {
+  version: 1,
+  id: 'password.export.policy.report',
+  toolId: TOOL_ID,
+  target: 'markdown',
+  accepts: PASSWORD_REPORT_EXPORT_KINDS,
+  producesMimeType: 'text/markdown',
+  producesExtension: 'md',
+  export({ artifacts }) {
+    const report = pickReport(artifacts)?.value;
+    const lines: string[] = ['# NekoPassword policy audit', ''];
+    if (report === undefined) {
+      lines.push('No assessment.');
+      return { mimeType: 'text/markdown', extension: 'md', body: lines.join('\n') };
+    }
+    const audit = auditPassword(report, DEFAULT_PASSWORD_POLICY);
+    lines.push(
+      `- verdict: **${audit.compliant ? 'COMPLIANT' : 'NON-COMPLIANT'}**`,
+      `- rules: ${audit.passed} passed, ${audit.failed} failed`,
+      '',
+      '| rule | status | severity | detail |',
+      '| --- | --- | --- | --- |',
+    );
+    for (const f of audit.findings) {
+      lines.push(`| \`${f.ruleId}\` | ${f.status} | ${f.severity} | ${f.detail} |`);
+    }
+    return { mimeType: 'text/markdown', extension: 'md', body: lines.join('\n') };
+  },
+};
+
+function csvCell(value: string): string {
+  return /[",\n]/.test(value) ? `"${value.replace(/"/g, '""')}"` : value;
+}
+
+/**
+ * `password.export.audit.csv` (Pro) — the policy findings as CSV, one row per
+ * rule, so a compliance check drops into a spreadsheet / CI artifact. Header:
+ * `ruleId,status,severity,detail`. Password-free by construction.
+ */
+export const auditCsvExporter: Exporter<PasswordArtifact> = {
+  version: 1,
+  id: 'password.export.audit.csv',
+  toolId: TOOL_ID,
+  target: 'csv',
+  accepts: PASSWORD_REPORT_EXPORT_KINDS,
+  producesMimeType: 'text/csv',
+  producesExtension: 'csv',
+  export({ artifacts }) {
+    const report = pickReport(artifacts)?.value;
+    const audit = auditPassword(report, DEFAULT_PASSWORD_POLICY);
+    const rows: string[] = ['ruleId,status,severity,detail'];
+    for (const f of audit.findings) {
+      rows.push([f.ruleId, f.status, f.severity, csvCell(f.detail)].join(','));
+    }
+    return { mimeType: 'text/csv', extension: 'csv', body: rows.join('\n') };
+  },
+};
+
+export const proExporters: readonly Exporter<PasswordArtifact>[] = [
+  policyReportExporter,
+  auditCsvExporter,
 ];

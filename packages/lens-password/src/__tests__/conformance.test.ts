@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
-import type { Artifact, Workspace } from '@nekotools/contracts';
+import type { Artifact, Entitlement, Workspace } from '@nekotools/contracts';
 import {
+  EntitlementError,
   ToolRegistry,
   jsonWorkspaceSerializer,
   runExporter,
@@ -9,10 +10,21 @@ import {
 } from '@nekotools/tool-runtime';
 import { validate } from '@nekotools/schemas';
 
-import { FIXED_CLOCK, assessPassword, buildPasswordRegistration, passwordManifest } from '../index.js';
-import type { PasswordReportArtifact } from '../kinds.js';
+import { FIXED_CLOCK, assessPassword, auditPassword, buildPasswordRegistration, passwordManifest } from '../index.js';
+import type { PasswordReport, PasswordReportArtifact } from '../kinds.js';
 
 const clock = FIXED_CLOCK('2026-05-28T00:00:00.000Z');
+
+const PRO: Entitlement = {
+  version: 1,
+  licenseId: 'TEST',
+  licensee: 'Test User',
+  tier: 'pro',
+  features: ['*'],
+  issuedAt: '2026-01-01T00:00:00.000Z',
+  expiresAt: null,
+  signature: 'test',
+};
 
 function registry(): ToolRegistry {
   const r = new ToolRegistry();
@@ -56,19 +68,66 @@ describe('NekoPassword: manifest', () => {
   });
 });
 
-describe('NekoPassword: monetization safety', () => {
-  const registration = buildPasswordRegistration(clock);
+describe('NekoPassword: monetization gating (single-build, entitlement-gated)', () => {
   const proExporterIds = ['password.export.policy.report', 'password.export.audit.csv'];
-  it('no Pro exporter is registered, and each throws "unknown exporter"', () => {
-    const registered = new Set(registration.exporters.map((e) => e.id));
-    const r = registry();
+
+  it('Pro exporters are declared AND registered as proExporters, not free', () => {
+    const reg = buildPasswordRegistration(clock);
+    const proIds = new Set((reg.proExporters ?? []).map((e) => e.id));
     for (const id of proExporterIds) {
-      expect(registered.has(id)).toBe(false);
       expect(passwordManifest.exporters).toContain(id);
-      expect(() => runExporter(r, 'password', id, { artifacts: [], diagnostics: [] })).toThrow(
-        /unknown exporter/,
-      );
+      expect(proIds.has(id)).toBe(true);
+      expect(reg.exporters.some((e) => e.id === id)).toBe(false);
     }
+  });
+
+  it('a free caller (default entitlement) is refused with EntitlementError', () => {
+    const r = registry();
+    const parsed = parse('password');
+    for (const id of proExporterIds) {
+      expect(() => runExporter(r, 'password', id, parsed)).toThrow(EntitlementError);
+    }
+  });
+
+  it('a Pro entitlement unlocks the policy report + audit CSV', () => {
+    const r = registry();
+    const parsed = parse('password'); // weak → non-compliant
+    const md = String(runExporter(r, 'password', 'password.export.policy.report', parsed, PRO).body);
+    expect(md).toContain('# NekoPassword policy audit');
+    expect(md).toContain('NON-COMPLIANT');
+    expect(md).toContain('password.policy.min_length');
+
+    const csv = String(runExporter(r, 'password', 'password.export.audit.csv', parsed, PRO).body);
+    expect(csv.split('\n')[0]).toBe('ruleId,status,severity,detail');
+    expect(csv).toContain('password.policy.min_length');
+  });
+
+  it('auditPassword returns COMPLIANT when every policy rule is satisfied', () => {
+    // Constructed report (decoupled from the strength engine's pattern
+    // heuristics) so the compliant path is deterministic.
+    const strong: PasswordReport = {
+      length: 20,
+      charClasses: { lower: true, upper: true, digit: true, symbol: true, other: false },
+      poolSize: 95,
+      entropyBits: 120,
+      bruteforceBits: 130,
+      shannonBits: 80,
+      score: 4,
+      label: 'Very strong',
+      crackTimes: [],
+      warnings: [],
+      suggestions: [],
+    };
+    const audit = auditPassword(strong);
+    expect(audit.compliant).toBe(true);
+    expect(audit.failed).toBe(0);
+    expect(audit.findings.every((f) => f.status === 'pass')).toBe(true);
+  });
+
+  it('a truly unknown exporter id still throws "unknown exporter"', () => {
+    expect(() =>
+      runExporter(registry(), 'password', 'password.export.nope', { artifacts: [], diagnostics: [] }, PRO),
+    ).toThrow(/unknown exporter/);
   });
 });
 
@@ -77,12 +136,13 @@ describe('NekoPassword: privacy (the password is never stored)', () => {
     const secret = 'Hunter2-Tr0ub4dour-xyz';
     const result = parse(secret);
     expect(JSON.stringify(result.artifacts[0])).not.toContain(secret);
+    const input = { artifacts: result.artifacts, diagnostics: result.diagnostics };
     for (const id of ['password.export.json', 'password.export.crack-times', 'password.export.markdown.summary']) {
-      const out = runExporter(registry(), 'password', id, {
-        artifacts: result.artifacts,
-        diagnostics: result.diagnostics,
-      });
-      expect(String(out.body)).not.toContain(secret);
+      expect(String(runExporter(registry(), 'password', id, input).body)).not.toContain(secret);
+    }
+    // ...and the Pro exports (policy report + audit CSV) are equally leak-free.
+    for (const id of ['password.export.policy.report', 'password.export.audit.csv']) {
+      expect(String(runExporter(registry(), 'password', id, input, PRO).body)).not.toContain(secret);
     }
   });
 });
