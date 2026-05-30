@@ -16,6 +16,14 @@ import {
   type EnvSchemaValue,
 } from './kinds.js';
 import { inferBasicSchema } from './schema-infer.js';
+import {
+  EMPTY_DOC,
+  toComposeStack,
+  toDataDictionary,
+  toProcessEnvInterface,
+  toZodEnvSchema,
+  type NamedEnvDoc,
+} from './codegen.js';
 
 const TOOL_ID = 'env';
 
@@ -232,4 +240,81 @@ export const freeExporters: readonly Exporter<EnvArtifact>[] = [
   plaintextKeysExporter,
   basicSchemaExporter,
   textualDiffExporter,
+];
+
+// --- Pro exporters (registered in the binary, gated by entitlement) --------
+//
+// These back the manifest's declared Pro exporter ids (docs/tools/nekoenv.md
+// §4). Each derives purely from parsed `env.document` artifacts — no network,
+// no premium-engine dependency. Code generation lives in `codegen.ts`.
+// `types.*` describe a single environment; `docs.data-dictionary` and
+// `compose.dotenv-stack` compose every env.document in the input.
+
+function namedDocs(artifacts: readonly EnvArtifact[]): NamedEnvDoc[] {
+  return pickDocuments(artifacts).map((d) => ({ id: d.id, doc: d.value }));
+}
+
+/** `env.export.types.typescript` (Pro) — typed ProcessEnv augmentation. */
+export const typescriptExporter: Exporter<EnvArtifact> = {
+  version: 1,
+  id: 'env.export.types.typescript',
+  toolId: TOOL_ID,
+  target: 'plaintext',
+  accepts: ENV_DOCUMENT_EXPORT_KINDS,
+  producesMimeType: 'text/plain',
+  producesExtension: 'ts',
+  export({ artifacts }) {
+    const doc = pickDocuments(artifacts)[0];
+    return { mimeType: 'text/plain', extension: 'ts', body: toProcessEnvInterface(doc?.value ?? EMPTY_DOC) };
+  },
+};
+
+/** `env.export.types.zod` (Pro) — Zod schema validating a loaded env. */
+export const zodExporter: Exporter<EnvArtifact> = {
+  version: 1,
+  id: 'env.export.types.zod',
+  toolId: TOOL_ID,
+  target: 'plaintext',
+  accepts: ENV_DOCUMENT_EXPORT_KINDS,
+  producesMimeType: 'text/plain',
+  producesExtension: 'ts',
+  export({ artifacts }) {
+    const doc = pickDocuments(artifacts)[0];
+    return { mimeType: 'text/plain', extension: 'ts', body: toZodEnvSchema(doc?.value ?? EMPTY_DOC) };
+  },
+};
+
+/** `env.export.docs.data-dictionary` (Pro) — cross-document key dictionary. */
+export const dataDictionaryExporter: Exporter<EnvArtifact> = {
+  version: 1,
+  id: 'env.export.docs.data-dictionary',
+  toolId: TOOL_ID,
+  target: 'markdown',
+  accepts: ENV_DOCUMENT_EXPORT_KINDS,
+  producesMimeType: 'text/markdown',
+  producesExtension: 'md',
+  export({ artifacts }) {
+    return { mimeType: 'text/markdown', extension: 'md', body: toDataDictionary(namedDocs(artifacts)) };
+  },
+};
+
+/** `env.export.compose.dotenv-stack` (Pro) — Compose / ConfigMap composite. */
+export const composeStackExporter: Exporter<EnvArtifact> = {
+  version: 1,
+  id: 'env.export.compose.dotenv-stack',
+  toolId: TOOL_ID,
+  target: 'plaintext',
+  accepts: ENV_DOCUMENT_EXPORT_KINDS,
+  producesMimeType: 'text/plain',
+  producesExtension: 'yml',
+  export({ artifacts }) {
+    return { mimeType: 'text/plain', extension: 'yml', body: toComposeStack(namedDocs(artifacts)) };
+  },
+};
+
+export const proExporters: readonly Exporter<EnvArtifact>[] = [
+  typescriptExporter,
+  zodExporter,
+  dataDictionaryExporter,
+  composeStackExporter,
 ];

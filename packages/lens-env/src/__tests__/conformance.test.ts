@@ -1,7 +1,8 @@
 import { describe, expect, it } from 'vitest';
-import type { Workspace } from '@nekotools/contracts';
+import type { Entitlement, Workspace } from '@nekotools/contracts';
 import {
   ToolRegistry,
+  EntitlementError,
   jsonWorkspaceSerializer,
   runExporter,
   runParser,
@@ -29,6 +30,17 @@ import type {
 } from '../kinds.js';
 
 const clock = FIXED_CLOCK('2026-05-20T00:00:00.000Z');
+
+const PRO: Entitlement = {
+  version: 1,
+  tier: 'pro',
+  features: ['*'],
+  issuedAt: '2026-01-01T00:00:00.000Z',
+  expiresAt: null,
+  licenseId: 'test-pro',
+  licensee: 'Conformance',
+  signature: 'sig',
+};
 
 function registry(): ToolRegistry {
   const r = new ToolRegistry();
@@ -73,7 +85,7 @@ describe('NekoEnv: manifest', () => {
  * Mirrors NekoJSON's monetization-safety block — these are the
  * mechanical enforcement of the open-core governance rule.
  */
-describe('NekoEnv: monetization safety', () => {
+describe('NekoEnv: monetization gating (single-build, entitlement-gated)', () => {
   const registration = buildEnvRegistration(clock);
 
   const proExporterIds = [
@@ -85,36 +97,68 @@ describe('NekoEnv: monetization safety', () => {
 
   const proProjectorIds = ['env.graph.references'];
 
-  it('no Pro exporter is registered in the free build', () => {
-    const registered = new Set(registration.exporters.map((e) => e.id));
+  it('Pro exporters are declared AND registered as proExporters, not free', () => {
+    const proIds = new Set((registration.proExporters ?? []).map((e) => e.id));
+    const free = new Set(registration.exporters.map((e) => e.id));
     for (const id of proExporterIds) {
-      expect(registered.has(id)).toBe(false);
+      expect(envManifest.exporters).toContain(id);
+      expect(proIds.has(id)).toBe(true);
+      expect(free.has(id)).toBe(false);
     }
   });
 
-  it('no graph projector is registered in the free build', () => {
+  it('the graph projector remains advertising-only (no projector registered)', () => {
     const projectors = registration.graphProjectors ?? [];
     expect(projectors).toHaveLength(0);
     for (const id of proProjectorIds) {
+      expect(envManifest.graphProjectors).toContain(id);
       expect(projectors.find((p) => p.id === id)).toBeUndefined();
     }
   });
 
-  it('runExporter throws "unknown exporter" when invoked with a Pro id', () => {
+  it('a free caller (default entitlement) is refused with EntitlementError', () => {
     const r = registry();
+    const parsed = runParser(r, 'env', 'env.text', {
+      raw: 'PORT=8080\nDEBUG=true\n',
+      source: { kind: 'paste', bytes: 20 },
+    });
     for (const id of proExporterIds) {
-      expect(() =>
-        runExporter(r, 'env', id, { artifacts: [], diagnostics: [] }),
-      ).toThrow(/unknown exporter/);
+      expect(() => runExporter(r, 'env', id, parsed)).toThrow(EntitlementError);
     }
   });
 
-  it('the manifest declares Pro exporters that are NOT in the registered set', () => {
-    const registered = new Set(registration.exporters.map((e) => e.id));
-    for (const id of proExporterIds) {
-      expect(envManifest.exporters).toContain(id);
-      expect(registered.has(id)).toBe(false);
-    }
+  it('a Pro entitlement unlocks the TypeScript / Zod / data-dictionary / compose exporters', () => {
+    const r = registry();
+    const parsed = runParser(r, 'env', 'env.text', {
+      raw: 'PORT=8080\nDEBUG=true\nDATABASE_URL=https://db.example.com # primary db\n',
+      source: { kind: 'paste', bytes: 70 },
+    });
+
+    const ts = String(runExporter(r, 'env', 'env.export.types.typescript', parsed, PRO).body);
+    expect(ts).toContain('namespace NodeJS');
+    expect(ts).toContain('interface ProcessEnv');
+    expect(ts).toContain('PORT: string;');
+
+    const zod = String(runExporter(r, 'env', 'env.export.types.zod', parsed, PRO).body);
+    expect(zod).toContain("import { z } from 'zod';");
+    expect(zod).toContain('PORT: z.coerce.number().int()');
+    expect(zod).toContain('DATABASE_URL: z.string().url()');
+
+    const dict = String(runExporter(r, 'env', 'env.export.docs.data-dictionary', parsed, PRO).body);
+    expect(dict).toContain('# NekoEnv data dictionary');
+    expect(dict).toContain('`DATABASE_URL`');
+    expect(dict).toContain('primary db');
+
+    const compose = String(runExporter(r, 'env', 'env.export.compose.dotenv-stack', parsed, PRO).body);
+    expect(compose).toContain('services:');
+    expect(compose).toContain('kind: ConfigMap');
+    expect(compose).toContain('PORT:');
+  });
+
+  it('a truly unknown exporter id still throws "unknown exporter"', () => {
+    expect(() =>
+      runExporter(registry(), 'env', 'env.export.nope', { artifacts: [], diagnostics: [] }, PRO),
+    ).toThrow(/unknown exporter/);
   });
 
   it('the manifest free entitlements list matches what the Phase 2.2 free tier actually ships', () => {
