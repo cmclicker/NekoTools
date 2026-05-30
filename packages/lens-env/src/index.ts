@@ -4,7 +4,7 @@ import { createEnvDiffTextualParser } from './diff-textual.js';
 import { createEnvKeyParser } from './parser-key.js';
 import { createEnvTextParser } from './parser-text.js';
 import { envManifest } from './manifest.js';
-import { freeExporters } from './exporters.js';
+import { freeExporters, proExporters } from './exporters.js';
 import { FIXED_CLOCK, type Clock } from '@nekotools/lens-kit';
 
 export * from './kinds.js';
@@ -14,6 +14,7 @@ export * from './parser-text.js';
 export * from './parser-key.js';
 export * from './diff-textual.js';
 export * from './schema-infer.js';
+export * from './codegen.js';
 export * from './exporters.js';
 export * from './manifest.js';
 export { FIXED_CLOCK } from '@nekotools/lens-kit';
@@ -34,11 +35,14 @@ export interface BuildEnvRegistrationOptions {
 /**
  * Build a NekoEnv registration for the runtime.
  *
- * The free build passes only the free parsers and exporters. Pro
- * implementations (TS / Zod / data-dictionary exports, semantic
- * diff, secrets scan, graph projector) live in a future private
- * package; the manifest itself is shared and declares the Pro ids as
- * advertising only.
+ * Free exporters run for everyone. The Pro exporters (typed ProcessEnv
+ * interface, Zod env validator, cross-document data dictionary, and the
+ * Docker Compose / k8s ConfigMap composite) are registered as
+ * `proExporters` and gated by `runExporter` behind a valid entitlement
+ * (single-build-gated model, same as NekoJSON / NekoHeaders). The
+ * advanced-inference, secrets-scan, semantic-diff, and graph-projector
+ * Pro features remain advertising-only — they depend on future premium
+ * engines and are not registered here.
  */
 export function buildEnvRegistration(
   clock: Clock = FIXED_CLOCK('1970-01-01T00:00:00.000Z'),
@@ -56,5 +60,6 @@ export function buildEnvRegistration(
       createEnvDiffTextualParser({ clock }),
     ],
     exporters: freeExporters,
+    proExporters,
   };
 }
