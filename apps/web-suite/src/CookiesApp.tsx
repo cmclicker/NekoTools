@@ -1,22 +1,24 @@
 import { useCallback, useMemo, useState, type ChangeEvent } from 'react';
 
 import type { CookieMode } from '@nekotools/lens-cookies';
+import type { Entitlement } from '@nekotools/contracts';
 
 import { Diagnostics } from './Diagnostics.js';
 import { copyToClipboard, type ClipboardDeps } from './clipboard.js';
+import { useLicenseContext } from './license-store.js';
 import { parseCookieInput } from './cookies-parse.js';
 
 /**
  * NekoCookies sub-app. Wires `@nekotools/lens-cookies` into the shared
  * web-suite shell as a WEB tool tab. Free surface: paste a Set-Cookie or
- * Cookie header, see the cookies broken down with their attributes, read
- * the security/privacy hints (Secure / HttpOnly / SameSite / prefix /
- * expiry), and copy a JSON / normalized / value-free markdown summary.
- * Cookie values are masked by default (they are often session secrets);
- * everything runs locally — no cookie is ever set or sent.
+ * Cookie header, see the cookies broken down with their attributes, read the
+ * security/privacy hints, and copy a JSON / normalized / value-free markdown
+ * summary. Pro (gated by the suite license): a deep security & privacy audit
+ * + SARIF export for CI. Cookie values are masked by default (they are often
+ * session secrets); everything runs locally — no cookie is ever set or sent.
  */
 
-export type CookiesViewMode = 'table' | 'json' | 'normalized' | 'markdown';
+export type CookiesViewMode = 'table' | 'json' | 'normalized' | 'markdown' | 'audit' | 'sarif';
 
 export interface NekoCookiesUiState {
   readonly mode: CookieMode;
@@ -28,12 +30,40 @@ export interface CookiesAppProps {
   readonly initialInput?: string;
   readonly initialUiState?: Partial<NekoCookiesUiState>;
   readonly clipboardDeps?: ClipboardDeps;
+  /** Injected entitlement; defaults to the suite license context. */
+  readonly entitlement?: Entitlement;
 }
 
 interface CopyStatus {
   readonly ok: boolean;
   readonly method: 'clipboard-api' | 'execCommand' | 'none';
 }
+
+const PRO_VIEWS = new Set<CookiesViewMode>(['audit', 'sarif']);
+const VIEW_MODES: readonly CookiesViewMode[] = [
+  'table',
+  'json',
+  'normalized',
+  'markdown',
+  'audit',
+  'sarif',
+];
+const VIEW_LABELS: Record<CookiesViewMode, string> = {
+  table: 'Table',
+  json: 'JSON',
+  normalized: 'Normalized',
+  markdown: 'Markdown',
+  audit: 'Audit ⭐',
+  sarif: 'SARIF ⭐',
+};
+const COPY_LABELS: Record<CookiesViewMode, string> = {
+  table: 'Copy markdown summary',
+  json: 'Copy JSON',
+  normalized: 'Copy normalized',
+  markdown: 'Copy markdown summary',
+  audit: 'Copy audit',
+  sarif: 'Copy SARIF',
+};
 
 const SAMPLE_INPUT = [
   'Set-Cookie: sid=8f3b9c2a1d; Domain=example.com; Path=/; Secure; HttpOnly; SameSite=Lax',
@@ -51,6 +81,7 @@ export function CookiesApp({
   initialInput,
   initialUiState,
   clipboardDeps,
+  entitlement,
 }: CookiesAppProps = {}): JSX.Element {
   const [input, setInput] = useState<string>(initialInput ?? SAMPLE_INPUT);
   const [mode, setMode] = useState<CookieMode>(initialUiState?.mode ?? 'set-cookie');
@@ -58,14 +89,29 @@ export function CookiesApp({
   const [masked, setMasked] = useState<boolean>(initialUiState?.masked ?? true);
   const [copyStatus, setCopyStatus] = useState<CopyStatus | null>(null);
 
-  const parsed = useMemo(() => parseCookieInput(input, mode), [input, mode]);
+  const license = useLicenseContext();
+  const effectiveEntitlement = entitlement ?? license.entitlement;
+  const parsed = useMemo(
+    () => parseCookieInput(input, mode, effectiveEntitlement),
+    [input, mode, effectiveEntitlement],
+  );
+  const proUnlocked = parsed.proUnlocked;
+  const isProView = PRO_VIEWS.has(viewMode);
 
-  const copyText =
+  const outputText =
     viewMode === 'json'
       ? parsed.json
       : viewMode === 'normalized'
         ? parsed.normalized
-        : parsed.markdown; // table view copies the value-free markdown summary
+        : viewMode === 'markdown'
+          ? parsed.markdown
+          : viewMode === 'audit'
+            ? parsed.auditReport
+            : viewMode === 'sarif'
+              ? parsed.sarif
+              : null; // table
+  // Copy target: table copies the value-free markdown summary; others copy their own output.
+  const copyText = viewMode === 'table' ? parsed.markdown : (outputText ?? '');
 
   const handleCopy = useCallback(async () => {
     if (copyText === '') {
@@ -130,8 +176,8 @@ export function CookiesApp({
           </label>
         </div>
         <p className="paste__hint">
-          Parsing runs entirely in your browser. No cookie is set, sent, or stored — values stay on
-          your machine and are masked by default.
+          Parsing and auditing run entirely in your browser. No cookie is set, sent, or stored —
+          values stay on your machine and are masked by default.
         </p>
       </section>
 
@@ -139,7 +185,7 @@ export function CookiesApp({
         <div className="results__toolbar">
           <fieldset className="viewmode" aria-label="Cookie output mode">
             <legend className="visually-hidden">Cookie output mode</legend>
-            {(['table', 'json', 'normalized', 'markdown'] as const).map((m) => (
+            {VIEW_MODES.map((m) => (
               <label key={m} className={viewMode === m ? 'viewmode--active' : ''}>
                 <input
                   type="radio"
@@ -148,7 +194,7 @@ export function CookiesApp({
                   checked={viewMode === m}
                   onChange={() => setViewMode(m)}
                 />
-                {m === 'table' ? 'Table' : m === 'json' ? 'JSON' : m === 'normalized' ? 'Normalized' : 'Markdown'}
+                {VIEW_LABELS[m]}
               </label>
             ))}
           </fieldset>
@@ -161,7 +207,7 @@ export function CookiesApp({
               disabled={copyText === ''}
               data-testid="cookies-copy-output"
             >
-              {viewMode === 'json' ? 'Copy JSON' : viewMode === 'normalized' ? 'Copy normalized' : 'Copy markdown summary'}
+              {COPY_LABELS[viewMode]}
             </button>
           </div>
 
@@ -189,7 +235,17 @@ export function CookiesApp({
         </ul>
 
         {parsed.cookies.length > 0 ? (
-          viewMode === 'table' ? (
+          isProView && !proUnlocked ? (
+            <div className="pro-lock" role="status" data-testid="cookies-locked">
+              <strong>{viewMode === 'audit' ? 'Security audit' : 'SARIF export'} is a Pro feature.</strong>
+              <p>
+                Audit cookies for missing Secure/HttpOnly, SameSite issues, __Host-/__Secure- prefix
+                violations, broad Domain scope, and Partitioned-without-Secure — and export SARIF
+                2.1.0 to wire NekoCookies into CI code-scanning. Value-free output. Unlock with a
+                license key (verified locally, works offline forever).
+              </p>
+            </div>
+          ) : viewMode === 'table' ? (
             <table className="url-params" data-testid="cookies-table">
               <thead>
                 <tr>
@@ -226,7 +282,7 @@ export function CookiesApp({
             </table>
           ) : (
             <pre className="toml-output" data-testid="cookies-output" aria-label={`${viewMode} output`}>
-              {viewMode === 'json' ? parsed.json : viewMode === 'normalized' ? parsed.normalized : parsed.markdown}
+              {outputText}
             </pre>
           )
         ) : (

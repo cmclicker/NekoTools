@@ -1,5 +1,6 @@
 import type { Exporter } from '@nekotools/contracts';
 
+import { auditCookies, type CookieAuditSeverity } from './audit.js';
 import {
   COOKIE_KIND_PARSED,
   COOKIE_PARSED_EXPORT_KINDS,
@@ -125,4 +126,101 @@ export const freeExporters: readonly Exporter<CookieArtifact>[] = [
   jsonExporter,
   normalizedExporter,
   markdownSummaryExporter,
+];
+
+// --- Pro exporters (registered in the binary, gated by entitlement) --------
+
+const SARIF_LEVEL: Record<CookieAuditSeverity, string> = {
+  high: 'error',
+  medium: 'warning',
+  low: 'note',
+  info: 'note',
+};
+
+/**
+ * `cookie.export.audit.report` (Pro) — a security & privacy posture report:
+ * every ruleId-keyed finding (missing Secure/HttpOnly, SameSite issues,
+ * __Host-/__Secure- prefix violations, broad Domain, Partitioned-without-Secure,
+ * duplicates) with its severity and cookie. Value-free — never prints a secret.
+ */
+export const auditReportExporter: Exporter<CookieArtifact> = {
+  version: 1,
+  id: 'cookie.export.audit.report',
+  toolId: TOOL_ID,
+  target: 'markdown',
+  accepts: COOKIE_PARSED_EXPORT_KINDS,
+  producesMimeType: 'text/markdown',
+  producesExtension: 'md',
+  export({ artifacts }) {
+    const set = pickParsed(artifacts)?.value;
+    const findings = auditCookies(set);
+    const counts = { high: 0, medium: 0, low: 0, info: 0 };
+    for (const f of findings) counts[f.severity] += 1;
+
+    const lines: string[] = ['# NekoCookies security audit', ''];
+    lines.push(
+      `- mode: \`${set?.mode ?? 'set-cookie'}\``,
+      `- cookies: ${set?.cookies.length ?? 0}`,
+      `- findings: ${findings.length} (high: ${counts.high}, medium: ${counts.medium}, low: ${counts.low}, info: ${counts.info})`,
+      '',
+    );
+    if (findings.length > 0) {
+      lines.push('| severity | rule | cookie | detail |', '| --- | --- | --- | --- |');
+      for (const f of findings) {
+        lines.push(`| ${f.severity} | \`${f.ruleId}\` | ${f.target ? `\`${f.target}\`` : '—'} | ${f.detail} |`);
+      }
+    } else {
+      lines.push('No security or privacy findings detected.');
+    }
+    return { mimeType: 'text/markdown', extension: 'md', body: lines.join('\n') };
+  },
+};
+
+/**
+ * `cookie.export.sarif` (Pro) — SARIF 2.1.0 of the cookie audit so a
+ * Set-Cookie review drops into CI code-scanning. Value-free; the ruleIds
+ * match the diagnostic codes shown in the free tier.
+ */
+export const sarifExporter: Exporter<CookieArtifact> = {
+  version: 1,
+  id: 'cookie.export.sarif',
+  toolId: TOOL_ID,
+  target: 'json',
+  accepts: COOKIE_PARSED_EXPORT_KINDS,
+  producesMimeType: 'application/sarif+json',
+  producesExtension: 'sarif',
+  export({ artifacts }) {
+    const findings = auditCookies(pickParsed(artifacts)?.value);
+    const ruleIds = [...new Set(findings.map((f) => f.ruleId))];
+    const sarif = {
+      version: '2.1.0',
+      $schema: 'https://json.schemastore.org/sarif-2.1.0.json',
+      runs: [
+        {
+          tool: {
+            driver: {
+              name: 'NekoCookies',
+              informationUri: 'https://nekotools.local',
+              rules: ruleIds.map((id) => ({ id })),
+            },
+          },
+          results: findings.map((f) => ({
+            ruleId: f.ruleId,
+            level: SARIF_LEVEL[f.severity],
+            message: { text: f.target ? `[${f.target}] ${f.detail}` : f.detail },
+          })),
+        },
+      ],
+    };
+    return {
+      mimeType: 'application/sarif+json',
+      extension: 'sarif',
+      body: JSON.stringify(sarif, null, 2),
+    };
+  },
+};
+
+export const proExporters: readonly Exporter<CookieArtifact>[] = [
+  auditReportExporter,
+  sarifExporter,
 ];

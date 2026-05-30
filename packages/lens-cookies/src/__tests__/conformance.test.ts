@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
-import type { Artifact, Workspace } from '@nekotools/contracts';
+import type { Artifact, Entitlement, Workspace } from '@nekotools/contracts';
 import {
+  EntitlementError,
   ToolRegistry,
   jsonWorkspaceSerializer,
   runExporter,
@@ -9,8 +10,19 @@ import {
 } from '@nekotools/tool-runtime';
 import { validate } from '@nekotools/schemas';
 
-import { FIXED_CLOCK, buildCookiesRegistration, cookiesManifest } from '../index.js';
+import { FIXED_CLOCK, auditCookies, buildCookiesRegistration, cookiesManifest } from '../index.js';
 import type { CookieParsedArtifact } from '../kinds.js';
+
+const PRO: Entitlement = {
+  version: 1,
+  licenseId: 'TEST',
+  licensee: 'Test User',
+  tier: 'pro',
+  features: ['*'],
+  issuedAt: '2026-01-01T00:00:00.000Z',
+  expiresAt: null,
+  signature: 'test',
+};
 
 const clock = FIXED_CLOCK('2026-05-28T00:00:00.000Z');
 
@@ -64,20 +76,97 @@ describe('NekoCookies: manifest', () => {
   });
 });
 
-describe('NekoCookies: monetization safety', () => {
-  const registration = buildCookiesRegistration(clock);
-  const proExporterIds = ['cookie.export.audit.report', 'cookie.export.policy.preset'];
+describe('NekoCookies: monetization gating (single-build, entitlement-gated)', () => {
+  const proExporterIds = ['cookie.export.audit.report', 'cookie.export.sarif'];
 
-  it('no Pro exporter is registered, and each throws "unknown exporter"', () => {
-    const registered = new Set(registration.exporters.map((e) => e.id));
-    const r = registry();
+  it('Pro exporters are declared AND registered as proExporters, not free', () => {
+    const reg = buildCookiesRegistration(clock);
+    const proIds = new Set((reg.proExporters ?? []).map((e) => e.id));
     for (const id of proExporterIds) {
-      expect(registered.has(id)).toBe(false);
       expect(cookiesManifest.exporters).toContain(id);
-      expect(() => runExporter(r, 'cookies', id, { artifacts: [], diagnostics: [] })).toThrow(
-        /unknown exporter/,
-      );
+      expect(proIds.has(id)).toBe(true);
+      expect(reg.exporters.some((e) => e.id === id)).toBe(false);
     }
+  });
+
+  it('does not register the future policy-preset generator as an exporter', () => {
+    expect(cookiesManifest.exporters).not.toContain('cookie.export.policy.preset');
+    expect(cookiesManifest.entitlements.pro).toContain('export.policy.preset');
+  });
+
+  it('a free caller (default entitlement) is refused with EntitlementError', () => {
+    const r = registry();
+    const parsed = parse('sid=x');
+    for (const id of proExporterIds) {
+      expect(() => runExporter(r, 'cookies', id, parsed)).toThrow(EntitlementError);
+    }
+  });
+
+  it('a Pro entitlement unlocks the audit report + SARIF exporters', () => {
+    const r = registry();
+    const parsed = parse('sid=secret; SameSite=None');
+
+    const report = String(runExporter(r, 'cookies', 'cookie.export.audit.report', parsed, PRO).body);
+    expect(report).toContain('# NekoCookies security audit');
+    expect(report).toContain('cookie.insecure');
+
+    const sarifResult = runExporter(r, 'cookies', 'cookie.export.sarif', parsed, PRO);
+    expect(sarifResult.mimeType).toBe('application/sarif+json');
+    expect(sarifResult.extension).toBe('sarif');
+    const sarif = JSON.parse(String(sarifResult.body));
+    expect(sarif.version).toBe('2.1.0');
+    expect(sarif.runs[0].tool.driver.name).toBe('NekoCookies');
+    expect(
+      sarif.runs[0].results.some((x: { ruleId: string }) => x.ruleId === 'cookie.samesite_none_insecure'),
+    ).toBe(true);
+  });
+
+  it('a truly unknown exporter id still throws "unknown exporter"', () => {
+    expect(() =>
+      runExporter(registry(), 'cookies', 'cookie.export.nope', { artifacts: [], diagnostics: [] }, PRO),
+    ).toThrow(/unknown exporter/);
+  });
+});
+
+describe('NekoCookies: security & privacy audit', () => {
+  const audit = (raw: string, mode?: 'set-cookie' | 'cookie') => auditCookies(setOf(raw, mode));
+
+  it('ranks a missing Secure as high and reuses the diagnostic code', () => {
+    const f = audit('sid=x; HttpOnly; SameSite=Lax').find((x) => x.ruleId === 'cookie.insecure');
+    expect(f?.severity).toBe('high');
+  });
+
+  it('elevates a session-named cookie without HttpOnly to high (vs medium otherwise)', () => {
+    const sess = audit('sid=x; Secure; SameSite=Lax').find((x) => x.ruleId === 'cookie.no_httponly');
+    const plain = audit('theme=x; Secure; SameSite=Lax').find((x) => x.ruleId === 'cookie.no_httponly');
+    expect(sess?.severity).toBe('high');
+    expect(plain?.severity).toBe('medium');
+  });
+
+  it('adds posture rules the parser does not run', () => {
+    expect(audit('a=x; Secure; HttpOnly; SameSite=Lax; Domain=.example.com').map((f) => f.ruleId)).toContain(
+      'cookie.broad_domain',
+    );
+    expect(audit('a=x; HttpOnly; SameSite=Lax; Partitioned').map((f) => f.ruleId)).toContain(
+      'cookie.partitioned_insecure',
+    );
+    expect(audit('a=x; Secure; HttpOnly; SameSite=None').map((f) => f.ruleId)).toContain(
+      'cookie.samesite_none',
+    );
+  });
+
+  it('does not run attribute rules in cookie (request) mode', () => {
+    const findings = audit('a=1; b=2', 'cookie');
+    expect(findings.every((f) => f.ruleId === 'cookie.duplicate_name')).toBe(true);
+  });
+
+  it('a hardened Set-Cookie yields no high/medium findings', () => {
+    const findings = audit('__Host-sid=x; Secure; Path=/; HttpOnly; SameSite=Strict');
+    expect(findings.every((f) => f.severity === 'low' || f.severity === 'info')).toBe(true);
+  });
+
+  it('returns nothing for an absent set', () => {
+    expect(auditCookies(undefined)).toEqual([]);
   });
 });
 

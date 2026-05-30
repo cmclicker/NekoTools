@@ -2,11 +2,12 @@ import type { ToolRegistration } from '@nekotools/tool-runtime';
 import { FIXED_CLOCK, type Clock } from '@nekotools/lens-kit';
 
 import { createCookieTextParser } from './parser-text.js';
-import { freeExporters } from './exporters.js';
+import { freeExporters, proExporters } from './exporters.js';
 import { cookiesManifest } from './manifest.js';
 
 export * from './kinds.js';
 export * from './diagnostics.js';
+export * from './audit.js';
 export * from './parser-text.js';
 export * from './exporters.js';
 export * from './manifest.js';
@@ -19,9 +20,10 @@ export interface BuildCookiesRegistrationOptions {
 }
 
 /**
- * Build a NekoCookies registration for the runtime. The free build passes
- * only the free parser and exporters; Pro ids declared in the manifest
- * (audit report, policy presets) are not registered here.
+ * Build a NekoCookies registration for the runtime. Free exporters run for
+ * everyone; the Pro exporters (security audit report, SARIF) are registered
+ * as `proExporters` and gated by `runExporter` behind a valid entitlement
+ * (single-build-gated model, same as NekoJWT / NekoCSP).
  */
 export function buildCookiesRegistration(
   clock: Clock = FIXED_CLOCK('1970-01-01T00:00:00.000Z'),
@@ -35,5 +37,6 @@ export function buildCookiesRegistration(
     manifest: cookiesManifest,
     parsers: [createCookieTextParser(deps)],
     exporters: freeExporters,
+    proExporters,
   };
 }
