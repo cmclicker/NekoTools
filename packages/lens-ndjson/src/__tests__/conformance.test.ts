@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
-import type { Artifact, Workspace } from '@nekotools/contracts';
+import type { Artifact, Entitlement, Workspace } from '@nekotools/contracts';
 import {
+  EntitlementError,
   ToolRegistry,
   jsonWorkspaceSerializer,
   runExporter,
@@ -13,6 +14,17 @@ import { FIXED_CLOCK, buildNdjsonRegistration, ndjsonManifest } from '../index.j
 import type { NdjsonParsedArtifact } from '../kinds.js';
 
 const clock = FIXED_CLOCK('2026-05-28T00:00:00.000Z');
+
+const PRO: Entitlement = {
+  version: 1,
+  licenseId: 'TEST',
+  licensee: 'Test User',
+  tier: 'pro',
+  features: ['*'],
+  issuedAt: '2026-01-01T00:00:00.000Z',
+  expiresAt: null,
+  signature: 'test',
+};
 
 function registry(): ToolRegistry {
   const r = new ToolRegistry();
@@ -56,19 +68,49 @@ describe('NekoNDJSON: manifest', () => {
   });
 });
 
-describe('NekoNDJSON: monetization safety', () => {
+describe('NekoNDJSON: monetization gating (single-build, entitlement-gated)', () => {
   const registration = buildNdjsonRegistration(clock);
   const proExporterIds = ['ndjson.export.schema.json', 'ndjson.export.csv'];
-  it('no Pro exporter is registered, and each throws "unknown exporter"', () => {
-    const registered = new Set(registration.exporters.map((e) => e.id));
-    const r = registry();
+
+  it('Pro exporters are declared AND registered as proExporters, not free', () => {
+    const proIds = new Set((registration.proExporters ?? []).map((e) => e.id));
+    const free = new Set(registration.exporters.map((e) => e.id));
     for (const id of proExporterIds) {
-      expect(registered.has(id)).toBe(false);
       expect(ndjsonManifest.exporters).toContain(id);
-      expect(() => runExporter(r, 'ndjson', id, { artifacts: [], diagnostics: [] })).toThrow(
-        /unknown exporter/,
-      );
+      expect(proIds.has(id)).toBe(true);
+      expect(free.has(id)).toBe(false);
     }
+  });
+
+  it('a free caller (default entitlement) is refused with EntitlementError', () => {
+    const r = registry();
+    const parsed = parse('{"id":1,"name":"a"}\n{"id":2}');
+    for (const id of proExporterIds) {
+      expect(() => runExporter(r, 'ndjson', id, parsed)).toThrow(EntitlementError);
+    }
+  });
+
+  it('a Pro entitlement unlocks the JSON Schema + CSV exporters', () => {
+    const r = registry();
+    const parsed = parse('{"id":1,"name":"a"}\n{"id":2}');
+
+    const schema = JSON.parse(
+      String(runExporter(r, 'ndjson', 'ndjson.export.schema.json', parsed, PRO).body),
+    ) as { type?: string; properties?: Record<string, { type?: string | string[] }>; required?: string[] };
+    expect(schema.type).toBe('object');
+    expect(schema.properties?.['id']?.type).toBe('number');
+    expect(schema.required).toEqual(['id']); // name is optional (absent from record 2)
+
+    const csv = String(runExporter(r, 'ndjson', 'ndjson.export.csv', parsed, PRO).body);
+    expect(csv.split('\n')[0]).toBe('id,name');
+    expect(csv).toContain('1,a');
+    expect(csv).toContain('2,');
+  });
+
+  it('a truly unknown exporter id still throws "unknown exporter"', () => {
+    expect(() =>
+      runExporter(registry(), 'ndjson', 'ndjson.export.nope', { artifacts: [], diagnostics: [] }, PRO),
+    ).toThrow(/unknown exporter/);
   });
 });
 
