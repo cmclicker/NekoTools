@@ -107,12 +107,15 @@ describe('NekoCSP: monetization gating (single-build, entitlement-gated)', () =>
     expect(report).toContain('csp.unsafe_inline');
 
     const hardened = String(runExporter(r, 'csp', 'csp.export.hardened', parsed, PRO).body);
-    // Hardened output strips unsafe-* and the wildcard, and adds the baseline.
-    expect(hardened).not.toContain("'unsafe-inline'");
-    expect(hardened).not.toContain("'unsafe-eval'");
-    expect(hardened).toContain("default-src 'self'");
-    expect(hardened).toContain("object-src 'none'");
     expect(hardened).toContain('# NekoCSP hardened policy');
+    // The emitted policy is the last non-comment line; the comment block above
+    // it is the changelog (which legitimately names the removed tokens).
+    const policy = hardened.split('\n').filter((l) => l.trim() !== '' && !l.startsWith('#')).at(-1) ?? '';
+    expect(policy).not.toContain("'unsafe-inline'");
+    expect(policy).not.toContain("'unsafe-eval'");
+    expect(policy).not.toContain('*');
+    expect(policy).toContain("default-src 'self'");
+    expect(policy).toContain("object-src 'none'");
   });
 
   it('a truly unknown exporter id still throws "unknown exporter"', () => {

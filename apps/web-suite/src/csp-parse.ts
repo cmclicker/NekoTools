@@ -12,9 +12,10 @@ import type { Diagnostic, Entitlement } from '@nekotools/contracts';
  * NekoCSP UI parse helper, extracted out of CspApp for testability — the
  * same engine-adapter seam the other tools provide. Output strings come
  * from the real engine exporters (not re-derived in the UI), so the tab
- * can't drift from the engine. The Pro audit + SARIF exporters are gated:
- * `runExporter` throws `EntitlementError` for a free caller, surfaced here
- * as `null` so the UI shows the Pro-lock. Pure-local; no network, ever.
+ * can't drift from the engine. The Pro posture-report + hardened-policy
+ * exporters are gated: `runExporter` throws `EntitlementError` for a free
+ * caller, surfaced here as `null` so the UI shows the Pro-lock. Pure-local;
+ * no network, ever.
  */
 
 const registry = (() => {

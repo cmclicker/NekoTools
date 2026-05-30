@@ -62,8 +62,11 @@ describe('CspApp', () => {
     );
     const out = screen.getByTestId('csp-output').textContent ?? '';
     expect(out).toContain('# NekoCSP hardened policy');
-    expect(out).not.toContain("'unsafe-inline'");
-    expect(out).toContain("default-src 'self'");
+    // Assert on the emitted policy line, not the changelog comment above it
+    // (the changelog legitimately names the tokens it removed).
+    const policy = out.split('\n').filter((l) => l.trim() !== '' && !l.startsWith('#')).at(-1) ?? '';
+    expect(policy).not.toContain("'unsafe-inline'");
+    expect(policy).toContain("default-src 'self'");
   });
 
   it('shows the empty-state for whitespace-only input', () => {
