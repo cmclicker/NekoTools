@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
-import type { Workspace } from '@nekotools/contracts';
+import type { Entitlement, Workspace } from '@nekotools/contracts';
 import {
+  EntitlementError,
   ToolRegistry,
   jsonWorkspaceSerializer,
   runExporter,
@@ -15,6 +16,21 @@ import {
   headersManifest,
 } from '../index.js';
 import type { HeadersDocumentArtifact } from '../kinds.js';
+
+const PRO: Entitlement = {
+  version: 1,
+  licenseId: 'TEST',
+  licensee: 'Test User',
+  tier: 'pro',
+  features: ['*'],
+  issuedAt: '2026-01-01T00:00:00.000Z',
+  expiresAt: null,
+  signature: 'test',
+};
+
+const INSECURE = 'Content-Type: text/html';
+const HARDENED =
+  "strict-transport-security: max-age=63072000\ncontent-security-policy: default-src 'self'\nx-content-type-options: nosniff\nx-frame-options: DENY\nreferrer-policy: no-referrer";
 
 const clock = FIXED_CLOCK('2026-05-27T00:00:00.000Z');
 
@@ -70,30 +86,66 @@ describe('NekoHeaders: manifest', () => {
   });
 });
 
-describe('NekoHeaders: monetization safety', () => {
-  const registration = buildHeadersRegistration(clock);
+describe('NekoHeaders: monetization gating (single-build, entitlement-gated)', () => {
   const proExporterIds = ['headers.export.audit.report', 'headers.export.cors-csp.pack'];
 
-  it('no Pro exporter is registered in the free build', () => {
-    const registered = new Set(registration.exporters.map((e) => e.id));
-    for (const id of proExporterIds) expect(registered.has(id)).toBe(false);
-  });
-
-  it('runExporter throws "unknown exporter" for Pro ids', () => {
-    const r = registry();
-    for (const id of proExporterIds) {
-      expect(() => runExporter(r, 'headers', id, { artifacts: [], diagnostics: [] })).toThrow(
-        /unknown exporter/,
-      );
-    }
-  });
-
-  it('manifest declares Pro exporters not in the registered set', () => {
-    const registered = new Set(registration.exporters.map((e) => e.id));
+  it('Pro exporters are declared AND registered as proExporters, not free', () => {
+    const reg = buildHeadersRegistration(clock);
+    const proIds = new Set((reg.proExporters ?? []).map((e) => e.id));
     for (const id of proExporterIds) {
       expect(headersManifest.exporters).toContain(id);
-      expect(registered.has(id)).toBe(false);
+      expect(proIds.has(id)).toBe(true);
+      expect(reg.exporters.some((e) => e.id === id)).toBe(false);
     }
+  });
+
+  it('declares the matching pro entitlement features', () => {
+    expect(headersManifest.entitlements.pro).toContain('security.audit');
+    expect(headersManifest.entitlements.pro).toContain('packs.cors-csp');
+  });
+
+  it('a free caller (default entitlement) is refused with EntitlementError', () => {
+    const r = registry();
+    const parsed = parse(INSECURE);
+    for (const id of proExporterIds) {
+      expect(() => runExporter(r, 'headers', id, parsed)).toThrow(EntitlementError);
+    }
+  });
+
+  it('a Pro entitlement unlocks the audit report + CORS/CSP pack exporters', () => {
+    const r = registry();
+    const parsed = parse(INSECURE);
+
+    const auditReport = String(runExporter(r, 'headers', 'headers.export.audit.report', parsed, PRO).body);
+    expect(auditReport).toContain('# NekoHeaders security audit');
+    expect(auditReport).toContain('grade:');
+    // Insecure input (no HSTS/CSP) must not grade clean.
+    expect(auditReport).not.toContain('grade: A');
+
+    const pack = String(runExporter(r, 'headers', 'headers.export.cors-csp.pack', parsed, PRO).body);
+    expect(pack).toContain('# NekoHeaders hardened CORS + CSP pack');
+    expect(pack).toContain('Strict-Transport-Security:');
+    expect(pack).toContain('Content-Security-Policy:');
+  });
+
+  it('the audit grades a hardened header set as A (clean)', () => {
+    const r = registry();
+    const auditReport = String(
+      runExporter(r, 'headers', 'headers.export.audit.report', parse(HARDENED), PRO).body,
+    );
+    expect(auditReport).toContain('grade: A');
+  });
+
+  it('the pack annotates already-present headers', () => {
+    const r = registry();
+    const pack = String(runExporter(r, 'headers', 'headers.export.cors-csp.pack', parse(HARDENED), PRO).body);
+    expect(pack).toContain('(already set');
+  });
+
+  it('a truly unknown exporter id still throws "unknown exporter"', () => {
+    expect(() =>
+      runExporter(registry(), 'headers', 'headers.export.nope', { artifacts: [], diagnostics: [] }, PRO),
+    ).toThrow(/unknown exporter/);
   });
 
   it('free entitlements match exactly the implemented engine-MVP set', () => {
