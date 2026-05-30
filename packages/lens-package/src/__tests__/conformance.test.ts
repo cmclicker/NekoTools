@@ -93,7 +93,7 @@ describe('NekoPackage: manifest', () => {
 });
 
 describe('NekoPackage: monetization gating (single-build, entitlement-gated)', () => {
-  const proExporterIds = ['package.export.policy.report', 'package.export.sarif'];
+  const proExporterIds = ['package.export.policy.report', 'package.export.ci.guard'];
 
   it('Pro exporters are declared AND registered as proExporters, not free', () => {
     const reg = buildPackageRegistration(clock);
@@ -105,8 +105,7 @@ describe('NekoPackage: monetization gating (single-build, entitlement-gated)', (
     }
   });
 
-  it('does not register the future ci.guard generator as an exporter', () => {
-    expect(packageManifest.exporters).not.toContain('package.export.ci.guard');
+  it('declares the matching ci.guard.export pro entitlement', () => {
     expect(packageManifest.entitlements.pro).toContain('ci.guard.export');
   });
 
@@ -118,7 +117,7 @@ describe('NekoPackage: monetization gating (single-build, entitlement-gated)', (
     }
   });
 
-  it('a Pro entitlement unlocks the policy report + SARIF exporters', () => {
+  it('a Pro entitlement unlocks the policy report + CI guard exporters', () => {
     const r = registry();
     const parsed = parse(SAMPLE);
 
@@ -126,15 +125,27 @@ describe('NekoPackage: monetization gating (single-build, entitlement-gated)', (
     expect(report).toContain('# NekoPackage risk audit');
     expect(report).toContain('package.network_shell_script');
 
-    const sarifResult = runExporter(r, 'package', 'package.export.sarif', parsed, PRO);
-    expect(sarifResult.mimeType).toBe('application/sarif+json');
-    expect(sarifResult.extension).toBe('sarif');
-    const sarif = JSON.parse(String(sarifResult.body));
-    expect(sarif.version).toBe('2.1.0');
-    expect(sarif.runs[0].tool.driver.name).toBe('NekoPackage');
+    const guardResult = runExporter(r, 'package', 'package.export.ci.guard', parsed, PRO);
+    expect(guardResult.mimeType).toBe('application/json');
+    expect(guardResult.extension).toBe('json');
+    const guard = JSON.parse(String(guardResult.body));
+    expect(guard.tool).toBe('nekopackage');
+    expect(guard.failOn).toEqual(['high', 'medium']);
+    // SAMPLE has a network-shell script (high) → the gate must fail.
+    expect(guard.pass).toBe(false);
+    expect(guard.exitCode).toBe(1);
     expect(
-      sarif.runs[0].results.some((x: { ruleId: string }) => x.ruleId === 'package.network_shell_script'),
+      guard.violations.some((v: { ruleId: string }) => v.ruleId === 'package.network_shell_script'),
     ).toBe(true);
+  });
+
+  it('the CI guard passes a clean package', () => {
+    const r = registry();
+    const parsed = parse(JSON.stringify({ name: 'clean', version: '1.0.0', private: true, license: 'MIT' }));
+    const guard = JSON.parse(String(runExporter(r, 'package', 'package.export.ci.guard', parsed, PRO).body));
+    expect(guard.pass).toBe(true);
+    expect(guard.exitCode).toBe(0);
+    expect(guard.violations).toEqual([]);
   });
 
   it('a truly unknown exporter id still throws "unknown exporter"', () => {

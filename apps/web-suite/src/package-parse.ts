@@ -25,8 +25,8 @@ export interface PackageRun {
   readonly markdownSummary: string | null;
   /** Pro: dependency & license-risk policy report (markdown), or null when not entitled. */
   readonly policyReport: string | null;
-  /** Pro: SARIF 2.1.0 of the risk audit, or null when not entitled. */
-  readonly sarif: string | null;
+  /** Pro: CI guard gate config (JSON), or null when not entitled. */
+  readonly ciGuard: string | null;
   readonly proUnlocked: boolean;
   readonly diagnostics: readonly Diagnostic[];
   readonly inputBytes: number;
@@ -34,9 +34,10 @@ export interface PackageRun {
 
 /**
  * Run `package.json` over raw input and render the engine's exporters. The
- * free summaries always render; the Pro policy report + SARIF render only for
- * a Pro entitlement (otherwise null — `runExporter` throws EntitlementError,
- * surfaced here as null so the UI shows the Pro-lock). Pure-local; no network.
+ * free summaries always render; the Pro policy report + CI guard render only
+ * for a Pro entitlement (otherwise null — `runExporter` throws
+ * EntitlementError, surfaced as null so the UI shows the Pro-lock). Pure-local;
+ * no network.
  */
 export function runPackage(raw: string, entitlement: Entitlement = FREE_ENTITLEMENT): PackageRun {
   const bytes = utf8ByteLength(raw);
@@ -66,7 +67,7 @@ export function runPackage(raw: string, entitlement: Entitlement = FREE_ENTITLEM
     jsonSummary: run('package.export.summary.json'),
     markdownSummary: run('package.export.markdown.summary'),
     policyReport: runPro('package.export.policy.report'),
-    sarif: runPro('package.export.sarif'),
+    ciGuard: runPro('package.export.ci.guard'),
     proUnlocked: entitlement.tier !== 'free',
     diagnostics: result.diagnostics,
     inputBytes: bytes,

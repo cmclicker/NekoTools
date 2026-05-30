@@ -108,11 +108,12 @@ describe('PackageApp', () => {
     expect(out).toContain('package.network_shell_script');
   });
 
-  it('renders SARIF 2.1.0 in the SARIF view when Pro', () => {
+  it('renders the CI guard gate config in the CI guard view when Pro', () => {
     render(<PackageApp initialInput={SAMPLE} entitlement={PRO} />);
-    fireEvent.click(screen.getByRole('radio', { name: 'SARIF' }));
-    expect(
-      JSON.parse(screen.getByTestId('package-audit-output').textContent ?? '{}').version,
-    ).toBe('2.1.0');
+    fireEvent.click(screen.getByRole('radio', { name: 'CI guard' }));
+    const guard = JSON.parse(screen.getByTestId('package-audit-output').textContent ?? '{}');
+    expect(guard.tool).toBe('nekopackage');
+    expect(guard.pass).toBe(false);
+    expect(guard.exitCode).toBe(1);
   });
 });

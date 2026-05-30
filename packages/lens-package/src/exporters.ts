@@ -1,6 +1,6 @@
 import type { Exporter } from '@nekotools/contracts';
 
-import { auditPackage, type PackageAuditSeverity } from './audit.js';
+import { auditPackage, PACKAGE_AUDIT_SEVERITY_RANK, type PackageAuditSeverity } from './audit.js';
 import {
   PACKAGE_KIND_MANIFEST,
   PACKAGE_MANIFEST_EXPORT_KINDS,
@@ -110,13 +110,6 @@ export const freeExporters: readonly Exporter<PackageArtifact>[] = [
 
 // --- Pro exporters (registered in the binary, gated by entitlement) --------
 
-const SARIF_LEVEL: Record<PackageAuditSeverity, string> = {
-  high: 'error',
-  medium: 'warning',
-  low: 'note',
-  info: 'note',
-};
-
 /**
  * `package.export.policy.report` (Pro) — a dependency & license-risk policy
  * report: every ruleId-keyed finding (copyleft/missing/unknown license,
@@ -156,51 +149,57 @@ export const policyReportExporter: Exporter<PackageArtifact> = {
   },
 };
 
+/** Severities that fail the gate by default, highest-to-lowest. */
+const CI_GUARD_DEFAULT_FAIL_ON: readonly PackageAuditSeverity[] = ['high', 'medium'];
+
 /**
- * `package.export.sarif` (Pro) — SARIF 2.1.0 of the risk audit so a
- * package.json review drops into CI code-scanning. Carries no secret
- * material; ruleIds match the diagnostic codes shown in the free tier.
+ * `package.export.ci.guard` (Pro) — the `ci.guard.export` capability: a
+ * machine-readable CI gate config derived from the risk audit. A CI step reads
+ * it and fails the build when any finding at a `failOn` severity is present, so
+ * a risky package.json can't merge. Deterministic JSON: the `failOn` policy,
+ * per-severity counts, the violating findings, and a top-level `pass` boolean
+ * (plus a non-zero `exitCode` for shell gates). Pure + local; no network.
  */
-export const sarifExporter: Exporter<PackageArtifact> = {
+export const ciGuardExporter: Exporter<PackageArtifact> = {
   version: 1,
-  id: 'package.export.sarif',
+  id: 'package.export.ci.guard',
   toolId: TOOL_ID,
   target: 'json',
   accepts: PACKAGE_MANIFEST_EXPORT_KINDS,
-  producesMimeType: 'application/sarif+json',
-  producesExtension: 'sarif',
+  producesMimeType: 'application/json',
+  producesExtension: 'json',
   export({ artifacts }) {
-    const findings = auditPackage(pickManifest(artifacts)?.value);
-    const ruleIds = [...new Set(findings.map((f) => f.ruleId))];
-    const sarif = {
-      version: '2.1.0',
-      $schema: 'https://json.schemastore.org/sarif-2.1.0.json',
-      runs: [
-        {
-          tool: {
-            driver: {
-              name: 'NekoPackage',
-              informationUri: 'https://nekotools.local',
-              rules: ruleIds.map((id) => ({ id })),
-            },
-          },
-          results: findings.map((f) => ({
-            ruleId: f.ruleId,
-            level: SARIF_LEVEL[f.severity],
-            message: { text: f.target ? `[${f.target}] ${f.detail}` : f.detail },
-          })),
-        },
-      ],
+    const doc = pickManifest(artifacts)?.value;
+    const findings = auditPackage(doc);
+    const failOn = new Set<PackageAuditSeverity>(CI_GUARD_DEFAULT_FAIL_ON);
+    const counts = { high: 0, medium: 0, low: 0, info: 0 };
+    for (const f of findings) counts[f.severity] += 1;
+
+    const violations = findings
+      .filter((f) => failOn.has(f.severity))
+      .sort(
+        (a, b) =>
+          PACKAGE_AUDIT_SEVERITY_RANK[a.severity] - PACKAGE_AUDIT_SEVERITY_RANK[b.severity] ||
+          a.ruleId.localeCompare(b.ruleId),
+      )
+      .map((f) => ({ ruleId: f.ruleId, severity: f.severity, target: f.target, detail: f.detail }));
+
+    const pass = violations.length === 0;
+    const guard = {
+      version: 1,
+      tool: 'nekopackage',
+      package: doc?.name ?? null,
+      failOn: [...CI_GUARD_DEFAULT_FAIL_ON],
+      counts,
+      violations,
+      pass,
+      exitCode: pass ? 0 : 1,
     };
-    return {
-      mimeType: 'application/sarif+json',
-      extension: 'sarif',
-      body: JSON.stringify(sarif, null, 2),
-    };
+    return { mimeType: 'application/json', extension: 'json', body: JSON.stringify(guard, null, 2) };
   },
 };
 
 export const proExporters: readonly Exporter<PackageArtifact>[] = [
   policyReportExporter,
-  sarifExporter,
+  ciGuardExporter,
 ];

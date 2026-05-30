@@ -17,7 +17,7 @@ export const packageManifest: ToolManifest = {
     'package.export.markdown.summary',
     // Pro — registered in this build but gated behind a valid entitlement.
     'package.export.policy.report',
-    'package.export.sarif',
+    'package.export.ci.guard',
   ],
   offlinePolicy: DEFAULT_OFFLINE_POLICY,
   capabilities: {
@@ -43,7 +43,6 @@ export const packageManifest: ToolManifest = {
       'lockfile.audit',
       'script.policy',
       'dependency.baseline',
-      'export.sarif',
       'ci.guard.export',
       'workspace.snapshots',
     ],
