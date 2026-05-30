@@ -25,8 +25,8 @@ export interface PackageRun {
   readonly markdownSummary: string | null;
   /** Pro: dependency & license-risk policy report (markdown), or null when not entitled. */
   readonly policyReport: string | null;
-  /** Pro: SARIF 2.1.0 of the risk audit, or null when not entitled. */
-  readonly sarif: string | null;
+  /** Pro: CI guard gate config (JSON), or null when not entitled. */
+  readonly ciGuard: string | null;
   readonly proUnlocked: boolean;
   readonly diagnostics: readonly Diagnostic[];
   readonly inputBytes: number;
@@ -66,7 +66,7 @@ export function runPackage(raw: string, entitlement: Entitlement = FREE_ENTITLEM
     jsonSummary: run('package.export.summary.json'),
     markdownSummary: run('package.export.markdown.summary'),
     policyReport: runPro('package.export.policy.report'),
-    sarif: runPro('package.export.sarif'),
+    ciGuard: runPro('package.export.ci.guard'),
     proUnlocked: entitlement.tier !== 'free',
     diagnostics: result.diagnostics,
     inputBytes: bytes,

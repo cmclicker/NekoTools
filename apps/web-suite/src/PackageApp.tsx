@@ -20,8 +20,8 @@ export interface PackageAppProps {
   readonly entitlement?: Entitlement;
 }
 
-type CopyTarget = 'json' | 'markdown' | 'report' | 'sarif';
-type ProView = 'report' | 'sarif';
+type CopyTarget = 'json' | 'markdown' | 'report' | 'ci-guard';
+type ProView = 'report' | 'ci-guard';
 
 interface CopyStatus {
   readonly ok: boolean;
@@ -78,7 +78,7 @@ export function PackageApp({
             ? run.markdownSummary
             : target === 'report'
               ? run.policyReport
-              : run.sarif;
+              : run.ciGuard;
       if (text === null) {
         setCopyStatus({ ok: false, target, method: 'none' });
         return;
@@ -86,7 +86,7 @@ export function PackageApp({
       const result = await copyToClipboard(text, clipboardDeps);
       setCopyStatus({ ok: result.ok, target, method: result.method });
     },
-    [clipboardDeps, run.jsonSummary, run.markdownSummary, run.policyReport, run.sarif],
+    [clipboardDeps, run.jsonSummary, run.markdownSummary, run.policyReport, run.ciGuard],
   );
 
   return (
@@ -297,7 +297,7 @@ export function PackageApp({
                   <div className="results__toolbar">
                     <fieldset className="viewmode" aria-label="Risk audit output">
                       <legend className="visually-hidden">Risk audit output</legend>
-                      {(['report', 'sarif'] as const).map((m) => (
+                      {(['report', 'ci-guard'] as const).map((m) => (
                         <label key={m} className={proView === m ? 'viewmode--active' : ''}>
                           <input
                             type="radio"
@@ -306,7 +306,7 @@ export function PackageApp({
                             checked={proView === m}
                             onChange={() => setProView(m)}
                           />
-                          {m === 'report' ? 'Report' : 'SARIF'}
+                          {m === 'report' ? 'Report' : 'CI guard'}
                         </label>
                       ))}
                     </fieldset>
@@ -317,7 +317,7 @@ export function PackageApp({
                         onClick={() => void handleCopy(proView)}
                         data-testid="package-copy-audit"
                       >
-                        Copy {proView === 'report' ? 'report' : 'SARIF'}
+                        Copy {proView === 'report' ? 'report' : 'CI guard'}
                       </button>
                     </div>
                   </div>
@@ -326,17 +326,17 @@ export function PackageApp({
                     data-testid="package-audit-output"
                     aria-label={`${proView} output`}
                   >
-                    {proView === 'report' ? run.policyReport : run.sarif}
+                    {proView === 'report' ? run.policyReport : run.ciGuard}
                   </pre>
                 </>
               ) : (
                 <div className="pro-lock" role="status" data-testid="package-locked">
-                  <strong>Dependency &amp; license-risk audit + SARIF is a Pro feature.</strong>
+                  <strong>Dependency &amp; license-risk audit + CI guard is a Pro feature.</strong>
                   <p>
                     Audit dependencies and scripts for license risk (copyleft / missing / unknown),
                     remote supply-chain specifiers, and lifecycle / shell-piping scripts — and export
-                    SARIF 2.1.0 to gate package.json in CI. Unlock with a license key (verified
-                    locally, works offline forever).
+                    a CI guard gate config that fails the build on high/medium risk. Unlock with a
+                    license key (verified locally, works offline forever).
                   </p>
                 </div>
               )}

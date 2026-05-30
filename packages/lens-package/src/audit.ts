@@ -3,14 +3,15 @@ import type { PackageManifestDocument } from './kinds.js';
 
 /**
  * NekoPackage dependency & license-risk audit. The Pro
- * `package.export.policy.report` and `package.export.sarif` exporters render
+ * `package.export.policy.report` and `package.export.ci.guard` exporters render
  * these findings. The parser already extracts the raw signals (license,
  * per-dependency remote/unpinned flags, script risk flags, duplicates); this
  * audit elevates them into a unified, ruleId-keyed, severity-ranked posture
  * and adds **license-risk classification** the free tier does not do. It
  * reuses the parser's diagnostic codes as ruleIds for the overlapping checks
- * (so a SARIF ruleId matches the diagnostic a user already sees). Pure, local,
- * deterministic — derived purely from the parsed document; no network.
+ * (so a CI-guard violation id matches the diagnostic a user already sees).
+ * Pure, local, deterministic — derived purely from the parsed document; no
+ * network.
  */
 
 export type PackageAuditSeverity = 'high' | 'medium' | 'low' | 'info';
