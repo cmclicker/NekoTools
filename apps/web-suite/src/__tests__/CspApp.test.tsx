@@ -3,23 +3,64 @@ import { fireEvent, render, screen, waitFor, within } from '@testing-library/rea
 
 import { CspApp } from '../CspApp.js';
 
+const PRO = {
+  version: 1 as const,
+  licenseId: 'X',
+  licensee: 'Buyer',
+  tier: 'pro' as const,
+  features: ['*'],
+  issuedAt: '2026-01-01T00:00:00.000Z',
+  expiresAt: null,
+  signature: 's',
+};
+
 describe('CspApp', () => {
-  it('renders directives + findings', () => {
+  it('renders the directive table (free, default view)', () => {
     render(<CspApp initialInput={"default-src 'self'; script-src 'self' 'unsafe-inline'"} />);
-    expect(screen.getByTestId('csp-stat-directives').textContent).toBe('2');
-    const dirs = screen.getByTestId('csp-directives');
-    expect(within(dirs).getByText('script-src')).toBeInTheDocument();
-    expect(screen.getByTestId('csp-findings').textContent).toMatch(/unsafe-inline/);
+    const table = screen.getByTestId('csp-table');
+    expect(within(table).getByText('default-src')).toBeInTheDocument();
+    expect(within(table).getByText('script-src')).toBeInTheDocument();
   });
 
-  it('surfaces an unsafe-inline diagnostic', () => {
+  it('shows JSON output in the json view', () => {
+    render(<CspApp initialInput={"default-src 'self'"} initialUiState={{ viewMode: 'json' }} />);
+    const json = JSON.parse(screen.getByTestId('csp-output').textContent ?? '{}');
+    expect(json.directives[0].name).toBe('default-src');
+  });
+
+  it('surfaces a security diagnostic via the Diagnostics panel', () => {
     render(<CspApp initialInput={"script-src 'unsafe-inline'"} />);
     expect(screen.getByText(/csp\.unsafe_inline/)).toBeInTheDocument();
   });
 
-  it('converts to normalized one-per-line output', () => {
-    render(<CspApp initialInput={"default-src 'self'; img-src *"} initialUiState={{ viewMode: 'normalized' }} />);
-    expect(screen.getByTestId('csp-output').textContent).toBe("default-src 'self';\nimg-src *");
+  it('locks the audit + SARIF Pro views when free', () => {
+    render(<CspApp initialInput={"script-src 'unsafe-inline'"} initialUiState={{ viewMode: 'audit' }} />);
+    expect(screen.getByTestId('csp-locked')).toBeInTheDocument();
+    expect(screen.queryByTestId('csp-output')).not.toBeInTheDocument();
+  });
+
+  it('unlocks the posture audit via an injected Pro entitlement', () => {
+    render(
+      <CspApp
+        initialInput={"script-src 'unsafe-inline' 'unsafe-eval'"}
+        initialUiState={{ viewMode: 'audit' }}
+        entitlement={PRO}
+      />,
+    );
+    const out = screen.getByTestId('csp-output').textContent ?? '';
+    expect(out).toContain('# NekoCSP posture audit');
+    expect(out).toContain('csp.unsafe_eval');
+  });
+
+  it('renders SARIF 2.1.0 in the sarif view when Pro', () => {
+    render(
+      <CspApp
+        initialInput={"script-src 'unsafe-inline'"}
+        initialUiState={{ viewMode: 'sarif' }}
+        entitlement={PRO}
+      />,
+    );
+    expect(JSON.parse(screen.getByTestId('csp-output').textContent ?? '{}').version).toBe('2.1.0');
   });
 
   it('shows the empty-state for whitespace-only input', () => {
@@ -34,10 +75,14 @@ describe('CspApp', () => {
       <CspApp
         initialInput={"default-src 'self'"}
         initialUiState={{ viewMode: 'json' }}
-        clipboardDeps={{ apiWrite: async (t) => { writes.push(t); } }}
+        clipboardDeps={{
+          apiWrite: async (t) => {
+            writes.push(t);
+          },
+        }}
       />,
     );
-    fireEvent.click(screen.getByTestId('csp-copy-output'));
+    fireEvent.click(screen.getByTestId('csp-copy-json'));
     await waitFor(() => expect(writes).toHaveLength(1));
     expect(JSON.parse(writes[0] ?? '{}').directives[0].name).toBe('default-src');
   });

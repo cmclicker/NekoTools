@@ -1,17 +1,21 @@
 import { useCallback, useMemo, useState, type ChangeEvent } from 'react';
 
+import type { Entitlement } from '@nekotools/contracts';
+
 import { Diagnostics } from './Diagnostics.js';
 import { copyToClipboard, type ClipboardDeps } from './clipboard.js';
-import { parseCspInput } from './csp-parse.js';
+import { useLicenseContext } from './license-store.js';
+import { parseCspText } from './csp-parse.js';
+import type { CspDirective } from '@nekotools/lens-csp';
 
 /**
- * NekoCSP sub-app. Wires `@nekotools/lens-csp` into the shared web-suite
- * shell as a Web tool tab. Free surface: paste a Content-Security-Policy,
- * see each directive + its sources and a list of security findings, and
- * copy JSON / normalized / markdown. All local.
+ * NekoCSP sub-app. Paste a Content-Security-Policy, see the directive table
+ * or JSON projection, see basic security hints, copy. Pro (gated by the
+ * suite license): a deep CSP security audit + SARIF export for CI. Parsing
+ * and auditing run entirely in the browser — no requests, ever.
  */
 
-export type CspViewMode = 'directives' | 'json' | 'normalized' | 'markdown';
+export type CspViewMode = 'table' | 'json' | 'audit' | 'sarif';
 
 export interface NekoCspUiState {
   readonly viewMode: CspViewMode;
@@ -21,6 +25,8 @@ export interface CspAppProps {
   readonly initialInput?: string;
   readonly initialUiState?: Partial<NekoCspUiState>;
   readonly clipboardDeps?: ClipboardDeps;
+  /** Injected entitlement; defaults to the suite license context. */
+  readonly entitlement?: Entitlement;
 }
 
 interface CopyStatus {
@@ -28,36 +34,62 @@ interface CopyStatus {
   readonly method: 'clipboard-api' | 'execCommand' | 'none';
 }
 
-const SAMPLE_INPUT =
-  "default-src 'self'; script-src 'self' 'unsafe-inline' https://cdn.example.com; img-src * data:; object-src 'none'";
+const SAMPLE_INPUT = "default-src 'self'; script-src 'self' 'unsafe-inline'; img-src *";
 
-export function CspApp({ initialInput, initialUiState, clipboardDeps }: CspAppProps = {}): JSX.Element {
+const PRO_VIEWS = new Set<CspViewMode>(['audit', 'sarif']);
+const VIEW_MODES: readonly CspViewMode[] = ['table', 'json', 'audit', 'sarif'];
+const VIEW_LABELS: Record<CspViewMode, string> = {
+  table: 'Table',
+  json: 'JSON',
+  audit: 'Audit ⭐',
+  sarif: 'SARIF ⭐',
+};
+
+export function CspApp({
+  initialInput,
+  initialUiState,
+  clipboardDeps,
+  entitlement,
+}: CspAppProps = {}): JSX.Element {
   const [input, setInput] = useState<string>(initialInput ?? SAMPLE_INPUT);
-  const [viewMode, setViewMode] = useState<CspViewMode>(initialUiState?.viewMode ?? 'directives');
+  const [viewMode, setViewMode] = useState<CspViewMode>(initialUiState?.viewMode ?? 'table');
   const [copyStatus, setCopyStatus] = useState<CopyStatus | null>(null);
 
-  const parsed = useMemo(() => parseCspInput(input), [input]);
+  const license = useLicenseContext();
+  const effectiveEntitlement = entitlement ?? license.entitlement;
+  const parsed = useMemo(() => parseCspText(input, effectiveEntitlement), [input, effectiveEntitlement]);
+  const directives = parsed.document?.directives ?? [];
+  const hasDirectives = directives.length > 0;
+  const proUnlocked = parsed.proUnlocked;
+  const isProView = PRO_VIEWS.has(viewMode);
 
+  const outputText =
+    viewMode === 'json'
+      ? parsed.jsonOutput
+      : viewMode === 'audit'
+        ? parsed.auditReport
+        : viewMode === 'sarif'
+          ? parsed.sarif
+          : null;
+  // Copy target: Pro views copy their own output; table + JSON both copy JSON.
   const copyText =
-    viewMode === 'json' ? parsed.json : viewMode === 'normalized' ? parsed.normalized : parsed.markdown;
-  const copyDisabled = viewMode === 'directives' ? parsed.directiveCount === 0 : copyText === '';
+    viewMode === 'audit' ? parsed.auditReport : viewMode === 'sarif' ? parsed.sarif : parsed.jsonOutput;
+  const copyLabel = viewMode === 'audit' ? 'Audit' : viewMode === 'sarif' ? 'SARIF' : 'JSON';
 
   const handleCopy = useCallback(async () => {
-    const text =
-      viewMode === 'json' ? parsed.json : viewMode === 'normalized' ? parsed.normalized : parsed.markdown;
-    if (text === '') {
+    if (copyText === null || copyText === '') {
       setCopyStatus({ ok: false, method: 'none' });
       return;
     }
-    const r = await copyToClipboard(text, clipboardDeps);
-    setCopyStatus({ ok: r.ok, method: r.method });
-  }, [viewMode, parsed, clipboardDeps]);
+    const result = await copyToClipboard(copyText, clipboardDeps);
+    setCopyStatus({ ok: result.ok, method: result.method });
+  }, [copyText, clipboardDeps]);
 
   return (
     <section className="tool tool--csp" aria-label="NekoCSP workbench">
       <section className="paste card">
         <label htmlFor="csp-paste" className="paste__label">
-          Paste a Content-Security-Policy header:
+          Paste a Content-Security-Policy here:
         </label>
         <textarea
           id="csp-paste"
@@ -65,20 +97,19 @@ export function CspApp({ initialInput, initialUiState, clipboardDeps }: CspAppPr
           value={input}
           onChange={(e: ChangeEvent<HTMLTextAreaElement>) => setInput(e.target.value)}
           spellCheck={false}
-          rows={4}
+          rows={6}
           data-testid="csp-input"
         />
         <p className="paste__hint">
-          Audited entirely in your browser — no policy is fetched, evaluated against a live page, or
-          uploaded.
+          Parsing and auditing run entirely in your browser. No requests, no network, no telemetry.
         </p>
       </section>
 
       <section className="results card">
         <div className="results__toolbar">
-          <fieldset className="viewmode" aria-label="CSP output mode">
-            <legend className="visually-hidden">CSP output mode</legend>
-            {(['directives', 'json', 'normalized', 'markdown'] as const).map((m) => (
+          <fieldset className="viewmode" aria-label="CSP view mode">
+            <legend className="visually-hidden">CSP view mode</legend>
+            {VIEW_MODES.map((m) => (
               <label key={m} className={viewMode === m ? 'viewmode--active' : ''}>
                 <input
                   type="radio"
@@ -87,7 +118,7 @@ export function CspApp({ initialInput, initialUiState, clipboardDeps }: CspAppPr
                   checked={viewMode === m}
                   onChange={() => setViewMode(m)}
                 />
-                {m === 'directives' ? 'Directives' : m === 'json' ? 'JSON' : m === 'normalized' ? 'Normalized' : 'Markdown'}
+                {VIEW_LABELS[m]}
               </label>
             ))}
           </fieldset>
@@ -97,10 +128,10 @@ export function CspApp({ initialInput, initialUiState, clipboardDeps }: CspAppPr
               type="button"
               className="copy__btn"
               onClick={handleCopy}
-              disabled={copyDisabled}
-              data-testid="csp-copy-output"
+              disabled={copyText === null || copyText === ''}
+              data-testid="csp-copy-json"
             >
-              {viewMode === 'json' ? 'Copy JSON' : viewMode === 'normalized' ? 'Copy normalized' : 'Copy markdown summary'}
+              Copy {copyLabel}
             </button>
           </div>
 
@@ -111,62 +142,52 @@ export function CspApp({ initialInput, initialUiState, clipboardDeps }: CspAppPr
               data-method={copyStatus.method}
               role="status"
             >
-              {copyStatus.ok ? `Copied to clipboard (via ${copyStatus.method}).` : 'Copy failed: nothing to copy.'}
+              {copyStatus.ok
+                ? `Copied to clipboard (via ${copyStatus.method}).`
+                : 'Copy failed: nothing to copy.'}
             </p>
           ) : null}
         </div>
 
-        <ul className="toml-stats" data-testid="csp-stats">
-          <li>
-            directives: <strong data-testid="csp-stat-directives">{parsed.directiveCount}</strong>
-          </li>
-          <li>
-            findings: <strong data-testid="csp-stat-findings">{parsed.findings.length}</strong>
-          </li>
-        </ul>
-
-        {parsed.directiveCount > 0 ? (
-          viewMode === 'directives' ? (
-            <div data-testid="csp-directives">
-              <table className="url-params">
+        {hasDirectives ? (
+          isProView && !proUnlocked ? (
+            <div className="pro-lock" role="status" data-testid="csp-locked">
+              <strong>{viewMode === 'audit' ? 'Security audit' : 'SARIF export'} is a Pro feature.</strong>
+              <p>
+                Audit the policy for unsafe-inline/eval, wildcards, insecure schemes, data: URIs, and
+                a missing default-src — and export SARIF 2.1.0 to wire NekoCSP into CI code-scanning.
+                Unlock with a license key (verified locally, works offline forever).
+              </p>
+            </div>
+          ) : viewMode === 'table' ? (
+            <div className="env-table" data-testid="csp-table">
+              <table>
                 <thead>
                   <tr>
-                    <th scope="col">directive</th>
-                    <th scope="col">sources</th>
+                    <th>Directive</th>
+                    <th>Sources</th>
                   </tr>
                 </thead>
                 <tbody>
-                  {parsed.directives.map((d) => (
-                    <tr key={d.name}>
-                      <td>{d.name}</td>
-                      <td>{d.sources.join(' ') || '(empty)'}</td>
+                  {directives.map((directive: CspDirective, i: number) => (
+                    <tr key={`${directive.name}-${i}`}>
+                      <td>
+                        <code>{directive.name}</code>
+                      </td>
+                      <td>{directive.sources.join(' ') || '(empty)'}</td>
                     </tr>
                   ))}
                 </tbody>
               </table>
-              {parsed.findings.length > 0 ? (
-                <ul className="cron-next-runs" data-testid="csp-findings">
-                  {parsed.findings.map((f, i) => (
-                    <li key={i} data-severity={f.severity}>
-                      <strong>{f.severity.toUpperCase()}</strong>
-                      {f.directive ? ` [${f.directive}]` : ''} — {f.message}
-                    </li>
-                  ))}
-                </ul>
-              ) : (
-                <p className="empty-state" data-testid="csp-clean">
-                  No findings — looks locked down.
-                </p>
-              )}
             </div>
           ) : (
-            <pre className="toml-output" data-testid="csp-output" aria-label={`${viewMode} output`}>
-              {viewMode === 'json' ? parsed.json : viewMode === 'normalized' ? parsed.normalized : parsed.markdown}
+            <pre className="yaml-output" data-testid="csp-output" aria-label={`${viewMode} output`}>
+              {outputText}
             </pre>
           )
         ) : (
           <div role="status" className="empty-state" data-testid="csp-no-document">
-            No directives yet. Paste a CSP header above (or check the diagnostics below).
+            No directives yet. Paste a Content-Security-Policy above (or check the diagnostics below).
           </div>
         )}
 
