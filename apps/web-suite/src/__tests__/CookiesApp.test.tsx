@@ -61,7 +61,7 @@ describe('CookiesApp', () => {
     expect(JSON.parse(writes[0] ?? '[]')[0]).toMatchObject({ name: 'sid' });
   });
 
-  it('locks the audit + SARIF Pro views when free', () => {
+  it('locks the audit + policy-preset Pro views when free', () => {
     render(<CookiesApp initialInput={'sid=x'} initialUiState={{ viewMode: 'audit' }} />);
     expect(screen.getByTestId('cookies-locked')).toBeInTheDocument();
     expect(screen.queryByTestId('cookies-output')).not.toBeInTheDocument();
@@ -80,12 +80,12 @@ describe('CookiesApp', () => {
     expect(out).toContain('cookie.insecure');
   });
 
-  it('renders SARIF 2.1.0 in the SARIF view when Pro', () => {
+  it('renders the hardened policy preset in the preset view when Pro', () => {
     render(
-      <CookiesApp initialInput={'sid=x'} initialUiState={{ viewMode: 'sarif' }} entitlement={PRO} />,
+      <CookiesApp initialInput={'sid=x'} initialUiState={{ viewMode: 'preset' }} entitlement={PRO} />,
     );
-    expect(JSON.parse(screen.getByTestId('cookies-output').textContent ?? '{}').version).toBe(
-      '2.1.0',
-    );
+    const out = screen.getByTestId('cookies-output').textContent ?? '';
+    expect(out).toContain('# NekoCookies hardened policy preset');
+    expect(out).toContain('Set-Cookie: sid=<value>;');
   });
 });

@@ -9,8 +9,8 @@ import { COOKIE_KIND_PARSED } from './kinds.js';
  * Reading model matches NekoJWT / NekoCSP: `entitlements.free` is what this
  * build ships (engine + UI); `entitlements.pro` advertises future
  * capabilities; and the two Pro exporter ids (`cookie.export.audit.report`,
- * `cookie.export.sarif`) are registered in this build but gated behind a
- * valid entitlement (monetization-safety tests assert a free caller is
+ * `cookie.export.policy.preset`) are registered in this build but gated behind
+ * a valid entitlement (monetization-safety tests assert a free caller is
  * refused with EntitlementError).
  *
  * Offline policy is `network-forbidden`. NekoCookies is a pure parser; it
@@ -34,7 +34,7 @@ export const cookiesManifest: ToolManifest = {
     'cookie.export.markdown.summary',
     // Pro — registered in this build but gated behind a valid entitlement.
     'cookie.export.audit.report',
-    'cookie.export.sarif',
+    'cookie.export.policy.preset',
   ],
   offlinePolicy: DEFAULT_OFFLINE_POLICY,
   capabilities: {
@@ -63,7 +63,6 @@ export const cookiesManifest: ToolManifest = {
       'public-suffix.check',
       'compare.sets',
       'export.audit.report',
-      'export.sarif',
       'export.policy.preset',
       'workspace.snapshots',
     ],
