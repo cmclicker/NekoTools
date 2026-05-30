@@ -8,7 +8,6 @@ import { gitignoreManifest } from './manifest.js';
 export * from './gitignore.js';
 export * from './kinds.js';
 export * from './diagnostics.js';
-export * from './audit.js';
 export * from './parser-text.js';
 export * from './exporters.js';
 export * from './manifest.js';
@@ -16,7 +15,7 @@ export { FIXED_CLOCK } from '@nekotools/lens-kit';
 
 /**
  * Build a NekoGitignore registration for the runtime. Free exporters run for
- * everyone; the Pro exporters (secret-coverage audit report, SARIF) are
+ * everyone; the Pro exporters (compiled-regex export, merged .gitignore) are
  * registered as `proExporters` and gated by `runExporter` behind a valid
  * entitlement (single-build-gated model, same as NekoJWT / NekoCSP).
  */

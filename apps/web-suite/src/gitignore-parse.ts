@@ -13,8 +13,9 @@ import type { Diagnostic, Entitlement } from '@nekotools/contracts';
  * NekoGitignore UI parse helper, extracted out of GitignoreApp for
  * testability. The `paths` argument is forwarded as a parser hint so the
  * engine returns ignored/not verdicts; output strings come from the real
- * engine exporters. The Pro secret-coverage audit + SARIF are gated:
- * `runExporter` throws EntitlementError for a free caller, surfaced as null.
+ * engine exporters. The Pro compiled-regex export + merged .gitignore are
+ * gated: `runExporter` throws EntitlementError for a free caller, surfaced as
+ * null.
  */
 
 const registry = (() => {
@@ -31,10 +32,10 @@ export interface ParsedGitignoreView {
   readonly json: string;
   readonly normalized: string;
   readonly markdown: string;
-  /** Pro: secret-coverage audit report (markdown), or null when not entitled. */
-  readonly auditReport: string | null;
-  /** Pro: SARIF 2.1.0 of the coverage audit, or null when not entitled. */
-  readonly sarif: string | null;
+  /** Pro: compiled-regex export (JSON), or null when not entitled. */
+  readonly regexExport: string | null;
+  /** Pro: merged/deduplicated canonical .gitignore, or null when not entitled. */
+  readonly mergedExport: string | null;
   readonly proUnlocked: boolean;
   readonly diagnostics: readonly Diagnostic[];
 }
@@ -74,8 +75,8 @@ export function parseGitignoreInput(
     json: run('gitignore.export.json', '{}'),
     normalized: run('gitignore.export.normalized', ''),
     markdown: run('gitignore.export.markdown.summary', ''),
-    auditReport: runPro('gitignore.export.audit.report'),
-    sarif: runPro('gitignore.export.sarif'),
+    regexExport: runPro('gitignore.export.regex'),
+    mergedExport: runPro('gitignore.export.merged'),
     proUnlocked: entitlement.tier !== 'free',
     diagnostics: result.diagnostics,
   };

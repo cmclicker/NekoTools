@@ -67,35 +67,35 @@ describe('GitignoreApp', () => {
     expect(writes[0]).toBe('foo\nbar/');
   });
 
-  it('locks the audit + SARIF Pro views when free', () => {
-    render(<GitignoreApp initialInput={'node_modules/'} initialUiState={{ paths: '', viewMode: 'audit' }} />);
+  it('locks the regex + merged Pro views when free', () => {
+    render(<GitignoreApp initialInput={'node_modules/'} initialUiState={{ paths: '', viewMode: 'regex' }} />);
     expect(screen.getByTestId('gitignore-locked')).toBeInTheDocument();
     expect(screen.queryByTestId('gitignore-output')).not.toBeInTheDocument();
   });
 
-  it('unlocks the secret-coverage audit via an injected Pro entitlement', () => {
+  it('unlocks the compiled-regex export via an injected Pro entitlement', () => {
     render(
       <GitignoreApp
         initialInput={'node_modules/'}
-        initialUiState={{ paths: '', viewMode: 'audit' }}
+        initialUiState={{ paths: '', viewMode: 'regex' }}
+        entitlement={PRO}
+      />,
+    );
+    const rows = JSON.parse(screen.getByTestId('gitignore-output').textContent ?? '[]');
+    expect(rows[0].pattern).toBe('node_modules');
+    expect(typeof rows[0].regex).toBe('string');
+  });
+
+  it('renders the merged .gitignore in the merged view when Pro', () => {
+    render(
+      <GitignoreApp
+        initialInput={'node_modules/\nnode_modules/'}
+        initialUiState={{ paths: '', viewMode: 'merged' }}
         entitlement={PRO}
       />,
     );
     const out = screen.getByTestId('gitignore-output').textContent ?? '';
-    expect(out).toContain('# NekoGitignore secret-coverage audit');
-    expect(out).toContain('gitignore.uncovered_secret');
-  });
-
-  it('renders SARIF 2.1.0 in the SARIF view when Pro', () => {
-    render(
-      <GitignoreApp
-        initialInput={'node_modules/'}
-        initialUiState={{ paths: '', viewMode: 'sarif' }}
-        entitlement={PRO}
-      />,
-    );
-    expect(JSON.parse(screen.getByTestId('gitignore-output').textContent ?? '{}').version).toBe(
-      '2.1.0',
-    );
+    expect(out).toContain('# NekoGitignore merged');
+    expect(out).toContain('duplicate(s) removed');
   });
 });

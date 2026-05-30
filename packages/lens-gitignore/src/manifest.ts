@@ -7,10 +7,10 @@ import { GITIGNORE_KIND_PARSED } from './kinds.js';
  * The NekoGitignore manifest. Reading model matches NekoJWT / NekoCSP:
  * `entitlements.free` ships (engine + UI); `entitlements.pro` advertises
  * future capabilities; and the two Pro exporter ids
- * (`gitignore.export.audit.report`, `gitignore.export.sarif`) are registered
- * in this build but gated behind a valid entitlement (monetization-safety
- * tests assert a free caller is refused with EntitlementError). Offline
- * policy is `network-forbidden` — it never touches the filesystem or a repo.
+ * (`gitignore.export.regex`, `gitignore.export.merged`) are registered in this
+ * build but gated behind a valid entitlement (monetization-safety tests assert
+ * a free caller is refused with EntitlementError). Offline policy is
+ * `network-forbidden` — it never touches the filesystem or a repo.
  */
 export const gitignoreManifest: ToolManifest = {
   version: 1,
@@ -26,8 +26,8 @@ export const gitignoreManifest: ToolManifest = {
     'gitignore.export.normalized',
     'gitignore.export.markdown.summary',
     // Pro — registered in this build but gated behind a valid entitlement.
-    'gitignore.export.audit.report',
-    'gitignore.export.sarif',
+    'gitignore.export.regex',
+    'gitignore.export.merged',
   ],
   offlinePolicy: DEFAULT_OFFLINE_POLICY,
   capabilities: {
@@ -56,7 +56,6 @@ export const gitignoreManifest: ToolManifest = {
       'redundancy.analyze',
       'scan.repo-local',
       'export.regex',
-      'export.sarif',
       'export.merged',
       'workspace.snapshots',
     ],

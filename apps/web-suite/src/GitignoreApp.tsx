@@ -11,9 +11,9 @@ import { parseGitignoreInput } from './gitignore-parse.js';
  * NekoGitignore sub-app. Wires `@nekotools/lens-gitignore` into the shared
  * web-suite shell as a Project tool tab. Free surface: paste a .gitignore,
  * see each rule classified, test paths against the ruleset, and copy JSON /
- * normalized / markdown. Pro (gated by the suite license): a secret-leak
- * coverage audit (does the ruleset ignore .env / *.pem / id_rsa / …?) + SARIF
- * export for CI. All local — no repo, no filesystem, no network.
+ * normalized / markdown. Pro (gated by the suite license): a compiled-regex
+ * export (the exact RegExp each rule matches) and a merged/deduplicated
+ * canonical .gitignore. All local — no repo, no filesystem, no network.
  */
 
 export type GitignoreViewMode =
@@ -22,8 +22,8 @@ export type GitignoreViewMode =
   | 'json'
   | 'normalized'
   | 'markdown'
-  | 'audit'
-  | 'sarif';
+  | 'regex'
+  | 'merged';
 
 export interface NekoGitignoreUiState {
   readonly paths: string;
@@ -43,15 +43,15 @@ interface CopyStatus {
   readonly method: 'clipboard-api' | 'execCommand' | 'none';
 }
 
-const PRO_VIEWS = new Set<GitignoreViewMode>(['audit', 'sarif']);
+const PRO_VIEWS = new Set<GitignoreViewMode>(['regex', 'merged']);
 const VIEW_MODES: readonly GitignoreViewMode[] = [
   'rules',
   'paths',
   'json',
   'normalized',
   'markdown',
-  'audit',
-  'sarif',
+  'regex',
+  'merged',
 ];
 const VIEW_LABELS: Record<GitignoreViewMode, string> = {
   rules: 'Rules',
@@ -59,8 +59,8 @@ const VIEW_LABELS: Record<GitignoreViewMode, string> = {
   json: 'JSON',
   normalized: 'Normalized',
   markdown: 'Markdown',
-  audit: 'Audit ⭐',
-  sarif: 'SARIF ⭐',
+  regex: 'Regex ⭐',
+  merged: 'Merged ⭐',
 };
 const COPY_LABELS: Record<GitignoreViewMode, string> = {
   rules: 'Copy markdown summary',
@@ -68,8 +68,8 @@ const COPY_LABELS: Record<GitignoreViewMode, string> = {
   json: 'Copy JSON',
   normalized: 'Copy normalized',
   markdown: 'Copy markdown summary',
-  audit: 'Copy audit',
-  sarif: 'Copy SARIF',
+  regex: 'Copy regex',
+  merged: 'Copy merged',
 };
 
 const SAMPLE_INPUT = [
@@ -112,10 +112,10 @@ export function GitignoreApp({
         ? parsed.normalized
         : viewMode === 'markdown'
           ? parsed.markdown
-          : viewMode === 'audit'
-            ? parsed.auditReport
-            : viewMode === 'sarif'
-              ? parsed.sarif
+          : viewMode === 'regex'
+            ? parsed.regexExport
+            : viewMode === 'merged'
+              ? parsed.mergedExport
               : null; // rules / paths
   const copyText = viewMode === 'rules' || viewMode === 'paths' ? parsed.markdown : (outputText ?? '');
   const copyDisabled = parsed.patternCount === 0 || copyText === '';
@@ -216,12 +216,11 @@ export function GitignoreApp({
         {parsed.patternCount > 0 ? (
           isProView && !proUnlocked ? (
             <div className="pro-lock" role="status" data-testid="gitignore-locked">
-              <strong>{viewMode === 'audit' ? 'Secret-coverage audit' : 'SARIF export'} is a Pro feature.</strong>
+              <strong>{viewMode === 'regex' ? 'Regex export' : 'Merged .gitignore'} is a Pro feature.</strong>
               <p>
-                Audit whether the ruleset actually ignores the files you must never commit (.env,
-                *.pem, id_rsa, credentials.json, .npmrc, …) and export SARIF 2.1.0 to gate
-                .gitignore coverage in CI. Unlock with a license key (verified locally, works
-                offline forever).
+                See the exact RegExp each pattern compiles to (explain-match), and generate a
+                merged, de-duplicated canonical .gitignore from the ruleset. Unlock with a license
+                key (verified locally, works offline forever).
               </p>
             </div>
           ) : viewMode === 'rules' ? (
