@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
-import type { Artifact, Workspace } from '@nekotools/contracts';
+import type { Artifact, Entitlement, Workspace } from '@nekotools/contracts';
 import {
+  EntitlementError,
   ToolRegistry,
   jsonWorkspaceSerializer,
   runExporter,
@@ -13,6 +14,17 @@ import { FIXED_CLOCK, buildSortRegistration, sortManifest, transformLines, DEFAU
 import type { SortParsedArtifact } from '../kinds.js';
 
 const clock = FIXED_CLOCK('2026-05-28T00:00:00.000Z');
+
+const PRO: Entitlement = {
+  version: 1,
+  licenseId: 'TEST',
+  licensee: 'Test User',
+  tier: 'pro',
+  features: ['*'],
+  issuedAt: '2026-01-01T00:00:00.000Z',
+  expiresAt: null,
+  signature: 'test',
+};
 
 function registry(): ToolRegistry {
   const r = new ToolRegistry();
@@ -57,19 +69,61 @@ describe('NekoSort: manifest', () => {
   });
 });
 
-describe('NekoSort: monetization safety', () => {
+describe('NekoSort: monetization gating (single-build, entitlement-gated)', () => {
   const registration = buildSortRegistration(clock);
-  const proExporterIds = ['sort.export.diff', 'sort.export.frequency'];
-  it('no Pro exporter is registered, and each throws "unknown exporter"', () => {
-    const registered = new Set(registration.exporters.map((e) => e.id));
-    const r = registry();
-    for (const id of proExporterIds) {
-      expect(registered.has(id)).toBe(false);
+  // One declared Pro id is built + gated; the other (input/output diff) needs
+  // the pre-transform input the artifact doesn't retain, so it stays
+  // advertising-only.
+  const builtProIds = ['sort.export.frequency'];
+  const advertisingOnlyIds = ['sort.export.diff'];
+
+  it('the built Pro exporter is declared AND registered as a proExporter, not free', () => {
+    const free = new Set(registration.exporters.map((e) => e.id));
+    const pro = new Set((registration.proExporters ?? []).map((e) => e.id));
+    for (const id of builtProIds) {
       expect(sortManifest.exporters).toContain(id);
-      expect(() => runExporter(r, 'sort', id, { artifacts: [], diagnostics: [] })).toThrow(
+      expect(pro.has(id)).toBe(true);
+      expect(free.has(id)).toBe(false);
+    }
+  });
+
+  it('the advertising-only Pro id is declared but registered nowhere (still "unknown exporter")', () => {
+    const free = new Set(registration.exporters.map((e) => e.id));
+    const pro = new Set((registration.proExporters ?? []).map((e) => e.id));
+    const r = registry();
+    for (const id of advertisingOnlyIds) {
+      expect(sortManifest.exporters).toContain(id);
+      expect(free.has(id)).toBe(false);
+      expect(pro.has(id)).toBe(false);
+      expect(() => runExporter(r, 'sort', id, { artifacts: [], diagnostics: [] }, PRO)).toThrow(
         /unknown exporter/,
       );
     }
+  });
+
+  it('a free caller (default entitlement) is refused the built Pro exporter with EntitlementError', () => {
+    const r = registry();
+    const parsed = parse('banana\napple\nbanana\ncherry\napple\nbanana');
+    for (const id of builtProIds) {
+      expect(() => runExporter(r, 'sort', id, parsed)).toThrow(EntitlementError);
+    }
+  });
+
+  it('a Pro entitlement unlocks the frequency exporter', () => {
+    const r = registry();
+    // No unique → output keeps all lines, so frequencies are real multiplicities.
+    const parsed = parse('banana\napple\nbanana\ncherry\napple\nbanana');
+    const csv = String(runExporter(r, 'sort', 'sort.export.frequency', parsed, PRO).body);
+    expect(csv.split('\n')[0]).toBe('count,line');
+    expect(csv).toContain('3,banana'); // most frequent first
+    expect(csv).toContain('2,apple');
+    expect(csv).toContain('1,cherry');
+  });
+
+  it('a truly unknown exporter id still throws "unknown exporter"', () => {
+    expect(() =>
+      runExporter(registry(), 'sort', 'sort.export.nope', { artifacts: [], diagnostics: [] }, PRO),
+    ).toThrow(/unknown exporter/);
   });
 });
 
