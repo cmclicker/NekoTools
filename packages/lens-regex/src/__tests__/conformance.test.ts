@@ -1,5 +1,7 @@
 import { describe, expect, it } from 'vitest';
+import type { Entitlement } from '@nekotools/contracts';
 import {
+  EntitlementError,
   ToolRegistry,
   runExporter,
   runParser,
@@ -16,6 +18,17 @@ import {
 import type { RegexMatchSet, RegexMatchSetArtifact } from '../kinds.js';
 
 const clock = FIXED_CLOCK('2026-05-27T00:00:00.000Z');
+
+const PRO: Entitlement = {
+  version: 1,
+  licenseId: 'TEST',
+  licensee: 'Test User',
+  tier: 'pro',
+  features: ['*'],
+  issuedAt: '2026-01-01T00:00:00.000Z',
+  expiresAt: null,
+  signature: 'test',
+};
 
 function registry(): ToolRegistry {
   const r = new ToolRegistry();
@@ -66,39 +79,66 @@ describe('NekoRegex: manifest', () => {
   });
 });
 
-describe('NekoRegex: monetization safety', () => {
+describe('NekoRegex: monetization gating (single-build, entitlement-gated)', () => {
   const registration = buildRegexRegistration(clock);
-  const proExporterIds = [
-    'regex.export.explain',
-    'regex.export.redaction.recipe',
-    'regex.export.suite',
-    'regex.export.snapshot',
-  ];
+  // Two declared Pro ids are built + gated in this PR; two remain
+  // advertising-only (saved suites / regression snapshots need the
+  // not-yet-built saved-workspace engine — canSaveWorkspace is false).
+  const builtProIds = ['regex.export.explain', 'regex.export.redaction.recipe'];
+  const advertisingOnlyIds = ['regex.export.suite', 'regex.export.snapshot'];
 
-  it('no Pro exporter is registered in the free build', () => {
-    const registered = new Set(registration.exporters.map((e) => e.id));
-    for (const id of proExporterIds) expect(registered.has(id)).toBe(false);
+  it('built Pro exporters are declared AND registered as proExporters, not free', () => {
+    const free = new Set(registration.exporters.map((e) => e.id));
+    const pro = new Set((registration.proExporters ?? []).map((e) => e.id));
+    for (const id of builtProIds) {
+      expect(regexManifest.exporters).toContain(id);
+      expect(pro.has(id)).toBe(true);
+      expect(free.has(id)).toBe(false);
+    }
+  });
+
+  it('advertising-only Pro ids are declared but registered nowhere (still "unknown exporter")', () => {
+    const free = new Set(registration.exporters.map((e) => e.id));
+    const pro = new Set((registration.proExporters ?? []).map((e) => e.id));
+    const r = registry();
+    for (const id of advertisingOnlyIds) {
+      expect(regexManifest.exporters).toContain(id);
+      expect(free.has(id)).toBe(false);
+      expect(pro.has(id)).toBe(false);
+      expect(() => runExporter(r, 'regex', id, { artifacts: [], diagnostics: [] }, PRO)).toThrow(
+        /unknown exporter/,
+      );
+    }
   });
 
   it('no graph projector is registered in the free build', () => {
     expect(registration.graphProjectors ?? []).toHaveLength(0);
   });
 
-  it('runExporter throws "unknown exporter" for every Pro exporter id', () => {
+  it('a free caller (default entitlement) is refused the built Pro exporters with EntitlementError', () => {
     const r = registry();
-    for (const id of proExporterIds) {
-      expect(() => runExporter(r, 'regex', id, { artifacts: [], diagnostics: [] })).toThrow(
-        /unknown exporter/,
-      );
+    const parsed = run('(?<year>\\d{4})-\\d{2}', 'g', '2026-05 and 1999-12');
+    for (const id of builtProIds) {
+      expect(() => runExporter(r, 'regex', id, parsed)).toThrow(EntitlementError);
     }
   });
 
-  it('the manifest declares Pro exporters that are NOT in the registered set', () => {
-    const registered = new Set(registration.exporters.map((e) => e.id));
-    for (const id of proExporterIds) {
-      expect(regexManifest.exporters).toContain(id);
-      expect(registered.has(id)).toBe(false);
-    }
+  it('a Pro entitlement unlocks the explain + redaction-recipe exporters', () => {
+    const r = registry();
+    const parsed = run('(?<year>\\d{4})-\\d{2}', 'g', '2026-05 and 1999-12');
+
+    const explain = String(runExporter(r, 'regex', 'regex.export.explain', parsed, PRO).body);
+    expect(explain).toContain('# NekoRegex pattern explanation');
+    expect(explain).toContain('named capture group "year"');
+    expect(explain).toContain('digit [0-9]');
+
+    const recipe = JSON.parse(
+      String(runExporter(r, 'regex', 'regex.export.redaction.recipe', parsed, PRO).body),
+    ) as { tool?: string; match?: { flags?: string }; replacement?: string; preserveGroups?: string[] };
+    expect(recipe.tool).toBe('regex');
+    expect(recipe.match?.flags).toContain('g'); // forced global for a redaction pass
+    expect(recipe.replacement).toBe('[REDACTED]');
+    expect(recipe.preserveGroups).toContain('year');
   });
 
   it('free entitlements match exactly the implemented Free-slice set', () => {
