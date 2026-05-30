@@ -8,6 +8,7 @@ import {
   type XmlElement,
   type XmlParsedArtifact,
 } from './kinds.js';
+import { toXPathReport, toXsd } from './codegen.js';
 
 const TOOL_ID = 'xml';
 
@@ -181,3 +182,50 @@ export const freeExporters: readonly Exporter<XmlArtifact>[] = [
   prettyExporter,
   markdownSummaryExporter,
 ];
+
+// --- Pro exporters (registered in the binary, gated by entitlement) --------
+//
+// These back the manifest's declared Pro exporter ids (`query.xpath` /
+// `validate.xsd`). Both derive purely from the parsed `xml.parsed` node tree
+// — no network, no DTD/entity resolution, no premium engine. Per the
+// manifest's out-of-scope list, the path report is a STRUCTURAL INVENTORY
+// (not XPath query evaluation) and the XSD is GENERATED from the sample (not
+// validation of the document against an external schema). Generators live in
+// `codegen.ts`.
+
+/** `xml.export.xpath.report` (Pro) — structural inventory of element paths. */
+export const xpathReportExporter: Exporter<XmlArtifact> = {
+  version: 1,
+  id: 'xml.export.xpath.report',
+  toolId: TOOL_ID,
+  target: 'markdown',
+  accepts: XML_PARSED_EXPORT_KINDS,
+  producesMimeType: 'text/markdown',
+  producesExtension: 'md',
+  export({ artifacts }) {
+    const value = pickParsed(artifacts)?.value;
+    const body = value === undefined ? '# NekoXML path inventory\n\n(no document)' : toXPathReport(value);
+    return { mimeType: 'text/markdown', extension: 'md', body };
+  },
+};
+
+/** `xml.export.xsd` (Pro) — an inferred W3C XSD generated from the tree. */
+export const xsdExporter: Exporter<XmlArtifact> = {
+  version: 1,
+  id: 'xml.export.xsd',
+  toolId: TOOL_ID,
+  target: 'plaintext',
+  accepts: XML_PARSED_EXPORT_KINDS,
+  producesMimeType: 'application/xml',
+  producesExtension: 'xsd',
+  export({ artifacts }) {
+    const value = pickParsed(artifacts)?.value;
+    const body =
+      value === undefined
+        ? '<?xml version="1.0" encoding="UTF-8"?>\n<xs:schema xmlns:xs="http://www.w3.org/2001/XMLSchema"/>'
+        : toXsd(value);
+    return { mimeType: 'application/xml', extension: 'xsd', body };
+  },
+};
+
+export const proExporters: readonly Exporter<XmlArtifact>[] = [xpathReportExporter, xsdExporter];
