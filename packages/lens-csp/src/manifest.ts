@@ -7,7 +7,7 @@ import { CSP_KIND_PARSED } from './kinds.js';
  * The NekoCSP manifest. Reading model matches NekoJWT:
  * `entitlements.free` ships (engine + UI); `entitlements.pro` advertises
  * future capabilities; and the two Pro exporter ids (`csp.export.report`,
- * `csp.export.sarif`) are registered in this build but gated behind a valid
+ * `csp.export.hardened`) are registered in this build but gated behind a valid
  * entitlement (monetization-safety tests assert a free caller is refused
  * with EntitlementError). Offline policy is `network-forbidden`.
  */
@@ -26,7 +26,7 @@ export const cspManifest: ToolManifest = {
     'csp.export.markdown.summary',
     // Pro — registered in this build but gated behind a valid entitlement.
     'csp.export.report',
-    'csp.export.sarif',
+    'csp.export.hardened',
   ],
   offlinePolicy: DEFAULT_OFFLINE_POLICY,
   capabilities: {
@@ -53,7 +53,6 @@ export const cspManifest: ToolManifest = {
       'simulate.violations',
       'nonce.audit',
       'export.report',
-      'export.sarif',
       'export.hardened',
       'workspace.snapshots',
     ],

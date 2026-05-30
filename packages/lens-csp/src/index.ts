@@ -15,9 +15,9 @@ export { FIXED_CLOCK } from '@nekotools/lens-kit';
 
 /**
  * Build a NekoCSP registration for the runtime. Free exporters run for
- * everyone; the Pro exporters (posture audit report, SARIF) are registered
- * as `proExporters` and gated by `runExporter` behind a valid entitlement
- * (single-build-gated model, same as NekoJWT).
+ * everyone; the Pro exporters (posture audit report, hardened-policy
+ * generator) are registered as `proExporters` and gated by `runExporter`
+ * behind a valid entitlement (single-build-gated model, same as NekoJWT).
  */
 export function buildCspRegistration(
   clock: Clock = FIXED_CLOCK('1970-01-01T00:00:00.000Z'),

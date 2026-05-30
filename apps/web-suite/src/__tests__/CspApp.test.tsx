@@ -33,7 +33,7 @@ describe('CspApp', () => {
     expect(screen.getByText(/csp\.unsafe_inline/)).toBeInTheDocument();
   });
 
-  it('locks the audit + SARIF Pro views when free', () => {
+  it('locks the audit + hardened Pro views when free', () => {
     render(<CspApp initialInput={"script-src 'unsafe-inline'"} initialUiState={{ viewMode: 'audit' }} />);
     expect(screen.getByTestId('csp-locked')).toBeInTheDocument();
     expect(screen.queryByTestId('csp-output')).not.toBeInTheDocument();
@@ -52,15 +52,21 @@ describe('CspApp', () => {
     expect(out).toContain('csp.unsafe_eval');
   });
 
-  it('renders SARIF 2.1.0 in the sarif view when Pro', () => {
+  it('renders the hardened policy in the hardened view when Pro', () => {
     render(
       <CspApp
-        initialInput={"script-src 'unsafe-inline'"}
-        initialUiState={{ viewMode: 'sarif' }}
+        initialInput={"script-src 'unsafe-inline' 'unsafe-eval'; img-src *"}
+        initialUiState={{ viewMode: 'hardened' }}
         entitlement={PRO}
       />,
     );
-    expect(JSON.parse(screen.getByTestId('csp-output').textContent ?? '{}').version).toBe('2.1.0');
+    const out = screen.getByTestId('csp-output').textContent ?? '';
+    expect(out).toContain('# NekoCSP hardened policy');
+    // Assert on the emitted policy line, not the changelog comment above it
+    // (the changelog legitimately names the tokens it removed).
+    const policy = out.split('\n').filter((l) => l.trim() !== '' && !l.startsWith('#')).at(-1) ?? '';
+    expect(policy).not.toContain("'unsafe-inline'");
+    expect(policy).toContain("default-src 'self'");
   });
 
   it('shows the empty-state for whitespace-only input', () => {

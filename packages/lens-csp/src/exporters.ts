@@ -1,6 +1,6 @@
 import type { Exporter } from '@nekotools/contracts';
 
-import { auditCsp, type CspAuditSeverity } from './audit.js';
+import { auditCsp, hardenCsp, serializeCsp } from './audit.js';
 import {
   CSP_KIND_PARSED,
   CSP_PARSED_EXPORT_KINDS,
@@ -81,13 +81,6 @@ export const freeExporters: readonly Exporter<CspArtifact>[] = [
 
 // --- Pro exporters (registered in the binary, gated by entitlement) --------
 
-const SARIF_LEVEL: Record<CspAuditSeverity, string> = {
-  high: 'error',
-  medium: 'warning',
-  low: 'note',
-  info: 'note',
-};
-
 /**
  * `csp.export.report` (Pro) — a CSP posture audit report: every ruleId-keyed
  * finding (unsafe-inline/eval, wildcards, insecure schemes, data: URIs,
@@ -127,47 +120,35 @@ export const reportExporter: Exporter<CspArtifact> = {
 };
 
 /**
- * `csp.export.sarif` (Pro) — SARIF 2.1.0 of the posture audit so a policy
- * review drops into CI code-scanning. Carries no secret material; the
- * ruleIds match the diagnostic codes shown in the free tier.
+ * `csp.export.hardened` (Pro) — the `suggest.hardened` capability: a stricter
+ * Content-Security-Policy generated from the pasted one (drop unsafe-inline/
+ * eval, collapse wildcards to 'self', upgrade http→https, add the safe
+ * baseline directives) plus a changelog of what changed and why. The body is
+ * the ready-to-paste header; the changelog rides in a leading comment block.
+ * Pure + local — it suggests, it never fetches or evaluates.
  */
-export const sarifExporter: Exporter<CspArtifact> = {
+export const hardenedExporter: Exporter<CspArtifact> = {
   version: 1,
-  id: 'csp.export.sarif',
+  id: 'csp.export.hardened',
   toolId: TOOL_ID,
-  target: 'json',
+  target: 'plaintext',
   accepts: CSP_PARSED_EXPORT_KINDS,
-  producesMimeType: 'application/sarif+json',
-  producesExtension: 'sarif',
+  producesMimeType: 'text/plain',
+  producesExtension: 'txt',
   export({ artifacts }) {
-    const findings = auditCsp(pickParsed(artifacts)?.value);
-    const ruleIds = [...new Set(findings.map((f) => f.ruleId))];
-    const sarif = {
-      version: '2.1.0',
-      $schema: 'https://json.schemastore.org/sarif-2.1.0.json',
-      runs: [
-        {
-          tool: {
-            driver: {
-              name: 'NekoCSP',
-              informationUri: 'https://nekotools.local',
-              rules: ruleIds.map((id) => ({ id })),
-            },
-          },
-          results: findings.map((f) => ({
-            ruleId: f.ruleId,
-            level: SARIF_LEVEL[f.severity],
-            message: { text: f.directive ? `[${f.directive}] ${f.detail}` : f.detail },
-          })),
-        },
-      ],
-    };
-    return {
-      mimeType: 'application/sarif+json',
-      extension: 'sarif',
-      body: JSON.stringify(sarif, null, 2),
-    };
+    const report = pickParsed(artifacts)?.value;
+    const { directives, changes } = hardenCsp(report);
+    const header = serializeCsp(directives);
+    const lines: string[] = [];
+    lines.push('# NekoCSP hardened policy');
+    if (changes.length > 0) {
+      for (const c of changes) lines.push(`#  - [${c.directive}] ${c.detail}`);
+    } else {
+      lines.push('#  (already hardened — no changes)');
+    }
+    lines.push('', header);
+    return { mimeType: 'text/plain', extension: 'txt', body: lines.join('\n') };
   },
 };
 
-export const proExporters: readonly Exporter<CspArtifact>[] = [reportExporter, sarifExporter];
+export const proExporters: readonly Exporter<CspArtifact>[] = [reportExporter, hardenedExporter];

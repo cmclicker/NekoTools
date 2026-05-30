@@ -72,7 +72,7 @@ describe('NekoCSP: manifest', () => {
 });
 
 describe('NekoCSP: monetization gating (single-build, entitlement-gated)', () => {
-  const proExporterIds = ['csp.export.report', 'csp.export.sarif'];
+  const proExporterIds = ['csp.export.report', 'csp.export.hardened'];
 
   it('Pro exporters are declared AND registered as proExporters, not free', () => {
     const reg = buildCspRegistration(clock);
@@ -84,9 +84,10 @@ describe('NekoCSP: monetization gating (single-build, entitlement-gated)', () =>
     }
   });
 
-  it('does not advertise the future hardened-policy generator as a registered exporter', () => {
-    expect(cspManifest.exporters).not.toContain('csp.export.hardened');
+  it('declares the matching pro entitlement features', () => {
+    expect(cspManifest.entitlements.pro).toContain('export.report');
     expect(cspManifest.entitlements.pro).toContain('export.hardened');
+    expect(cspManifest.entitlements.pro).toContain('suggest.hardened');
   });
 
   it('a free caller (default entitlement) is refused with EntitlementError', () => {
@@ -97,7 +98,7 @@ describe('NekoCSP: monetization gating (single-build, entitlement-gated)', () =>
     }
   });
 
-  it('a Pro entitlement unlocks the audit report + SARIF exporters', () => {
+  it('a Pro entitlement unlocks the posture report + hardened-policy exporters', () => {
     const r = registry();
     const parsed = parse("script-src 'unsafe-inline' 'unsafe-eval'; img-src *");
 
@@ -105,13 +106,16 @@ describe('NekoCSP: monetization gating (single-build, entitlement-gated)', () =>
     expect(report).toContain('# NekoCSP posture audit');
     expect(report).toContain('csp.unsafe_inline');
 
-    const sarifResult = runExporter(r, 'csp', 'csp.export.sarif', parsed, PRO);
-    expect(sarifResult.mimeType).toBe('application/sarif+json');
-    expect(sarifResult.extension).toBe('sarif');
-    const sarif = JSON.parse(String(sarifResult.body));
-    expect(sarif.version).toBe('2.1.0');
-    expect(sarif.runs[0].tool.driver.name).toBe('NekoCSP');
-    expect(sarif.runs[0].results.some((x: { ruleId: string }) => x.ruleId === 'csp.unsafe_eval')).toBe(true);
+    const hardened = String(runExporter(r, 'csp', 'csp.export.hardened', parsed, PRO).body);
+    expect(hardened).toContain('# NekoCSP hardened policy');
+    // The emitted policy is the last non-comment line; the comment block above
+    // it is the changelog (which legitimately names the removed tokens).
+    const policy = hardened.split('\n').filter((l) => l.trim() !== '' && !l.startsWith('#')).at(-1) ?? '';
+    expect(policy).not.toContain("'unsafe-inline'");
+    expect(policy).not.toContain("'unsafe-eval'");
+    expect(policy).not.toContain('*');
+    expect(policy).toContain("default-src 'self'");
+    expect(policy).toContain("object-src 'none'");
   });
 
   it('a truly unknown exporter id still throws "unknown exporter"', () => {

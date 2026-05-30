@@ -12,9 +12,10 @@ import type { Diagnostic, Entitlement } from '@nekotools/contracts';
  * NekoCSP UI parse helper, extracted out of CspApp for testability — the
  * same engine-adapter seam the other tools provide. Output strings come
  * from the real engine exporters (not re-derived in the UI), so the tab
- * can't drift from the engine. The Pro audit + SARIF exporters are gated:
- * `runExporter` throws `EntitlementError` for a free caller, surfaced here
- * as `null` so the UI shows the Pro-lock. Pure-local; no network, ever.
+ * can't drift from the engine. The Pro posture-report + hardened-policy
+ * exporters are gated: `runExporter` throws `EntitlementError` for a free
+ * caller, surfaced here as `null` so the UI shows the Pro-lock. Pure-local;
+ * no network, ever.
  */
 
 const registry = (() => {
@@ -30,16 +31,16 @@ export interface ParsedCsp {
   readonly jsonOutput: string;
   /** Pro: CSP posture audit report (markdown), or null when not entitled. */
   readonly auditReport: string | null;
-  /** Pro: SARIF 2.1.0 of the posture audit, or null when not entitled. */
-  readonly sarif: string | null;
+  /** Pro: hardened-policy suggestion (header + changelog), or null when not entitled. */
+  readonly hardened: string | null;
   readonly proUnlocked: boolean;
   readonly diagnostics: readonly Diagnostic[];
 }
 
 /**
  * Run `csp.text` over raw policy input and render the engine's exporters.
- * The free `jsonOutput` always renders; `auditReport` / `sarif` render only
- * for a Pro entitlement (otherwise `null`).
+ * The free `jsonOutput` always renders; `auditReport` / `hardened` render
+ * only for a Pro entitlement (otherwise `null`).
  */
 export function parseCspText(raw: string, entitlement: Entitlement = FREE_ENTITLEMENT): ParsedCsp {
   const result = runParser(registry, 'csp', 'csp.text', {
@@ -68,7 +69,7 @@ export function parseCspText(raw: string, entitlement: Entitlement = FREE_ENTITL
     document: artifact?.value ?? null,
     jsonOutput: run('csp.export.json'),
     auditReport: runPro('csp.export.report'),
-    sarif: runPro('csp.export.sarif'),
+    hardened: runPro('csp.export.hardened'),
     proUnlocked: entitlement.tier !== 'free',
     diagnostics: result.diagnostics,
   };
