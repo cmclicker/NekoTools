@@ -1,5 +1,6 @@
 import type { Exporter } from '@nekotools/contracts';
 
+import { auditLicense, type LicenseAuditSeverity } from './audit.js';
 import {
   LICENSE_KIND_PARSED,
   LICENSE_PARSED_EXPORT_KINDS,
@@ -81,4 +82,98 @@ export const freeExporters: readonly Exporter<LicenseArtifact>[] = [
   jsonExporter,
   normalizedExporter,
   markdownSummaryExporter,
+];
+
+// --- Pro exporters (registered in the binary, gated by entitlement) --------
+
+const SARIF_LEVEL: Record<LicenseAuditSeverity, string> = {
+  high: 'error',
+  medium: 'warning',
+  low: 'note',
+  info: 'note',
+};
+
+/**
+ * `license.export.audit.report` (Pro) — an obligations & risk report for the
+ * detected license: copyleft / network-copyleft risk, source-disclosure and
+ * same-license obligations, and detection-quality signals, each ruleId-keyed
+ * with a severity. Pure + local; informational, not legal advice.
+ */
+export const auditReportExporter: Exporter<LicenseArtifact> = {
+  version: 1,
+  id: 'license.export.audit.report',
+  toolId: TOOL_ID,
+  target: 'markdown',
+  accepts: LICENSE_PARSED_EXPORT_KINDS,
+  producesMimeType: 'text/markdown',
+  producesExtension: 'md',
+  export({ artifacts }) {
+    const value = pickParsed(artifacts)?.value;
+    const findings = auditLicense(value);
+    const counts = { high: 0, medium: 0, low: 0, info: 0 };
+    for (const f of findings) counts[f.severity] += 1;
+
+    const lines: string[] = ['# NekoLicense obligations & risk audit', ''];
+    lines.push(
+      `- license: ${value?.primary ?? '(unknown)'}${value?.spdxTag ? ` (SPDX tag: ${value.spdxTag})` : ''}`,
+      `- findings: ${findings.length} (high: ${counts.high}, medium: ${counts.medium}, low: ${counts.low}, info: ${counts.info})`,
+      '',
+    );
+    if (findings.length > 0) {
+      lines.push('| severity | rule | detail |', '| --- | --- | --- |');
+      for (const f of findings) lines.push(`| ${f.severity} | \`${f.ruleId}\` | ${f.detail} |`);
+    } else {
+      lines.push('No copyleft obligations or detection issues — low-risk for typical commercial use.');
+    }
+    return { mimeType: 'text/markdown', extension: 'md', body: lines.join('\n') };
+  },
+};
+
+/**
+ * `license.export.sarif` (Pro) — SARIF 2.1.0 of the obligations & risk audit
+ * so a LICENSE review drops into CI code-scanning (gate copyleft / AGPL in a
+ * commercial codebase). Carries no secret material.
+ */
+export const sarifExporter: Exporter<LicenseArtifact> = {
+  version: 1,
+  id: 'license.export.sarif',
+  toolId: TOOL_ID,
+  target: 'json',
+  accepts: LICENSE_PARSED_EXPORT_KINDS,
+  producesMimeType: 'application/sarif+json',
+  producesExtension: 'sarif',
+  export({ artifacts }) {
+    const findings = auditLicense(pickParsed(artifacts)?.value);
+    const ruleIds = [...new Set(findings.map((f) => f.ruleId))];
+    const sarif = {
+      version: '2.1.0',
+      $schema: 'https://json.schemastore.org/sarif-2.1.0.json',
+      runs: [
+        {
+          tool: {
+            driver: {
+              name: 'NekoLicense',
+              informationUri: 'https://nekotools.local',
+              rules: ruleIds.map((id) => ({ id })),
+            },
+          },
+          results: findings.map((f) => ({
+            ruleId: f.ruleId,
+            level: SARIF_LEVEL[f.severity],
+            message: { text: f.detail },
+          })),
+        },
+      ],
+    };
+    return {
+      mimeType: 'application/sarif+json',
+      extension: 'sarif',
+      body: JSON.stringify(sarif, null, 2),
+    };
+  },
+};
+
+export const proExporters: readonly Exporter<LicenseArtifact>[] = [
+  auditReportExporter,
+  sarifExporter,
 ];

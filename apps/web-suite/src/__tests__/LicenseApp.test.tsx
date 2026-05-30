@@ -4,6 +4,18 @@ import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { LicenseApp } from '../LicenseApp.js';
 
 const MIT = 'MIT License\n\nPermission is hereby granted, free of charge, to any person obtaining a copy...';
+const GPL3 = 'GNU GENERAL PUBLIC LICENSE\nVersion 3, 29 June 2007';
+
+const PRO = {
+  version: 1 as const,
+  licenseId: 'X',
+  licensee: 'Buyer',
+  tier: 'pro' as const,
+  features: ['*'],
+  issuedAt: '2026-01-01T00:00:00.000Z',
+  expiresAt: null,
+  signature: 's',
+};
 
 describe('LicenseApp', () => {
   it('detects MIT and shows its category', () => {
@@ -40,5 +52,27 @@ describe('LicenseApp', () => {
     fireEvent.click(screen.getByTestId('license-copy-output'));
     await waitFor(() => expect(writes).toHaveLength(1));
     expect(JSON.parse(writes[0] ?? '{}').primary).toBe('MIT');
+  });
+
+  it('locks the audit + SARIF Pro views when free', () => {
+    render(<LicenseApp initialInput={MIT} initialUiState={{ viewMode: 'audit' }} />);
+    expect(screen.getByTestId('license-locked')).toBeInTheDocument();
+    expect(screen.queryByTestId('license-output')).not.toBeInTheDocument();
+  });
+
+  it('unlocks the obligations audit via an injected Pro entitlement', () => {
+    render(
+      <LicenseApp initialInput={GPL3} initialUiState={{ viewMode: 'audit' }} entitlement={PRO} />,
+    );
+    const out = screen.getByTestId('license-output').textContent ?? '';
+    expect(out).toContain('# NekoLicense obligations & risk audit');
+    expect(out).toContain('license.copyleft');
+  });
+
+  it('renders SARIF 2.1.0 in the SARIF view when Pro', () => {
+    render(<LicenseApp initialInput={MIT} initialUiState={{ viewMode: 'sarif' }} entitlement={PRO} />);
+    expect(JSON.parse(screen.getByTestId('license-output').textContent ?? '{}').version).toBe(
+      '2.1.0',
+    );
   });
 });

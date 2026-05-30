@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
-import type { Artifact, Workspace } from '@nekotools/contracts';
+import type { Artifact, Entitlement, Workspace } from '@nekotools/contracts';
 import {
+  EntitlementError,
   ToolRegistry,
   jsonWorkspaceSerializer,
   runExporter,
@@ -9,8 +10,25 @@ import {
 } from '@nekotools/tool-runtime';
 import { validate } from '@nekotools/schemas';
 
-import { FIXED_CLOCK, buildLicenseRegistration, detectLicense, licenseManifest } from '../index.js';
+import {
+  FIXED_CLOCK,
+  auditLicense,
+  buildLicenseRegistration,
+  detectLicense,
+  licenseManifest,
+} from '../index.js';
 import type { LicenseParsedArtifact } from '../kinds.js';
+
+const PRO: Entitlement = {
+  version: 1,
+  licenseId: 'TEST',
+  licensee: 'Test User',
+  tier: 'pro',
+  features: ['*'],
+  issuedAt: '2026-01-01T00:00:00.000Z',
+  expiresAt: null,
+  signature: 'test',
+};
 
 const clock = FIXED_CLOCK('2026-05-28T00:00:00.000Z');
 
@@ -61,19 +79,96 @@ describe('NekoLicense: manifest', () => {
   });
 });
 
-describe('NekoLicense: monetization safety', () => {
-  const registration = buildLicenseRegistration(clock);
-  const proExporterIds = ['license.export.compatibility', 'license.export.notice'];
-  it('no Pro exporter is registered, and each throws "unknown exporter"', () => {
-    const registered = new Set(registration.exporters.map((e) => e.id));
-    const r = registry();
+describe('NekoLicense: monetization gating (single-build, entitlement-gated)', () => {
+  const proExporterIds = ['license.export.audit.report', 'license.export.sarif'];
+
+  it('Pro exporters are declared AND registered as proExporters, not free', () => {
+    const reg = buildLicenseRegistration(clock);
+    const proIds = new Set((reg.proExporters ?? []).map((e) => e.id));
     for (const id of proExporterIds) {
-      expect(registered.has(id)).toBe(false);
       expect(licenseManifest.exporters).toContain(id);
-      expect(() => runExporter(r, 'license', id, { artifacts: [], diagnostics: [] })).toThrow(
-        /unknown exporter/,
-      );
+      expect(proIds.has(id)).toBe(true);
+      expect(reg.exporters.some((e) => e.id === id)).toBe(false);
     }
+  });
+
+  it('does not register the future compatibility/notice generators as exporters', () => {
+    expect(licenseManifest.exporters).not.toContain('license.export.compatibility');
+    expect(licenseManifest.exporters).not.toContain('license.export.notice');
+    expect(licenseManifest.entitlements.pro).toContain('export.compatibility');
+    expect(licenseManifest.entitlements.pro).toContain('export.notice');
+  });
+
+  it('a free caller (default entitlement) is refused with EntitlementError', () => {
+    const r = registry();
+    const parsed = parse(GPL3);
+    for (const id of proExporterIds) {
+      expect(() => runExporter(r, 'license', id, parsed)).toThrow(EntitlementError);
+    }
+  });
+
+  it('a Pro entitlement unlocks the obligations audit + SARIF exporters', () => {
+    const r = registry();
+    const parsed = parse(GPL3);
+
+    const auditReport = String(
+      runExporter(r, 'license', 'license.export.audit.report', parsed, PRO).body,
+    );
+    expect(auditReport).toContain('# NekoLicense obligations & risk audit');
+    expect(auditReport).toContain('license.copyleft');
+
+    const sarifResult = runExporter(r, 'license', 'license.export.sarif', parsed, PRO);
+    expect(sarifResult.mimeType).toBe('application/sarif+json');
+    expect(sarifResult.extension).toBe('sarif');
+    const sarif = JSON.parse(String(sarifResult.body));
+    expect(sarif.version).toBe('2.1.0');
+    expect(sarif.runs[0].tool.driver.name).toBe('NekoLicense');
+    expect(sarif.runs[0].results.some((x: { ruleId: string }) => x.ruleId === 'license.copyleft')).toBe(true);
+  });
+
+  it('a truly unknown exporter id still throws "unknown exporter"', () => {
+    expect(() =>
+      runExporter(registry(), 'license', 'license.export.nope', { artifacts: [], diagnostics: [] }, PRO),
+    ).toThrow(/unknown exporter/);
+  });
+});
+
+describe('NekoLicense: obligations & risk audit', () => {
+  const audit = (raw: string) => auditLicense(report(raw));
+
+  it('ranks a strong copyleft license (GPL-3.0) as high and adds its obligations', () => {
+    const findings = audit(GPL3);
+    expect(findings.find((f) => f.ruleId === 'license.copyleft')?.severity).toBe('high');
+    const ids = findings.map((f) => f.ruleId);
+    expect(ids).toContain('license.disclose_source');
+    expect(ids).toContain('license.same_license');
+  });
+
+  it('treats a permissive license (MIT) as clean (no findings)', () => {
+    expect(audit(MIT)).toEqual([]);
+  });
+
+  it('flags a weak-copyleft license (MPL-2.0) as medium', () => {
+    const findings = auditLicense(
+      report('Mozilla Public License Version 2.0\n\n1. Definitions'),
+    );
+    expect(findings.find((f) => f.ruleId === 'license.weak_copyleft')?.severity).toBe('medium');
+  });
+
+  it('flags an unidentified license for manual review', () => {
+    expect(audit('this is just some random text, not a license').map((f) => f.ruleId)).toContain(
+      'license.unknown',
+    );
+  });
+
+  it('flags an SPDX tag that disagrees with the detected text', () => {
+    expect(audit(`SPDX-License-Identifier: GPL-3.0\n${MIT}`).map((f) => f.ruleId)).toContain(
+      'license.tag_mismatch',
+    );
+  });
+
+  it('returns nothing for an absent report', () => {
+    expect(auditLicense(undefined)).toEqual([]);
   });
 });
 
