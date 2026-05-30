@@ -1,6 +1,6 @@
 import type { Exporter } from '@nekotools/contracts';
 
-import { auditGitignore, type GitignoreAuditSeverity } from './audit.js';
+import { compileRule } from './gitignore.js';
 import {
   GITIGNORE_KIND_PARSED,
   GITIGNORE_PARSED_EXPORT_KINDS,
@@ -91,96 +91,84 @@ export const freeExporters: readonly Exporter<GitignoreArtifact>[] = [
 
 // --- Pro exporters (registered in the binary, gated by entitlement) --------
 
-const SARIF_LEVEL: Record<GitignoreAuditSeverity, string> = {
-  high: 'error',
-  medium: 'warning',
-  low: 'note',
-  info: 'note',
-};
+/** Canonical re-serialization of a single pattern rule (matches `normalized`). */
+function canonicalPattern(rule: { negated: boolean; anchored: boolean; dirOnly: boolean; pattern: string }): string {
+  const anchorSlash = rule.anchored && !rule.pattern.includes('/') ? '/' : '';
+  return `${rule.negated ? '!' : ''}${anchorSlash}${rule.pattern}${rule.dirOnly ? '/' : ''}`;
+}
 
 /**
- * `gitignore.export.audit.report` (Pro) — a secret-leak coverage & hygiene
- * report: every ruleId-keyed finding (uncovered secret/credential paths,
- * uncovered junk artifacts, duplicate patterns) with its severity. Pure +
- * local.
+ * `gitignore.export.regex` (Pro) — the `explain.match` capability: each
+ * pattern rule paired with the exact RegExp it compiles to (the engine's real
+ * matcher), so a reviewer can see precisely what a rule matches. JSON array of
+ * `{ lineNo, pattern, negated, dirOnly, anchored, regex }`. Pure + local.
  */
-export const auditReportExporter: Exporter<GitignoreArtifact> = {
+export const regexExporter: Exporter<GitignoreArtifact> = {
   version: 1,
-  id: 'gitignore.export.audit.report',
+  id: 'gitignore.export.regex',
   toolId: TOOL_ID,
-  target: 'markdown',
+  target: 'json',
   accepts: GITIGNORE_PARSED_EXPORT_KINDS,
-  producesMimeType: 'text/markdown',
-  producesExtension: 'md',
+  producesMimeType: 'application/json',
+  producesExtension: 'json',
   export({ artifacts }) {
-    const report = pickParsed(artifacts)?.value;
-    const findings = auditGitignore(report);
-    const counts = { high: 0, medium: 0, low: 0, info: 0 };
-    for (const f of findings) counts[f.severity] += 1;
-
-    const lines: string[] = ['# NekoGitignore secret-coverage audit', ''];
-    lines.push(
-      `- patterns: ${report?.patternCount ?? 0}`,
-      `- findings: ${findings.length} (high: ${counts.high}, medium: ${counts.medium}, low: ${counts.low}, info: ${counts.info})`,
-      '',
-    );
-    if (findings.length > 0) {
-      lines.push('| severity | rule | target | detail |', '| --- | --- | --- | --- |');
-      for (const f of findings) {
-        lines.push(`| ${f.severity} | \`${f.ruleId}\` | ${f.target ? `\`${f.target}\`` : '—'} | ${f.detail} |`);
-      }
-    } else {
-      lines.push('No coverage gaps or hygiene issues detected.');
-    }
-    return { mimeType: 'text/markdown', extension: 'md', body: lines.join('\n') };
+    const rules = pickParsed(artifacts)?.value.rules ?? [];
+    const out = rules
+      .map((rule) => {
+        const compiled = compileRule(rule);
+        if (compiled === null || rule.pattern === null) return null;
+        return {
+          lineNo: rule.lineNo,
+          pattern: rule.pattern,
+          negated: rule.negated,
+          dirOnly: rule.dirOnly,
+          anchored: rule.anchored,
+          regex: compiled.regex.source,
+        };
+      })
+      .filter((x): x is NonNullable<typeof x> => x !== null);
+    return { mimeType: 'application/json', extension: 'json', body: JSON.stringify(out, null, 2) };
   },
 };
 
 /**
- * `gitignore.export.sarif` (Pro) — SARIF 2.1.0 of the coverage audit so a
- * .gitignore review drops into CI code-scanning (gate that secret paths are
- * ignored). Carries no secret material.
+ * `gitignore.export.merged` (Pro) — the `merge.files` / `redundancy.analyze`
+ * capability: a single canonical .gitignore with exact-duplicate patterns
+ * collapsed (first occurrence wins; order preserved because negation order is
+ * significant) and comments/blanks stripped. A leading comment notes how many
+ * duplicates were removed. Pure + local.
  */
-export const sarifExporter: Exporter<GitignoreArtifact> = {
+export const mergedExporter: Exporter<GitignoreArtifact> = {
   version: 1,
-  id: 'gitignore.export.sarif',
+  id: 'gitignore.export.merged',
   toolId: TOOL_ID,
-  target: 'json',
+  target: 'plaintext',
   accepts: GITIGNORE_PARSED_EXPORT_KINDS,
-  producesMimeType: 'application/sarif+json',
-  producesExtension: 'sarif',
+  producesMimeType: 'text/plain',
+  producesExtension: 'txt',
   export({ artifacts }) {
-    const findings = auditGitignore(pickParsed(artifacts)?.value);
-    const ruleIds = [...new Set(findings.map((f) => f.ruleId))];
-    const sarif = {
-      version: '2.1.0',
-      $schema: 'https://json.schemastore.org/sarif-2.1.0.json',
-      runs: [
-        {
-          tool: {
-            driver: {
-              name: 'NekoGitignore',
-              informationUri: 'https://nekotools.local',
-              rules: ruleIds.map((id) => ({ id })),
-            },
-          },
-          results: findings.map((f) => ({
-            ruleId: f.ruleId,
-            level: SARIF_LEVEL[f.severity],
-            message: { text: f.target ? `[${f.target}] ${f.detail}` : f.detail },
-          })),
-        },
-      ],
-    };
-    return {
-      mimeType: 'application/sarif+json',
-      extension: 'sarif',
-      body: JSON.stringify(sarif, null, 2),
-    };
+    const rules = pickParsed(artifacts)?.value.rules ?? [];
+    const seen = new Set<string>();
+    const merged: string[] = [];
+    let removed = 0;
+    for (const rule of rules) {
+      if (rule.pattern === null) continue;
+      const canonical = canonicalPattern({ ...rule, pattern: rule.pattern });
+      if (seen.has(canonical)) {
+        removed += 1;
+        continue;
+      }
+      seen.add(canonical);
+      merged.push(canonical);
+    }
+    const header = `# NekoGitignore merged — ${merged.length} unique pattern(s)${
+      removed > 0 ? `, ${removed} duplicate(s) removed` : ''
+    }`;
+    return { mimeType: 'text/plain', extension: 'txt', body: [header, '', ...merged].join('\n') };
   },
 };
 
 export const proExporters: readonly Exporter<GitignoreArtifact>[] = [
-  auditReportExporter,
-  sarifExporter,
+  regexExporter,
+  mergedExporter,
 ];
