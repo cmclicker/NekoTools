@@ -8,6 +8,7 @@ import {
   type CaseParsedArtifact,
   type CaseReport,
 } from './kinds.js';
+import { toCsv, toSingleForm } from './codegen.js';
 
 const TOOL_ID = 'case';
 
@@ -74,3 +75,43 @@ export const freeExporters: readonly Exporter<CaseArtifact>[] = [
   normalizedExporter,
   markdownSummaryExporter,
 ];
+
+// --- Pro exporters (registered in the binary, gated by entitlement) --------
+//
+// These back the manifest's declared Pro exporter ids (`export.csv` /
+// `export.single-form`). Both are pure projections of the parsed case forms
+// — no network, no premium engine. Generators live in `codegen.ts`. The
+// custom-acronym, transliteration, and batch-rename Pro features stay
+// advertising-only.
+
+/** `case.export.csv` (Pro) — input + every case form as a CSV grid. */
+export const csvExporter: Exporter<CaseArtifact> = {
+  version: 1,
+  id: 'case.export.csv',
+  toolId: TOOL_ID,
+  target: 'csv',
+  accepts: CASE_PARSED_EXPORT_KINDS,
+  producesMimeType: 'text/csv',
+  producesExtension: 'csv',
+  export({ artifacts }) {
+    const value = pickParsed(artifacts)?.value ?? { count: 0, entries: [] };
+    return { mimeType: 'text/csv', extension: 'csv', body: toCsv(value) };
+  },
+};
+
+/** `case.export.single-form` (Pro) — one chosen case form, one per line. */
+export const singleFormExporter: Exporter<CaseArtifact> = {
+  version: 1,
+  id: 'case.export.single-form',
+  toolId: TOOL_ID,
+  target: 'plaintext',
+  accepts: CASE_PARSED_EXPORT_KINDS,
+  producesMimeType: 'text/plain',
+  producesExtension: 'txt',
+  export({ artifacts }) {
+    const value = pickParsed(artifacts)?.value ?? { count: 0, entries: [] };
+    return { mimeType: 'text/plain', extension: 'txt', body: toSingleForm(value) };
+  },
+};
+
+export const proExporters: readonly Exporter<CaseArtifact>[] = [csvExporter, singleFormExporter];

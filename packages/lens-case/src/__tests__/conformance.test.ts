@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
-import type { Artifact, Workspace } from '@nekotools/contracts';
+import type { Artifact, Entitlement, Workspace } from '@nekotools/contracts';
 import {
+  EntitlementError,
   ToolRegistry,
   jsonWorkspaceSerializer,
   runExporter,
@@ -13,6 +14,17 @@ import { FIXED_CLOCK, buildCaseRegistration, caseManifest, tokenize, transformCa
 import type { CaseParsedArtifact } from '../kinds.js';
 
 const clock = FIXED_CLOCK('2026-05-28T00:00:00.000Z');
+
+const PRO: Entitlement = {
+  version: 1,
+  licenseId: 'TEST',
+  licensee: 'Test User',
+  tier: 'pro',
+  features: ['*'],
+  issuedAt: '2026-01-01T00:00:00.000Z',
+  expiresAt: null,
+  signature: 'test',
+};
 
 function registry(): ToolRegistry {
   const r = new ToolRegistry();
@@ -55,19 +67,46 @@ describe('NekoCase: manifest', () => {
   });
 });
 
-describe('NekoCase: monetization safety', () => {
+describe('NekoCase: monetization gating (single-build, entitlement-gated)', () => {
   const registration = buildCaseRegistration(clock);
   const proExporterIds = ['case.export.csv', 'case.export.single-form'];
-  it('no Pro exporter is registered, and each throws "unknown exporter"', () => {
-    const registered = new Set(registration.exporters.map((e) => e.id));
-    const r = registry();
+
+  it('Pro exporters are declared AND registered as proExporters, not free', () => {
+    const free = new Set(registration.exporters.map((e) => e.id));
+    const pro = new Set((registration.proExporters ?? []).map((e) => e.id));
     for (const id of proExporterIds) {
-      expect(registered.has(id)).toBe(false);
       expect(caseManifest.exporters).toContain(id);
-      expect(() => runExporter(r, 'case', id, { artifacts: [], diagnostics: [] })).toThrow(
-        /unknown exporter/,
-      );
+      expect(pro.has(id)).toBe(true);
+      expect(free.has(id)).toBe(false);
     }
+  });
+
+  it('a free caller (default entitlement) is refused with EntitlementError', () => {
+    const r = registry();
+    const parsed = parse('Hello World\nfooBar');
+    for (const id of proExporterIds) {
+      expect(() => runExporter(r, 'case', id, parsed)).toThrow(EntitlementError);
+    }
+  });
+
+  it('a Pro entitlement unlocks the CSV + single-form exporters', () => {
+    const r = registry();
+    const parsed = parse('Hello World\nfooBar');
+
+    const csv = String(runExporter(r, 'case', 'case.export.csv', parsed, PRO).body);
+    expect(csv.split('\n')[0]).toContain('input,');
+    expect(csv.split('\n')[0]).toContain('camel');
+    expect(csv).toContain('Hello World,');
+
+    const single = String(runExporter(r, 'case', 'case.export.single-form', parsed, PRO).body);
+    // Default single form is camelCase: "Hello World" → "helloWorld".
+    expect(single.split('\n')[0]).toBe('helloWorld');
+  });
+
+  it('a truly unknown exporter id still throws "unknown exporter"', () => {
+    expect(() =>
+      runExporter(registry(), 'case', 'case.export.nope', { artifacts: [], diagnostics: [] }, PRO),
+    ).toThrow(/unknown exporter/);
   });
 });
 
