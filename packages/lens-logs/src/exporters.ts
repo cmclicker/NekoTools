@@ -4,13 +4,16 @@ import {
   LOG_ENTRY_EXPORT_KINDS,
   LOG_KIND_DOCUMENT,
   LOG_KIND_FILTER_RESULT,
+  LOG_KIND_HISTOGRAM,
   LOG_KIND_SUMMARY,
   LOG_LEVELS,
   LOG_SUMMARY_EXPORT_KINDS,
   type LogArtifact,
   type LogEntry,
+  type LogHistogram,
   type LogSummary,
 } from './kinds.js';
+import { toHistogramSvg, toIncidentReport, toPatternClusters } from './codegen.js';
 
 const TOOL_ID = 'logs';
 
@@ -164,4 +167,96 @@ export const freeExporters: readonly Exporter<LogArtifact>[] = [
   jsonEntriesExporter,
   csvEntriesExporter,
   markdownSummaryExporter,
+];
+
+// --- Pro exporters (registered in the binary, gated by entitlement) --------
+//
+// These back the manifest's declared Pro exporter ids (`report.incident` /
+// `histogram.advanced` / `pattern.cluster`). Each is a pure derivation of
+// artifacts the FREE `log.text` run already produces (log.summary,
+// log.histogram, entries on log.document / log.filter-result) — no network,
+// no premium analytics engine. They are honest structural renders, not
+// statistical anomaly detection / ML clustering (those stay advertising-only).
+// Generators live in `codegen.ts`. The log.graph.trace projector remains
+// advertising-only (not registered).
+
+const LOG_INCIDENT_EXPORT_KINDS = [LOG_KIND_SUMMARY, LOG_KIND_DOCUMENT] as const;
+const LOG_HISTOGRAM_EXPORT_KINDS = [LOG_KIND_HISTOGRAM] as const;
+
+/** `log.export.report.incident` (Pro) — markdown incident report. */
+export const incidentReportExporter: Exporter<LogArtifact> = {
+  version: 1,
+  id: 'log.export.report.incident',
+  toolId: TOOL_ID,
+  target: 'markdown',
+  accepts: LOG_INCIDENT_EXPORT_KINDS,
+  producesMimeType: 'text/markdown',
+  producesExtension: 'md',
+  export({ artifacts }) {
+    const summary = artifacts.find(
+      (a): a is LogArtifact & { value: LogSummary } => a.kind === LOG_KIND_SUMMARY,
+    )?.value;
+    const entries = pickEntries(artifacts);
+    const effective: LogSummary =
+      summary ?? {
+        documentArtifactId: '',
+        total: entries.length,
+        byLevel: countLevels(entries),
+        timeRange: { startMs: null, endMs: null },
+        unparseableCount: 0,
+        topMessages: [],
+      };
+    return { mimeType: 'text/markdown', extension: 'md', body: toIncidentReport(effective, entries) };
+  },
+};
+
+/** `log.export.histogram.svg` (Pro) — stacked-bar SVG of the histogram matrix. */
+export const histogramSvgExporter: Exporter<LogArtifact> = {
+  version: 1,
+  id: 'log.export.histogram.svg',
+  toolId: TOOL_ID,
+  target: 'plaintext',
+  accepts: LOG_HISTOGRAM_EXPORT_KINDS,
+  producesMimeType: 'image/svg+xml',
+  producesExtension: 'svg',
+  export({ artifacts }) {
+    const hist = artifacts.find(
+      (a): a is LogArtifact & { value: LogHistogram } => a.kind === LOG_KIND_HISTOGRAM,
+    )?.value;
+    const body =
+      hist === undefined
+        ? '<svg xmlns="http://www.w3.org/2000/svg" width="0" height="0"/>'
+        : toHistogramSvg(hist);
+    return { mimeType: 'image/svg+xml', extension: 'svg', body };
+  },
+};
+
+/** `log.export.patterns.clusters` (Pro) — message clustering by template. */
+export const patternClustersExporter: Exporter<LogArtifact> = {
+  version: 1,
+  id: 'log.export.patterns.clusters',
+  toolId: TOOL_ID,
+  target: 'markdown',
+  accepts: LOG_ENTRY_EXPORT_KINDS,
+  producesMimeType: 'text/markdown',
+  producesExtension: 'md',
+  export({ artifacts }) {
+    return { mimeType: 'text/markdown', extension: 'md', body: toPatternClusters(pickEntries(artifacts)) };
+  },
+};
+
+/** Level counts over a bare entry list (incident fallback when no summary). */
+function countLevels(entries: readonly LogEntry[]): Record<string, number> {
+  const counts: Record<string, number> = {};
+  for (const e of entries) {
+    const key = e.level ?? 'none';
+    counts[key] = (counts[key] ?? 0) + 1;
+  }
+  return counts;
+}
+
+export const proExporters: readonly Exporter<LogArtifact>[] = [
+  incidentReportExporter,
+  histogramSvgExporter,
+  patternClustersExporter,
 ];

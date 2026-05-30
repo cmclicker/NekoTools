@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
-import type { Workspace } from '@nekotools/contracts';
+import type { Entitlement, Workspace } from '@nekotools/contracts';
 import {
+  EntitlementError,
   ToolRegistry,
   jsonWorkspaceSerializer,
   runExporter,
@@ -27,6 +28,17 @@ import type {
 } from '../kinds.js';
 
 const clock = FIXED_CLOCK('2026-05-21T00:00:00.000Z');
+
+const PRO: Entitlement = {
+  version: 1,
+  licenseId: 'TEST',
+  licensee: 'Test User',
+  tier: 'pro',
+  features: ['*'],
+  issuedAt: '2026-01-01T00:00:00.000Z',
+  expiresAt: null,
+  signature: 'test',
+};
 
 function registry(): ToolRegistry {
   const r = new ToolRegistry();
@@ -70,7 +82,7 @@ describe('NekoLogs: manifest', () => {
   });
 });
 
-describe('NekoLogs: monetization safety', () => {
+describe('NekoLogs: monetization gating (single-build, entitlement-gated)', () => {
   const registration = buildLogsRegistration(clock);
 
   const proExporterIds = [
@@ -80,34 +92,70 @@ describe('NekoLogs: monetization safety', () => {
   ];
   const proProjectorIds = ['log.graph.trace'];
 
-  it('no Pro exporter is registered in the free build', () => {
-    const registered = new Set(registration.exporters.map((e) => e.id));
-    for (const id of proExporterIds) expect(registered.has(id)).toBe(false);
+  it('Pro exporters are declared AND registered as proExporters, not free', () => {
+    const free = new Set(registration.exporters.map((e) => e.id));
+    const pro = new Set((registration.proExporters ?? []).map((e) => e.id));
+    for (const id of proExporterIds) {
+      expect(logsManifest.exporters).toContain(id);
+      expect(pro.has(id)).toBe(true);
+      expect(free.has(id)).toBe(false);
+    }
   });
 
-  it('no graph projector is registered in the free build', () => {
+  it('the graph projector remains advertising-only (no projector registered)', () => {
     const projectors = registration.graphProjectors ?? [];
     expect(projectors).toHaveLength(0);
     for (const id of proProjectorIds) {
+      expect(logsManifest.graphProjectors).toContain(id);
       expect(projectors.find((p) => p.id === id)).toBeUndefined();
     }
   });
 
-  it('runExporter rejects every Pro exporter id', () => {
+  it('a free caller (default entitlement) is refused with EntitlementError', () => {
     const r = registry();
+    const parsed = parse('2026-05-21T00:00:00Z error db timeout id=42\n2026-05-21T00:00:01Z info ok id=43\n');
     for (const id of proExporterIds) {
-      expect(() =>
-        runExporter(r, 'logs', id, { artifacts: [], diagnostics: [] }),
-      ).toThrow(/unknown exporter/);
+      expect(() => runExporter(r, 'logs', id, parsed)).toThrow(EntitlementError);
     }
   });
 
-  it('manifest declares Pro exporters that are NOT registered', () => {
-    const registered = new Set(registration.exporters.map((e) => e.id));
-    for (const id of proExporterIds) {
-      expect(logsManifest.exporters).toContain(id);
-      expect(registered.has(id)).toBe(false);
-    }
+  it('a Pro entitlement unlocks the incident report / histogram SVG / clusters exporters', () => {
+    const r = registry();
+    const parsed = parse(
+      ' 2026-05-21T00:00:00Z error db timeout id=42\n2026-05-21T00:00:01Z error db timeout id=99\n2026-05-21T00:00:02Z info ok\n',
+    );
+    // The runtime enforces `accepts` against every input artifact, so feed
+    // each Pro exporter only the artifact kinds it declares (the free
+    // exporter tests do the same with the summary exporter).
+    const only = (...kinds: string[]) => ({
+      artifacts: parsed.artifacts.filter((a) => kinds.includes(a.kind)),
+      diagnostics: parsed.diagnostics,
+    });
+
+    const report = String(
+      runExporter(r, 'logs', 'log.export.report.incident', only('log.summary', 'log.document'), PRO).body,
+    );
+    expect(report).toContain('# NekoLogs incident report');
+    expect(report).toContain('severity:');
+
+    const svg = String(
+      runExporter(r, 'logs', 'log.export.histogram.svg', only('log.histogram'), PRO).body,
+    );
+    expect(svg).toContain('<svg');
+    expect(svg).toContain('</svg>');
+
+    const clusters = String(
+      runExporter(r, 'logs', 'log.export.patterns.clusters', only('log.document'), PRO).body,
+    );
+    expect(clusters).toContain('# NekoLogs message clusters');
+    // The two "db timeout id=NN" lines collapse to one template.
+    expect(clusters).toContain('db timeout id=<num>');
+  });
+
+  it('a truly unknown exporter id still throws "unknown exporter"', () => {
+    expect(() =>
+      runExporter(registry(), 'logs', 'log.export.nope', { artifacts: [], diagnostics: [] }, PRO),
+    ).toThrow(/unknown exporter/);
   });
 
   it('free entitlements match the exact closed-free-tier set (engine + Phase 2.x.2 UI)', () => {
