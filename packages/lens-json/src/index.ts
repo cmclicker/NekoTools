@@ -1,7 +1,7 @@
 import type { ToolRegistration } from '@nekotools/tool-runtime';
 
 import { createDiffTextualParser } from './diff-textual.js';
-import { freeExporters } from './exporters.js';
+import { freeExporters, proExporters } from './exporters.js';
 import { jsonManifest } from './manifest.js';
 import { createJsonPointerParser } from './parser-pointer.js';
 import { createJsonTextParser } from './parser-text.js';
@@ -14,6 +14,7 @@ export * from './paths.js';
 export * from './parser-text.js';
 export * from './parser-pointer.js';
 export * from './diff-textual.js';
+export * from './codegen.js';
 export * from './exporters.js';
 export * from './manifest.js';
 export * from './tokenizer.js';
@@ -37,9 +38,12 @@ export interface BuildJsonRegistrationOptions {
 /**
  * Build a NekoJSON registration for the runtime.
  *
- * The free build passes only the free parsers and exporters. Pro
- * implementations live in a private package and are added by a Pro
- * build's registration call; the manifest itself is shared.
+ * Free exporters run for everyone; the Pro exporters (TypeScript types, Zod
+ * schema, data dictionary) are registered as `proExporters` and gated by
+ * `runExporter` behind a valid entitlement (single-build-gated model, same as
+ * NekoJWT / NekoCSP). The remaining Pro entitlements (graph projection,
+ * semantic diff, migration studio, advanced inference) depend on future
+ * premium engines and are advertised in the manifest only.
  */
 export function buildJsonRegistration(
   clock: Clock = FIXED_CLOCK('1970-01-01T00:00:00.000Z'),
@@ -57,5 +61,6 @@ export function buildJsonRegistration(
       createDiffTextualParser({ clock }),
     ],
     exporters: freeExporters,
+    proExporters,
   };
 }
