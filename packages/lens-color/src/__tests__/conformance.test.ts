@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
-import type { Artifact, Workspace } from '@nekotools/contracts';
+import type { Artifact, Entitlement, Workspace } from '@nekotools/contracts';
 import {
+  EntitlementError,
   ToolRegistry,
   jsonWorkspaceSerializer,
   runExporter,
@@ -20,6 +21,17 @@ import {
 import type { ColorParsedArtifact, ParsedColor } from '../kinds.js';
 
 const clock = FIXED_CLOCK('2026-05-28T00:00:00.000Z');
+
+const PRO: Entitlement = {
+  version: 1,
+  licenseId: 'TEST',
+  licensee: 'Test User',
+  tier: 'pro',
+  features: ['*'],
+  issuedAt: '2026-01-01T00:00:00.000Z',
+  expiresAt: null,
+  signature: 'test',
+};
 
 function registry(): ToolRegistry {
   const r = new ToolRegistry();
@@ -64,19 +76,47 @@ describe('NekoColor: manifest', () => {
   });
 });
 
-describe('NekoColor: monetization safety', () => {
+describe('NekoColor: monetization gating (single-build, entitlement-gated)', () => {
   const registration = buildColorRegistration(clock);
   const proExporterIds = ['color.export.palette', 'color.export.css-vars'];
-  it('no Pro exporter is registered, and each throws "unknown exporter"', () => {
-    const registered = new Set(registration.exporters.map((e) => e.id));
-    const r = registry();
+
+  it('Pro exporters are declared AND registered as proExporters, not free', () => {
+    const free = new Set(registration.exporters.map((e) => e.id));
+    const pro = new Set((registration.proExporters ?? []).map((e) => e.id));
     for (const id of proExporterIds) {
-      expect(registered.has(id)).toBe(false);
       expect(colorManifest.exporters).toContain(id);
-      expect(() => runExporter(r, 'color', id, { artifacts: [], diagnostics: [] })).toThrow(
-        /unknown exporter/,
-      );
+      expect(pro.has(id)).toBe(true);
+      expect(free.has(id)).toBe(false);
     }
+  });
+
+  it('a free caller (default entitlement) is refused with EntitlementError', () => {
+    const r = registry();
+    const parsed = parse('#3b82f6');
+    for (const id of proExporterIds) {
+      expect(() => runExporter(r, 'color', id, parsed)).toThrow(EntitlementError);
+    }
+  });
+
+  it('a Pro entitlement unlocks the palette + css-vars exporters', () => {
+    const r = registry();
+    const parsed = parse('#3b82f6');
+
+    const palette = String(runExporter(r, 'color', 'color.export.palette', parsed, PRO).body);
+    expect(palette).toContain('# NekoColor palette');
+    expect(palette).toContain('| 500 |');
+    expect(palette).toContain('#3b82f6'); // the base at stop 500 (toHex is lowercase)
+
+    const css = String(runExporter(r, 'color', 'color.export.css-vars', parsed, PRO).body);
+    expect(css).toContain(':root {');
+    expect(css).toContain('--color-500: #3b82f6;');
+    expect(css).toContain('--color-50:');
+  });
+
+  it('a truly unknown exporter id still throws "unknown exporter"', () => {
+    expect(() =>
+      runExporter(registry(), 'color', 'color.export.nope', { artifacts: [], diagnostics: [] }, PRO),
+    ).toThrow(/unknown exporter/);
   });
 });
 
