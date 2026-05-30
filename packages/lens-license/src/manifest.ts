@@ -4,11 +4,13 @@ import { DEFAULT_OFFLINE_POLICY } from '@nekotools/contracts';
 import { LICENSE_KIND_PARSED } from './kinds.js';
 
 /**
- * The NekoLicense manifest. Reading model matches the other lenses:
- * `entitlements.free` ships (engine + UI); `entitlements.pro` advertises a
- * future package, and the two Pro exporter ids are declared but NOT
- * registered (monetization-safety tests assert they throw "unknown
- * exporter"). Offline policy is `network-forbidden`.
+ * The NekoLicense manifest. Reading model matches NekoJWT / NekoCSP:
+ * `entitlements.free` ships (engine + UI); `entitlements.pro` advertises
+ * future capabilities; and the two Pro exporter ids
+ * (`license.export.audit.report`, `license.export.sarif`) are registered in
+ * this build but gated behind a valid entitlement (monetization-safety tests
+ * assert a free caller is refused with EntitlementError). Offline policy is
+ * `network-forbidden`.
  */
 export const licenseManifest: ToolManifest = {
   version: 1,
@@ -23,9 +25,9 @@ export const licenseManifest: ToolManifest = {
     'license.export.json',
     'license.export.normalized',
     'license.export.markdown.summary',
-    // Pro — declared as advertising, NOT registered in the free build.
-    'license.export.compatibility',
-    'license.export.notice',
+    // Pro — registered in this build but gated behind a valid entitlement.
+    'license.export.audit.report',
+    'license.export.sarif',
   ],
   offlinePolicy: DEFAULT_OFFLINE_POLICY,
   capabilities: {
@@ -47,11 +49,13 @@ export const licenseManifest: ToolManifest = {
       'workspace.save',
     ],
     pro: [
+      'audit.obligations',
       'compatibility.matrix',
       'dependency.scan',
       'notice.generate',
       'custom.fingerprints',
       'export.compatibility',
+      'export.sarif',
       'export.notice',
       'workspace.snapshots',
     ],
