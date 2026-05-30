@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
-import type { Artifact, Workspace } from '@nekotools/contracts';
+import type { Artifact, Entitlement, Workspace } from '@nekotools/contracts';
 import {
+  EntitlementError,
   ToolRegistry,
   jsonWorkspaceSerializer,
   runExporter,
@@ -9,8 +10,19 @@ import {
 } from '@nekotools/tool-runtime';
 import { validate } from '@nekotools/schemas';
 
-import { FIXED_CLOCK, buildGitignoreRegistration, gitignoreManifest } from '../index.js';
+import { FIXED_CLOCK, auditGitignore, buildGitignoreRegistration, gitignoreManifest } from '../index.js';
 import type { GitignoreParsedArtifact } from '../kinds.js';
+
+const PRO: Entitlement = {
+  version: 1,
+  licenseId: 'TEST',
+  licensee: 'Test User',
+  tier: 'pro',
+  features: ['*'],
+  issuedAt: '2026-01-01T00:00:00.000Z',
+  expiresAt: null,
+  signature: 'test',
+};
 
 const clock = FIXED_CLOCK('2026-05-28T00:00:00.000Z');
 
@@ -60,19 +72,88 @@ describe('NekoGitignore: manifest', () => {
   });
 });
 
-describe('NekoGitignore: monetization safety', () => {
-  const registration = buildGitignoreRegistration(clock);
-  const proExporterIds = ['gitignore.export.regex', 'gitignore.export.merged'];
-  it('no Pro exporter is registered, and each throws "unknown exporter"', () => {
-    const registered = new Set(registration.exporters.map((e) => e.id));
-    const r = registry();
+describe('NekoGitignore: monetization gating (single-build, entitlement-gated)', () => {
+  const proExporterIds = ['gitignore.export.audit.report', 'gitignore.export.sarif'];
+
+  it('Pro exporters are declared AND registered as proExporters, not free', () => {
+    const reg = buildGitignoreRegistration(clock);
+    const proIds = new Set((reg.proExporters ?? []).map((e) => e.id));
     for (const id of proExporterIds) {
-      expect(registered.has(id)).toBe(false);
       expect(gitignoreManifest.exporters).toContain(id);
-      expect(() => runExporter(r, 'gitignore', id, { artifacts: [], diagnostics: [] })).toThrow(
-        /unknown exporter/,
-      );
+      expect(proIds.has(id)).toBe(true);
+      expect(reg.exporters.some((e) => e.id === id)).toBe(false);
     }
+  });
+
+  it('does not register the future regex/merged generators as exporters', () => {
+    expect(gitignoreManifest.exporters).not.toContain('gitignore.export.regex');
+    expect(gitignoreManifest.exporters).not.toContain('gitignore.export.merged');
+    expect(gitignoreManifest.entitlements.pro).toContain('export.regex');
+    expect(gitignoreManifest.entitlements.pro).toContain('export.merged');
+  });
+
+  it('a free caller (default entitlement) is refused with EntitlementError', () => {
+    const r = registry();
+    const parsed = parse('node_modules/');
+    for (const id of proExporterIds) {
+      expect(() => runExporter(r, 'gitignore', id, parsed)).toThrow(EntitlementError);
+    }
+  });
+
+  it('a Pro entitlement unlocks the audit report + SARIF exporters', () => {
+    const r = registry();
+    const parsed = parse('node_modules/\n*.log');
+
+    const auditReport = String(
+      runExporter(r, 'gitignore', 'gitignore.export.audit.report', parsed, PRO).body,
+    );
+    expect(auditReport).toContain('# NekoGitignore secret-coverage audit');
+    expect(auditReport).toContain('gitignore.uncovered_secret');
+
+    const sarifResult = runExporter(r, 'gitignore', 'gitignore.export.sarif', parsed, PRO);
+    expect(sarifResult.mimeType).toBe('application/sarif+json');
+    expect(sarifResult.extension).toBe('sarif');
+    const sarif = JSON.parse(String(sarifResult.body));
+    expect(sarif.version).toBe('2.1.0');
+    expect(sarif.runs[0].tool.driver.name).toBe('NekoGitignore');
+    expect(
+      sarif.runs[0].results.some((x: { ruleId: string }) => x.ruleId === 'gitignore.uncovered_secret'),
+    ).toBe(true);
+  });
+
+  it('a truly unknown exporter id still throws "unknown exporter"', () => {
+    expect(() =>
+      runExporter(registry(), 'gitignore', 'gitignore.export.nope', { artifacts: [], diagnostics: [] }, PRO),
+    ).toThrow(/unknown exporter/);
+  });
+});
+
+describe('NekoGitignore: secret-coverage audit', () => {
+  const audit = (raw: string) => auditGitignore(report(raw));
+
+  it('flags uncovered secret paths on a minimal ignore, ranking .env high', () => {
+    const ids = audit('node_modules/\ndist/').map((f) => f.ruleId);
+    expect(ids).toContain('gitignore.uncovered_secret');
+    expect(audit('node_modules/').find((f) => f.target === '.env')?.severity).toBe('high');
+  });
+
+  it('does not flag a secret path once it is covered', () => {
+    expect(audit('.env\n*.pem\nid_rsa').find((f) => f.target === '.env')).toBeUndefined();
+  });
+
+  it('a comprehensive ignore yields no high/medium coverage findings', () => {
+    const findings = audit(
+      '.env\n.env.*\nid_rsa\nid_ed25519\n*.pem\n*.key\n*.p12\n*.pfx\n*.keystore\ncredentials.json\n.npmrc\n.pypirc\n.DS_Store\n*.log',
+    );
+    expect(findings.every((f) => f.severity === 'low' || f.severity === 'info')).toBe(true);
+  });
+
+  it('flags duplicate patterns as a hygiene finding', () => {
+    expect(audit('.env\nfoo\nfoo').map((f) => f.ruleId)).toContain('gitignore.duplicate');
+  });
+
+  it('returns nothing for an absent report', () => {
+    expect(auditGitignore(undefined)).toEqual([]);
   });
 });
 

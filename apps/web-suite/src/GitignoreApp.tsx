@@ -1,17 +1,29 @@
 import { useCallback, useMemo, useState, type ChangeEvent } from 'react';
 
+import type { Entitlement } from '@nekotools/contracts';
+
 import { Diagnostics } from './Diagnostics.js';
 import { copyToClipboard, type ClipboardDeps } from './clipboard.js';
+import { useLicenseContext } from './license-store.js';
 import { parseGitignoreInput } from './gitignore-parse.js';
 
 /**
  * NekoGitignore sub-app. Wires `@nekotools/lens-gitignore` into the shared
  * web-suite shell as a Project tool tab. Free surface: paste a .gitignore,
- * see each rule classified, test paths against the ruleset (ignored / not,
- * which rule decided), and copy JSON / normalized / markdown. All local.
+ * see each rule classified, test paths against the ruleset, and copy JSON /
+ * normalized / markdown. Pro (gated by the suite license): a secret-leak
+ * coverage audit (does the ruleset ignore .env / *.pem / id_rsa / …?) + SARIF
+ * export for CI. All local — no repo, no filesystem, no network.
  */
 
-export type GitignoreViewMode = 'rules' | 'paths' | 'json' | 'normalized' | 'markdown';
+export type GitignoreViewMode =
+  | 'rules'
+  | 'paths'
+  | 'json'
+  | 'normalized'
+  | 'markdown'
+  | 'audit'
+  | 'sarif';
 
 export interface NekoGitignoreUiState {
   readonly paths: string;
@@ -22,12 +34,43 @@ export interface GitignoreAppProps {
   readonly initialInput?: string;
   readonly initialUiState?: Partial<NekoGitignoreUiState>;
   readonly clipboardDeps?: ClipboardDeps;
+  /** Injected entitlement; defaults to the suite license context. */
+  readonly entitlement?: Entitlement;
 }
 
 interface CopyStatus {
   readonly ok: boolean;
   readonly method: 'clipboard-api' | 'execCommand' | 'none';
 }
+
+const PRO_VIEWS = new Set<GitignoreViewMode>(['audit', 'sarif']);
+const VIEW_MODES: readonly GitignoreViewMode[] = [
+  'rules',
+  'paths',
+  'json',
+  'normalized',
+  'markdown',
+  'audit',
+  'sarif',
+];
+const VIEW_LABELS: Record<GitignoreViewMode, string> = {
+  rules: 'Rules',
+  paths: 'Path tests',
+  json: 'JSON',
+  normalized: 'Normalized',
+  markdown: 'Markdown',
+  audit: 'Audit ⭐',
+  sarif: 'SARIF ⭐',
+};
+const COPY_LABELS: Record<GitignoreViewMode, string> = {
+  rules: 'Copy markdown summary',
+  paths: 'Copy markdown summary',
+  json: 'Copy JSON',
+  normalized: 'Copy normalized',
+  markdown: 'Copy markdown summary',
+  audit: 'Copy audit',
+  sarif: 'Copy SARIF',
+};
 
 const SAMPLE_INPUT = [
   '# dependencies',
@@ -42,28 +85,49 @@ const SAMPLE_INPUT = [
 
 const SAMPLE_PATHS = ['node_modules/react/index.js', 'dist/app.js', 'debug.log', 'important.log', '.env'].join('\n');
 
-export function GitignoreApp({ initialInput, initialUiState, clipboardDeps }: GitignoreAppProps = {}): JSX.Element {
+export function GitignoreApp({
+  initialInput,
+  initialUiState,
+  clipboardDeps,
+  entitlement,
+}: GitignoreAppProps = {}): JSX.Element {
   const [input, setInput] = useState<string>(initialInput ?? SAMPLE_INPUT);
   const [paths, setPaths] = useState<string>(initialUiState?.paths ?? SAMPLE_PATHS);
   const [viewMode, setViewMode] = useState<GitignoreViewMode>(initialUiState?.viewMode ?? 'rules');
   const [copyStatus, setCopyStatus] = useState<CopyStatus | null>(null);
 
-  const parsed = useMemo(() => parseGitignoreInput(input, paths), [input, paths]);
+  const license = useLicenseContext();
+  const effectiveEntitlement = entitlement ?? license.entitlement;
+  const parsed = useMemo(
+    () => parseGitignoreInput(input, paths, effectiveEntitlement),
+    [input, paths, effectiveEntitlement],
+  );
+  const proUnlocked = parsed.proUnlocked;
+  const isProView = PRO_VIEWS.has(viewMode);
 
-  const copyText =
-    viewMode === 'json' ? parsed.json : viewMode === 'normalized' ? parsed.normalized : parsed.markdown;
-  const copyDisabled = viewMode === 'rules' || viewMode === 'paths' ? parsed.patternCount === 0 : copyText === '';
+  const outputText =
+    viewMode === 'json'
+      ? parsed.json
+      : viewMode === 'normalized'
+        ? parsed.normalized
+        : viewMode === 'markdown'
+          ? parsed.markdown
+          : viewMode === 'audit'
+            ? parsed.auditReport
+            : viewMode === 'sarif'
+              ? parsed.sarif
+              : null; // rules / paths
+  const copyText = viewMode === 'rules' || viewMode === 'paths' ? parsed.markdown : (outputText ?? '');
+  const copyDisabled = parsed.patternCount === 0 || copyText === '';
 
   const handleCopy = useCallback(async () => {
-    const text =
-      viewMode === 'json' ? parsed.json : viewMode === 'normalized' ? parsed.normalized : parsed.markdown;
-    if (text === '') {
+    if (copyText === '') {
       setCopyStatus({ ok: false, method: 'none' });
       return;
     }
-    const r = await copyToClipboard(text, clipboardDeps);
+    const r = await copyToClipboard(copyText, clipboardDeps);
     setCopyStatus({ ok: r.ok, method: r.method });
-  }, [viewMode, parsed, clipboardDeps]);
+  }, [copyText, clipboardDeps]);
 
   return (
     <section className="tool tool--gitignore" aria-label="NekoGitignore workbench">
@@ -93,8 +157,8 @@ export function GitignoreApp({ initialInput, initialUiState, clipboardDeps }: Gi
           data-testid="gitignore-paths"
         />
         <p className="paste__hint">
-          Classification + path matching run entirely in your browser. No repo, no filesystem, no
-          network.
+          Classification, path matching, and auditing run entirely in your browser. No repo, no
+          filesystem, no network.
         </p>
       </section>
 
@@ -102,7 +166,7 @@ export function GitignoreApp({ initialInput, initialUiState, clipboardDeps }: Gi
         <div className="results__toolbar">
           <fieldset className="viewmode" aria-label="Gitignore output mode">
             <legend className="visually-hidden">Gitignore output mode</legend>
-            {(['rules', 'paths', 'json', 'normalized', 'markdown'] as const).map((m) => (
+            {VIEW_MODES.map((m) => (
               <label key={m} className={viewMode === m ? 'viewmode--active' : ''}>
                 <input
                   type="radio"
@@ -111,7 +175,7 @@ export function GitignoreApp({ initialInput, initialUiState, clipboardDeps }: Gi
                   checked={viewMode === m}
                   onChange={() => setViewMode(m)}
                 />
-                {m === 'rules' ? 'Rules' : m === 'paths' ? 'Path tests' : m === 'json' ? 'JSON' : m === 'normalized' ? 'Normalized' : 'Markdown'}
+                {VIEW_LABELS[m]}
               </label>
             ))}
           </fieldset>
@@ -124,7 +188,7 @@ export function GitignoreApp({ initialInput, initialUiState, clipboardDeps }: Gi
               disabled={copyDisabled}
               data-testid="gitignore-copy-output"
             >
-              {viewMode === 'json' ? 'Copy JSON' : viewMode === 'normalized' ? 'Copy normalized' : 'Copy markdown summary'}
+              {COPY_LABELS[viewMode]}
             </button>
           </div>
 
@@ -150,7 +214,17 @@ export function GitignoreApp({ initialInput, initialUiState, clipboardDeps }: Gi
         </ul>
 
         {parsed.patternCount > 0 ? (
-          viewMode === 'rules' ? (
+          isProView && !proUnlocked ? (
+            <div className="pro-lock" role="status" data-testid="gitignore-locked">
+              <strong>{viewMode === 'audit' ? 'Secret-coverage audit' : 'SARIF export'} is a Pro feature.</strong>
+              <p>
+                Audit whether the ruleset actually ignores the files you must never commit (.env,
+                *.pem, id_rsa, credentials.json, .npmrc, …) and export SARIF 2.1.0 to gate
+                .gitignore coverage in CI. Unlock with a license key (verified locally, works
+                offline forever).
+              </p>
+            </div>
+          ) : viewMode === 'rules' ? (
             <table className="url-params" data-testid="gitignore-rules">
               <thead>
                 <tr>
@@ -202,7 +276,7 @@ export function GitignoreApp({ initialInput, initialUiState, clipboardDeps }: Gi
             )
           ) : (
             <pre className="toml-output" data-testid="gitignore-output" aria-label={`${viewMode} output`}>
-              {viewMode === 'json' ? parsed.json : viewMode === 'normalized' ? parsed.normalized : parsed.markdown}
+              {outputText}
             </pre>
           )
         ) : (

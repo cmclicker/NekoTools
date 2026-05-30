@@ -3,6 +3,17 @@ import { fireEvent, render, screen, waitFor, within } from '@testing-library/rea
 
 import { GitignoreApp } from '../GitignoreApp.js';
 
+const PRO = {
+  version: 1 as const,
+  licenseId: 'X',
+  licensee: 'Buyer',
+  tier: 'pro' as const,
+  features: ['*'],
+  issuedAt: '2026-01-01T00:00:00.000Z',
+  expiresAt: null,
+  signature: 's',
+};
+
 describe('GitignoreApp', () => {
   it('renders the rules table with classification', () => {
     render(<GitignoreApp initialInput={'node_modules/\n!keep.log'} initialUiState={{ paths: '' }} />);
@@ -54,5 +65,37 @@ describe('GitignoreApp', () => {
     fireEvent.click(screen.getByTestId('gitignore-copy-output'));
     await waitFor(() => expect(writes).toHaveLength(1));
     expect(writes[0]).toBe('foo\nbar/');
+  });
+
+  it('locks the audit + SARIF Pro views when free', () => {
+    render(<GitignoreApp initialInput={'node_modules/'} initialUiState={{ paths: '', viewMode: 'audit' }} />);
+    expect(screen.getByTestId('gitignore-locked')).toBeInTheDocument();
+    expect(screen.queryByTestId('gitignore-output')).not.toBeInTheDocument();
+  });
+
+  it('unlocks the secret-coverage audit via an injected Pro entitlement', () => {
+    render(
+      <GitignoreApp
+        initialInput={'node_modules/'}
+        initialUiState={{ paths: '', viewMode: 'audit' }}
+        entitlement={PRO}
+      />,
+    );
+    const out = screen.getByTestId('gitignore-output').textContent ?? '';
+    expect(out).toContain('# NekoGitignore secret-coverage audit');
+    expect(out).toContain('gitignore.uncovered_secret');
+  });
+
+  it('renders SARIF 2.1.0 in the SARIF view when Pro', () => {
+    render(
+      <GitignoreApp
+        initialInput={'node_modules/'}
+        initialUiState={{ paths: '', viewMode: 'sarif' }}
+        entitlement={PRO}
+      />,
+    );
+    expect(JSON.parse(screen.getByTestId('gitignore-output').textContent ?? '{}').version).toBe(
+      '2.1.0',
+    );
   });
 });
