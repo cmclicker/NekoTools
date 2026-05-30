@@ -7,6 +7,7 @@ import {
   type DurationParsedArtifact,
   type DurationReport,
 } from './kinds.js';
+import { toBreakdownCsv } from './codegen.js';
 
 const TOOL_ID = 'duration';
 
@@ -84,3 +85,30 @@ export const freeExporters: readonly Exporter<DurationArtifact>[] = [
   normalizedExporter,
   markdownSummaryExporter,
 ];
+
+// --- Pro exporters (registered in the binary, gated by entitlement) --------
+//
+// Backs ONE of the two declared Pro exporter ids — `export.breakdown.csv` —
+// a pure projection of the parsed d/h/m/s components. Generator in
+// `codegen.ts`. The other declared id, `duration.export.locale`
+// (`locale.format`), needs locale-specific human formatting that the
+// manifest's out-of-scope list excludes (bundled i18n data); it stays
+// advertising-only and is NOT registered, so it still throws "unknown
+// exporter" — same partial-build pattern as NekoRegex.
+
+/** `duration.export.breakdown.csv` (Pro) — per-input d/h/m/s CSV breakdown. */
+export const breakdownCsvExporter: Exporter<DurationArtifact> = {
+  version: 1,
+  id: 'duration.export.breakdown.csv',
+  toolId: TOOL_ID,
+  target: 'csv',
+  accepts: DURATION_PARSED_EXPORT_KINDS,
+  producesMimeType: 'text/csv',
+  producesExtension: 'csv',
+  export({ artifacts }) {
+    const value = pickParsed(artifacts)?.value ?? { count: 0, entries: [] };
+    return { mimeType: 'text/csv', extension: 'csv', body: toBreakdownCsv(value) };
+  },
+};
+
+export const proExporters: readonly Exporter<DurationArtifact>[] = [breakdownCsvExporter];
