@@ -16,6 +16,7 @@ import {
 } from './kinds.js';
 import { listPaths } from './paths.js';
 import { inferBasicSchema } from './schema-infer.js';
+import { toDataDictionary, toTypeScript, toZod } from './codegen.js';
 
 const TOOL_ID = 'json';
 
@@ -244,4 +245,71 @@ export const freeExporters: readonly Exporter<JsonArtifact>[] = [
   plaintextPathsExporter,
   basicSchemaExporter,
   textualDiffExporter,
+];
+
+// --- Pro exporters (registered in the binary, gated by entitlement) --------
+//
+// These back the manifest's declared Pro exporter ids. Each derives purely
+// from the first `json.document` value (same basis as the free schema
+// exporter) — no network, no premium-engine dependency. Code generation lives
+// in `codegen.ts`.
+
+/** `json.export.types.typescript` (Pro) — a TypeScript type from the document. */
+export const typescriptExporter: Exporter<JsonArtifact> = {
+  version: 1,
+  id: 'json.export.types.typescript',
+  toolId: TOOL_ID,
+  target: 'plaintext',
+  accepts: JSON_DOCUMENT_EXPORT_KINDS,
+  producesMimeType: 'text/plain',
+  producesExtension: 'ts',
+  export({ artifacts }) {
+    const doc = pickDocuments(artifacts)[0];
+    const body = doc === undefined ? 'export type Root = unknown;\n' : toTypeScript(doc.value, 'Root');
+    return { mimeType: 'text/plain', extension: 'ts', body };
+  },
+};
+
+/** `json.export.types.zod` (Pro) — a Zod schema from the document. */
+export const zodExporter: Exporter<JsonArtifact> = {
+  version: 1,
+  id: 'json.export.types.zod',
+  toolId: TOOL_ID,
+  target: 'plaintext',
+  accepts: JSON_DOCUMENT_EXPORT_KINDS,
+  producesMimeType: 'text/plain',
+  producesExtension: 'ts',
+  export({ artifacts }) {
+    const doc = pickDocuments(artifacts)[0];
+    const body =
+      doc === undefined
+        ? "import { z } from 'zod';\n\nexport const rootSchema = z.unknown();\n"
+        : toZod(doc.value, 'rootSchema');
+    return { mimeType: 'text/plain', extension: 'ts', body };
+  },
+};
+
+/** `json.export.docs.data-dictionary` (Pro) — a markdown path/type/sample table. */
+export const dataDictionaryExporter: Exporter<JsonArtifact> = {
+  version: 1,
+  id: 'json.export.docs.data-dictionary',
+  toolId: TOOL_ID,
+  target: 'markdown',
+  accepts: JSON_DOCUMENT_EXPORT_KINDS,
+  producesMimeType: 'text/markdown',
+  producesExtension: 'md',
+  export({ artifacts }) {
+    const doc = pickDocuments(artifacts)[0];
+    const body =
+      doc === undefined
+        ? '# NekoJSON data dictionary\n\n(no document)'
+        : toDataDictionary(doc.value);
+    return { mimeType: 'text/markdown', extension: 'md', body };
+  },
+};
+
+export const proExporters: readonly Exporter<JsonArtifact>[] = [
+  typescriptExporter,
+  zodExporter,
+  dataDictionaryExporter,
 ];

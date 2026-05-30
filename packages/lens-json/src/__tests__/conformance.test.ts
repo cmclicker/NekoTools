@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
-import type { Workspace } from '@nekotools/contracts';
+import type { Entitlement, Workspace } from '@nekotools/contracts';
 import {
+  EntitlementError,
   ToolRegistry,
   jsonWorkspaceSerializer,
   runExporter,
@@ -20,6 +21,17 @@ import {
   listPaths,
   parsePointer,
 } from '../index.js';
+
+const PRO: Entitlement = {
+  version: 1,
+  licenseId: 'TEST',
+  licensee: 'Test User',
+  tier: 'pro',
+  features: ['*'],
+  issuedAt: '2026-01-01T00:00:00.000Z',
+  expiresAt: null,
+  signature: 'test',
+};
 import type { JsonDiff, JsonDiffArtifact, JsonDocumentArtifact, JsonPathResult } from '../kinds.js';
 
 const clock = FIXED_CLOCK('2026-05-20T00:00:00.000Z');
@@ -68,7 +80,7 @@ describe('NekoJSON: manifest', () => {
  * These tests are the mechanical enforcement of the rule in
  * docs/open-core-strategy.md.
  */
-describe('NekoJSON: monetization safety', () => {
+describe('NekoJSON: monetization gating (single-build, entitlement-gated)', () => {
   const registration = buildJsonRegistration(clock);
 
   const proExporterIds = [
@@ -77,38 +89,65 @@ describe('NekoJSON: monetization safety', () => {
     'json.export.docs.data-dictionary',
   ];
 
+  // Still advertising-only — depends on a future premium engine.
   const proProjectorIds = ['json.graph.references'];
 
-  it('no Pro exporter is registered in the free build', () => {
-    const registered = new Set(registration.exporters.map((e) => e.id));
+  it('Pro exporters are declared AND registered as proExporters, not free', () => {
+    const proIds = new Set((registration.proExporters ?? []).map((e) => e.id));
     for (const id of proExporterIds) {
-      expect(registered.has(id)).toBe(false);
+      expect(jsonManifest.exporters).toContain(id);
+      expect(proIds.has(id)).toBe(true);
+      expect(registration.exporters.some((e) => e.id === id)).toBe(false);
     }
   });
 
-  it('no graph projector is registered in the free build', () => {
+  it('the graph projector remains advertising-only (no projector registered)', () => {
     const projectors = registration.graphProjectors ?? [];
     expect(projectors).toHaveLength(0);
     for (const id of proProjectorIds) {
+      expect(jsonManifest.graphProjectors).toContain(id);
       expect(projectors.find((p) => p.id === id)).toBeUndefined();
     }
   });
 
-  it('runExporter throws "unknown exporter" when invoked with a Pro id', () => {
+  it('a free caller (default entitlement) is refused with EntitlementError', () => {
     const r = registry();
+    const parsed = runParser(r, 'json', 'json.text', {
+      raw: '{"name":"x","age":3}',
+      source: { kind: 'paste', bytes: 20 },
+    });
     for (const id of proExporterIds) {
-      expect(() =>
-        runExporter(r, 'json', id, { artifacts: [], diagnostics: [] }),
-      ).toThrow(/unknown exporter/);
+      expect(() => runExporter(r, 'json', id, parsed)).toThrow(EntitlementError);
     }
   });
 
-  it('the manifest declares Pro exporters that are NOT in the registered set', () => {
-    const registered = new Set(registration.exporters.map((e) => e.id));
-    for (const id of proExporterIds) {
-      expect(jsonManifest.exporters).toContain(id);
-      expect(registered.has(id)).toBe(false);
-    }
+  it('a Pro entitlement unlocks the TypeScript / Zod / data-dictionary exporters', () => {
+    const r = registry();
+    const parsed = runParser(r, 'json', 'json.text', {
+      raw: '{"name":"Ada","age":36,"tags":["x"]}',
+      source: { kind: 'paste', bytes: 36 },
+    });
+
+    const ts = String(runExporter(r, 'json', 'json.export.types.typescript', parsed, PRO).body);
+    expect(ts).toContain('export type Root = {');
+    expect(ts).toContain('name: string;');
+    expect(ts).toContain('age: number;');
+    expect(ts).toContain('tags: string[];');
+
+    const zod = String(runExporter(r, 'json', 'json.export.types.zod', parsed, PRO).body);
+    expect(zod).toContain("import { z } from 'zod';");
+    expect(zod).toContain('name: z.string()');
+    expect(zod).toContain('tags: z.array(z.string())');
+
+    const dict = String(runExporter(r, 'json', 'json.export.docs.data-dictionary', parsed, PRO).body);
+    expect(dict).toContain('# NekoJSON data dictionary');
+    expect(dict).toContain('| `/name` | string |');
+  });
+
+  it('a truly unknown exporter id still throws "unknown exporter"', () => {
+    expect(() =>
+      runExporter(registry(), 'json', 'json.export.nope', { artifacts: [], diagnostics: [] }, PRO),
+    ).toThrow(/unknown exporter/);
   });
 
   it('the manifest free entitlements list matches what the build can actually do', () => {
