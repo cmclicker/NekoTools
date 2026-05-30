@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
-import type { Artifact, Workspace } from '@nekotools/contracts';
+import type { Artifact, Entitlement, Workspace } from '@nekotools/contracts';
 import {
+  EntitlementError,
   ToolRegistry,
   jsonWorkspaceSerializer,
   runExporter,
@@ -13,6 +14,17 @@ import { FIXED_CLOCK, TOML_KIND_PARSED, buildTomlRegistration, tomlManifest } fr
 import type { ParsedToml, TomlParsedArtifact } from '../kinds.js';
 
 const clock = FIXED_CLOCK('2026-05-28T00:00:00.000Z');
+
+const PRO: Entitlement = {
+  version: 1,
+  licenseId: 'TEST',
+  licensee: 'Test User',
+  tier: 'pro',
+  features: ['*'],
+  issuedAt: '2026-01-01T00:00:00.000Z',
+  expiresAt: null,
+  signature: 'test',
+};
 
 function registry(): ToolRegistry {
   const r = new ToolRegistry();
@@ -63,30 +75,56 @@ describe('NekoTOML: manifest', () => {
   });
 });
 
-describe('NekoTOML: monetization safety', () => {
+describe('NekoTOML: monetization gating (single-build, entitlement-gated)', () => {
   const registration = buildTomlRegistration(clock);
   const proExporterIds = ['toml.export.types', 'toml.export.schema.json'];
 
-  it('no Pro exporter is registered in the free build', () => {
-    const registered = new Set(registration.exporters.map((e) => e.id));
-    for (const id of proExporterIds) expect(registered.has(id)).toBe(false);
-  });
-
-  it('runExporter throws "unknown exporter" for every Pro exporter id', () => {
-    const r = registry();
-    for (const id of proExporterIds) {
-      expect(() => runExporter(r, 'toml', id, { artifacts: [], diagnostics: [] })).toThrow(
-        /unknown exporter/,
-      );
-    }
-  });
-
-  it('the manifest declares Pro exporters that are NOT in the registered set', () => {
-    const registered = new Set(registration.exporters.map((e) => e.id));
+  it('Pro exporters are declared AND registered as proExporters, not free', () => {
+    const proIds = new Set((registration.proExporters ?? []).map((e) => e.id));
+    const free = new Set(registration.exporters.map((e) => e.id));
     for (const id of proExporterIds) {
       expect(tomlManifest.exporters).toContain(id);
-      expect(registered.has(id)).toBe(false);
+      expect(proIds.has(id)).toBe(true);
+      expect(free.has(id)).toBe(false);
     }
+  });
+
+  it('a free caller (default entitlement) is refused with EntitlementError', () => {
+    const r = registry();
+    const parsed = runParser(r, 'toml', 'toml.text', {
+      raw: 'title = "x"\n[server]\nport = 8080\n',
+      source: { kind: 'paste', bytes: 32 },
+    });
+    for (const id of proExporterIds) {
+      expect(() => runExporter(r, 'toml', id, parsed)).toThrow(EntitlementError);
+    }
+  });
+
+  it('a Pro entitlement unlocks the TypeScript types + JSON Schema exporters', () => {
+    const r = registry();
+    const parsed = runParser(r, 'toml', 'toml.text', {
+      raw: 'title = "Neko"\nport = 8080\n[server]\nhost = "localhost"\n',
+      source: { kind: 'paste', bytes: 50 },
+    });
+
+    const ts = String(runExporter(r, 'toml', 'toml.export.types', parsed, PRO).body);
+    expect(ts).toContain('export type Config = {');
+    expect(ts).toContain('title: string;');
+    expect(ts).toContain('port: number;');
+    expect(ts).toContain('host: string;');
+
+    const schema = JSON.parse(
+      String(runExporter(r, 'toml', 'toml.export.schema.json', parsed, PRO).body),
+    ) as { type?: string; properties?: Record<string, { type?: string }> };
+    expect(schema.type).toBe('object');
+    expect(schema.properties?.['port']?.type).toBe('integer');
+    expect(schema.properties?.['server']?.type).toBe('object');
+  });
+
+  it('a truly unknown exporter id still throws "unknown exporter"', () => {
+    expect(() =>
+      runExporter(registry(), 'toml', 'toml.export.nope', { artifacts: [], diagnostics: [] }, PRO),
+    ).toThrow(/unknown exporter/);
   });
 
   it('free entitlements match exactly the implemented vertical-slice set', () => {

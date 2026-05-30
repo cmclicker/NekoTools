@@ -8,6 +8,7 @@ import {
   type TomlParsedArtifact,
   type TomlValue,
 } from './kinds.js';
+import { inferJsonSchema, toTypeScript } from './codegen.js';
 
 const TOOL_ID = 'toml';
 
@@ -198,4 +199,47 @@ export const freeExporters: readonly Exporter<TomlArtifact>[] = [
   jsonExporter,
   normalizedExporter,
   markdownSummaryExporter,
+];
+
+// --- Pro exporters (registered in the binary, gated by entitlement) --------
+//
+// These back the manifest's declared Pro exporter ids (`infer.types` /
+// `infer.schema`). Each derives purely from the decoded `toml.parsed` value
+// tree — no network, no premium-engine dependency. Code generation lives in
+// `codegen.ts` and mirrors NekoJSON's shape rules.
+
+/** `toml.export.types` (Pro) — a TypeScript type from the decoded tree. */
+export const typescriptExporter: Exporter<TomlArtifact> = {
+  version: 1,
+  id: 'toml.export.types',
+  toolId: TOOL_ID,
+  target: 'plaintext',
+  accepts: TOML_PARSED_EXPORT_KINDS,
+  producesMimeType: 'text/plain',
+  producesExtension: 'ts',
+  export({ artifacts }) {
+    const data = pickParsed(artifacts)?.value.data ?? null;
+    return { mimeType: 'text/plain', extension: 'ts', body: toTypeScript(data, 'Config') };
+  },
+};
+
+/** `toml.export.schema.json` (Pro) — an inferred JSON Schema from the tree. */
+export const schemaJsonExporter: Exporter<TomlArtifact> = {
+  version: 1,
+  id: 'toml.export.schema.json',
+  toolId: TOOL_ID,
+  target: 'json',
+  accepts: TOML_PARSED_EXPORT_KINDS,
+  producesMimeType: 'application/schema+json',
+  producesExtension: 'json',
+  export({ artifacts }) {
+    const data = pickParsed(artifacts)?.value.data ?? null;
+    const body = JSON.stringify(inferJsonSchema(data), null, 2);
+    return { mimeType: 'application/schema+json', extension: 'json', body };
+  },
+};
+
+export const proExporters: readonly Exporter<TomlArtifact>[] = [
+  typescriptExporter,
+  schemaJsonExporter,
 ];
