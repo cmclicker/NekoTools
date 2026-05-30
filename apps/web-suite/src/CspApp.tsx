@@ -11,11 +11,11 @@ import type { CspDirective } from '@nekotools/lens-csp';
 /**
  * NekoCSP sub-app. Paste a Content-Security-Policy, see the directive table
  * or JSON projection, see basic security hints, copy. Pro (gated by the
- * suite license): a deep CSP security audit + SARIF export for CI. Parsing
- * and auditing run entirely in the browser — no requests, ever.
+ * suite license): a deep CSP posture audit + a hardened-policy suggestion.
+ * Parsing and auditing run entirely in the browser — no requests, ever.
  */
 
-export type CspViewMode = 'table' | 'json' | 'audit' | 'sarif';
+export type CspViewMode = 'table' | 'json' | 'audit' | 'hardened';
 
 export interface NekoCspUiState {
   readonly viewMode: CspViewMode;
@@ -36,13 +36,13 @@ interface CopyStatus {
 
 const SAMPLE_INPUT = "default-src 'self'; script-src 'self' 'unsafe-inline'; img-src *";
 
-const PRO_VIEWS = new Set<CspViewMode>(['audit', 'sarif']);
-const VIEW_MODES: readonly CspViewMode[] = ['table', 'json', 'audit', 'sarif'];
+const PRO_VIEWS = new Set<CspViewMode>(['audit', 'hardened']);
+const VIEW_MODES: readonly CspViewMode[] = ['table', 'json', 'audit', 'hardened'];
 const VIEW_LABELS: Record<CspViewMode, string> = {
   table: 'Table',
   json: 'JSON',
   audit: 'Audit ⭐',
-  sarif: 'SARIF ⭐',
+  hardened: 'Hardened ⭐',
 };
 
 export function CspApp({
@@ -68,13 +68,13 @@ export function CspApp({
       ? parsed.jsonOutput
       : viewMode === 'audit'
         ? parsed.auditReport
-        : viewMode === 'sarif'
-          ? parsed.sarif
+        : viewMode === 'hardened'
+          ? parsed.hardened
           : null;
   // Copy target: Pro views copy their own output; table + JSON both copy JSON.
   const copyText =
-    viewMode === 'audit' ? parsed.auditReport : viewMode === 'sarif' ? parsed.sarif : parsed.jsonOutput;
-  const copyLabel = viewMode === 'audit' ? 'Audit' : viewMode === 'sarif' ? 'SARIF' : 'JSON';
+    viewMode === 'audit' ? parsed.auditReport : viewMode === 'hardened' ? parsed.hardened : parsed.jsonOutput;
+  const copyLabel = viewMode === 'audit' ? 'Audit' : viewMode === 'hardened' ? 'hardened policy' : 'JSON';
 
   const handleCopy = useCallback(async () => {
     if (copyText === null || copyText === '') {
@@ -152,10 +152,10 @@ export function CspApp({
         {hasDirectives ? (
           isProView && !proUnlocked ? (
             <div className="pro-lock" role="status" data-testid="csp-locked">
-              <strong>{viewMode === 'audit' ? 'Security audit' : 'SARIF export'} is a Pro feature.</strong>
+              <strong>{viewMode === 'audit' ? 'Security audit' : 'Hardened policy'} is a Pro feature.</strong>
               <p>
                 Audit the policy for unsafe-inline/eval, wildcards, insecure schemes, data: URIs, and
-                a missing default-src — and export SARIF 2.1.0 to wire NekoCSP into CI code-scanning.
+                a missing default-src — and generate a hardened policy you can paste straight back.
                 Unlock with a license key (verified locally, works offline forever).
               </p>
             </div>

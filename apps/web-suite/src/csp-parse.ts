@@ -30,16 +30,16 @@ export interface ParsedCsp {
   readonly jsonOutput: string;
   /** Pro: CSP posture audit report (markdown), or null when not entitled. */
   readonly auditReport: string | null;
-  /** Pro: SARIF 2.1.0 of the posture audit, or null when not entitled. */
-  readonly sarif: string | null;
+  /** Pro: hardened-policy suggestion (header + changelog), or null when not entitled. */
+  readonly hardened: string | null;
   readonly proUnlocked: boolean;
   readonly diagnostics: readonly Diagnostic[];
 }
 
 /**
  * Run `csp.text` over raw policy input and render the engine's exporters.
- * The free `jsonOutput` always renders; `auditReport` / `sarif` render only
- * for a Pro entitlement (otherwise `null`).
+ * The free `jsonOutput` always renders; `auditReport` / `hardened` render
+ * only for a Pro entitlement (otherwise `null`).
  */
 export function parseCspText(raw: string, entitlement: Entitlement = FREE_ENTITLEMENT): ParsedCsp {
   const result = runParser(registry, 'csp', 'csp.text', {
@@ -68,7 +68,7 @@ export function parseCspText(raw: string, entitlement: Entitlement = FREE_ENTITL
     document: artifact?.value ?? null,
     jsonOutput: run('csp.export.json'),
     auditReport: runPro('csp.export.report'),
-    sarif: runPro('csp.export.sarif'),
+    hardened: runPro('csp.export.hardened'),
     proUnlocked: entitlement.tier !== 'free',
     diagnostics: result.diagnostics,
   };
