@@ -7,6 +7,7 @@ import {
   type ColorParsedArtifact,
   type ColorReport,
 } from './kinds.js';
+import { toCssVars, toPalette } from './codegen.js';
 
 const TOOL_ID = 'color';
 
@@ -83,3 +84,43 @@ export const freeExporters: readonly Exporter<ColorArtifact>[] = [
   normalizedExporter,
   markdownSummaryExporter,
 ];
+
+// --- Pro exporters (registered in the binary, gated by entitlement) --------
+//
+// These back the manifest's declared Pro exporter ids (`palette.generate` /
+// `export.css-vars`). Both are pure color math over the parsed colors — no
+// network, no premium engine. Generators live in `codegen.ts`. The
+// scale.generate / blend.mix / contrast-grid / colorblind.simulate Pro
+// features stay advertising-only.
+
+/** `color.export.palette` (Pro) — a 50–900 tint/shade palette per color. */
+export const paletteExporter: Exporter<ColorArtifact> = {
+  version: 1,
+  id: 'color.export.palette',
+  toolId: TOOL_ID,
+  target: 'markdown',
+  accepts: COLOR_PARSED_EXPORT_KINDS,
+  producesMimeType: 'text/markdown',
+  producesExtension: 'md',
+  export({ artifacts }) {
+    const value = pickParsed(artifacts)?.value ?? { count: 0, colors: [] };
+    return { mimeType: 'text/markdown', extension: 'md', body: toPalette(value) };
+  },
+};
+
+/** `color.export.css-vars` (Pro) — :root custom properties for the scale(s). */
+export const cssVarsExporter: Exporter<ColorArtifact> = {
+  version: 1,
+  id: 'color.export.css-vars',
+  toolId: TOOL_ID,
+  target: 'plaintext',
+  accepts: COLOR_PARSED_EXPORT_KINDS,
+  producesMimeType: 'text/css',
+  producesExtension: 'css',
+  export({ artifacts }) {
+    const value = pickParsed(artifacts)?.value ?? { count: 0, colors: [] };
+    return { mimeType: 'text/css', extension: 'css', body: toCssVars(value) };
+  },
+};
+
+export const proExporters: readonly Exporter<ColorArtifact>[] = [paletteExporter, cssVarsExporter];
