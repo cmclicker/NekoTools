@@ -1,12 +1,13 @@
 import type { ToolRegistration } from '@nekotools/tool-runtime';
 import { FIXED_CLOCK, type Clock } from '@nekotools/lens-kit';
 
-import { freeExporters } from './exporters.js';
+import { freeExporters, proExporters } from './exporters.js';
 import { packageManifest } from './manifest.js';
 import { createPackageJsonParser } from './parser-text.js';
 
 export * from './kinds.js';
 export * from './diagnostics.js';
+export * from './audit.js';
 export * from './parser-text.js';
 export * from './exporters.js';
 export * from './manifest.js';
@@ -28,5 +29,6 @@ export function buildPackageRegistration(
     manifest: packageManifest,
     parsers: [createPackageJsonParser(deps)],
     exporters: freeExporters,
+    proExporters,
   };
 }

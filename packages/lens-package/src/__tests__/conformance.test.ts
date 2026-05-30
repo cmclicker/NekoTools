@@ -1,20 +1,33 @@
 import { describe, expect, it } from 'vitest';
 import {
+  EntitlementError,
   ToolRegistry,
   jsonWorkspaceSerializer,
   runExporter,
   runParser,
   validateManifest,
 } from '@nekotools/tool-runtime';
-import type { Workspace } from '@nekotools/contracts';
+import type { Entitlement, Workspace } from '@nekotools/contracts';
 
 import {
+  auditPackage,
   buildPackageRegistration,
   FIXED_CLOCK,
   PACKAGE_KIND_MANIFEST,
   packageManifest,
   type PackageManifestArtifact,
 } from '../index.js';
+
+const PRO: Entitlement = {
+  version: 1,
+  licenseId: 'TEST',
+  licensee: 'Test User',
+  tier: 'pro',
+  features: ['*'],
+  issuedAt: '2026-01-01T00:00:00.000Z',
+  expiresAt: null,
+  signature: 'test',
+};
 
 const clock = FIXED_CLOCK('2026-05-28T00:00:00.000Z');
 
@@ -73,13 +86,105 @@ describe('NekoPackage: manifest', () => {
     expect(packageManifest.offlinePolicy.networkPolicy).toBe('network-forbidden');
   });
 
-  it('keeps policy packs and lockfile audit out of the free build', () => {
-    const registration = buildPackageRegistration(clock);
-    const registered = new Set(registration.exporters.map((exporter) => exporter.id));
+  it('still advertises future Pro capabilities (policy packs, lockfile audit)', () => {
     expect(packageManifest.entitlements.pro).toContain('policy.packs');
     expect(packageManifest.entitlements.pro).toContain('lockfile.audit');
-    expect(registered.has('package.export.policy.report')).toBe(false);
-    expect(registered.has('package.export.ci.guard')).toBe(false);
+  });
+});
+
+describe('NekoPackage: monetization gating (single-build, entitlement-gated)', () => {
+  const proExporterIds = ['package.export.policy.report', 'package.export.sarif'];
+
+  it('Pro exporters are declared AND registered as proExporters, not free', () => {
+    const reg = buildPackageRegistration(clock);
+    const proIds = new Set((reg.proExporters ?? []).map((e) => e.id));
+    for (const id of proExporterIds) {
+      expect(packageManifest.exporters).toContain(id);
+      expect(proIds.has(id)).toBe(true);
+      expect(reg.exporters.some((e) => e.id === id)).toBe(false);
+    }
+  });
+
+  it('does not register the future ci.guard generator as an exporter', () => {
+    expect(packageManifest.exporters).not.toContain('package.export.ci.guard');
+    expect(packageManifest.entitlements.pro).toContain('ci.guard.export');
+  });
+
+  it('a free caller (default entitlement) is refused with EntitlementError', () => {
+    const r = registry();
+    const parsed = parse(SAMPLE);
+    for (const id of proExporterIds) {
+      expect(() => runExporter(r, 'package', id, parsed)).toThrow(EntitlementError);
+    }
+  });
+
+  it('a Pro entitlement unlocks the policy report + SARIF exporters', () => {
+    const r = registry();
+    const parsed = parse(SAMPLE);
+
+    const report = String(runExporter(r, 'package', 'package.export.policy.report', parsed, PRO).body);
+    expect(report).toContain('# NekoPackage risk audit');
+    expect(report).toContain('package.network_shell_script');
+
+    const sarifResult = runExporter(r, 'package', 'package.export.sarif', parsed, PRO);
+    expect(sarifResult.mimeType).toBe('application/sarif+json');
+    expect(sarifResult.extension).toBe('sarif');
+    const sarif = JSON.parse(String(sarifResult.body));
+    expect(sarif.version).toBe('2.1.0');
+    expect(sarif.runs[0].tool.driver.name).toBe('NekoPackage');
+    expect(
+      sarif.runs[0].results.some((x: { ruleId: string }) => x.ruleId === 'package.network_shell_script'),
+    ).toBe(true);
+  });
+
+  it('a truly unknown exporter id still throws "unknown exporter"', () => {
+    expect(() =>
+      runExporter(registry(), 'package', 'package.export.nope', { artifacts: [], diagnostics: [] }, PRO),
+    ).toThrow(/unknown exporter/);
+  });
+});
+
+describe('NekoPackage: dependency & license-risk audit', () => {
+  const audit = (raw: string) => auditPackage(manifestOf(raw).value);
+
+  it('classifies a strong/network copyleft license as high', () => {
+    const f = audit(JSON.stringify({ name: 'a', version: '1.0.0', license: 'AGPL-3.0-only' })).find(
+      (x) => x.ruleId === 'package.license_copyleft',
+    );
+    expect(f?.severity).toBe('high');
+  });
+
+  it('classifies GPL as medium and LGPL as low copyleft', () => {
+    const gpl = audit(JSON.stringify({ name: 'a', version: '1.0.0', license: 'GPL-3.0-only' }));
+    const lgpl = audit(JSON.stringify({ name: 'a', version: '1.0.0', license: 'LGPL-3.0-only' }));
+    expect(gpl.find((x) => x.ruleId === 'package.license_copyleft')?.severity).toBe('medium');
+    expect(lgpl.find((x) => x.ruleId === 'package.license_copyleft')?.severity).toBe('low');
+  });
+
+  it('flags a public package with no license, but not a private one', () => {
+    const pub = audit(JSON.stringify({ name: 'a', version: '1.0.0' })).map((x) => x.ruleId);
+    const priv = audit(JSON.stringify({ name: 'a', version: '1.0.0', private: true })).map((x) => x.ruleId);
+    expect(pub).toContain('package.license_missing');
+    expect(priv).not.toContain('package.license_missing');
+  });
+
+  it('treats a permissive license as clean (no copyleft finding)', () => {
+    expect(
+      audit(JSON.stringify({ name: 'a', version: '1.0.0', license: 'MIT' })).map((x) => x.ruleId),
+    ).not.toContain('package.license_copyleft');
+  });
+
+  it('elevates the parser risk signals into ruleId-keyed findings', () => {
+    const ids = audit(SAMPLE).map((x) => x.ruleId);
+    expect(ids).toContain('package.network_shell_script');
+    expect(ids).toContain('package.lifecycle_script');
+    expect(ids).toContain('package.remote_dependency');
+    expect(ids).toContain('package.unpinned_dependency');
+    expect(ids).toContain('package.duplicate_dependency');
+  });
+
+  it('returns nothing for an absent document', () => {
+    expect(auditPackage(undefined)).toEqual([]);
   });
 });
 

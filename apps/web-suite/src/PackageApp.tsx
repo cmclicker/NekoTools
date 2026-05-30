@@ -1,7 +1,10 @@
 import { useCallback, useMemo, useState, type ChangeEvent } from 'react';
 
+import type { Entitlement } from '@nekotools/contracts';
+
 import { Diagnostics } from './Diagnostics.js';
 import { copyToClipboard, type ClipboardDeps } from './clipboard.js';
+import { useLicenseContext } from './license-store.js';
 import { runPackage } from './package-parse.js';
 
 export interface NekoPackageUiState {
@@ -13,9 +16,12 @@ export interface PackageAppProps {
   readonly initialInput?: string;
   readonly initialUiState?: Partial<NekoPackageUiState>;
   readonly clipboardDeps?: ClipboardDeps;
+  /** Injected entitlement; defaults to the suite license context. */
+  readonly entitlement?: Entitlement;
 }
 
-type CopyTarget = 'json' | 'markdown';
+type CopyTarget = 'json' | 'markdown' | 'report' | 'sarif';
+type ProView = 'report' | 'sarif';
 
 interface CopyStatus {
   readonly ok: boolean;
@@ -47,20 +53,32 @@ export function PackageApp({
   initialInput,
   initialUiState,
   clipboardDeps,
+  entitlement,
 }: PackageAppProps = {}): JSX.Element {
   const [input, setInput] = useState<string>(initialInput ?? SAMPLE_INPUT);
   const [showDependencies, setShowDependencies] = useState<boolean>(
     initialUiState?.showDependencies ?? true,
   );
   const [showScripts, setShowScripts] = useState<boolean>(initialUiState?.showScripts ?? true);
+  const [proView, setProView] = useState<ProView>('report');
   const [copyStatus, setCopyStatus] = useState<CopyStatus | null>(null);
 
-  const run = useMemo(() => runPackage(input), [input]);
+  const license = useLicenseContext();
+  const effectiveEntitlement = entitlement ?? license.entitlement;
+  const run = useMemo(() => runPackage(input, effectiveEntitlement), [input, effectiveEntitlement]);
   const manifest = run.manifest;
+  const proUnlocked = run.proUnlocked;
 
   const handleCopy = useCallback(
     async (target: CopyTarget) => {
-      const text = target === 'json' ? run.jsonSummary : run.markdownSummary;
+      const text =
+        target === 'json'
+          ? run.jsonSummary
+          : target === 'markdown'
+            ? run.markdownSummary
+            : target === 'report'
+              ? run.policyReport
+              : run.sarif;
       if (text === null) {
         setCopyStatus({ ok: false, target, method: 'none' });
         return;
@@ -68,7 +86,7 @@ export function PackageApp({
       const result = await copyToClipboard(text, clipboardDeps);
       setCopyStatus({ ok: result.ok, target, method: result.method });
     },
-    [clipboardDeps, run.jsonSummary, run.markdownSummary],
+    [clipboardDeps, run.jsonSummary, run.markdownSummary, run.policyReport, run.sarif],
   );
 
   return (
@@ -87,8 +105,8 @@ export function PackageApp({
           data-testid="package-input"
         />
         <p className="paste__hint">
-          Inspection runs locally in your browser. No registry lookups, installs, telemetry, or
-          remote fetches.
+          Inspection and auditing run locally in your browser. No registry lookups, installs,
+          telemetry, or remote fetches.
         </p>
       </section>
 
@@ -271,6 +289,58 @@ export function PackageApp({
                 )}
               </section>
             ) : null}
+
+            <section className="package-section" aria-label="Risk audit (Pro)">
+              <h2 className="package-section__heading">Risk audit ⭐</h2>
+              {proUnlocked ? (
+                <>
+                  <div className="results__toolbar">
+                    <fieldset className="viewmode" aria-label="Risk audit output">
+                      <legend className="visually-hidden">Risk audit output</legend>
+                      {(['report', 'sarif'] as const).map((m) => (
+                        <label key={m} className={proView === m ? 'viewmode--active' : ''}>
+                          <input
+                            type="radio"
+                            name="packageProView"
+                            value={m}
+                            checked={proView === m}
+                            onChange={() => setProView(m)}
+                          />
+                          {m === 'report' ? 'Report' : 'SARIF'}
+                        </label>
+                      ))}
+                    </fieldset>
+                    <div className="copy" role="group" aria-label="Copy audit">
+                      <button
+                        type="button"
+                        className="copy__btn"
+                        onClick={() => void handleCopy(proView)}
+                        data-testid="package-copy-audit"
+                      >
+                        Copy {proView === 'report' ? 'report' : 'SARIF'}
+                      </button>
+                    </div>
+                  </div>
+                  <pre
+                    className="yaml-output"
+                    data-testid="package-audit-output"
+                    aria-label={`${proView} output`}
+                  >
+                    {proView === 'report' ? run.policyReport : run.sarif}
+                  </pre>
+                </>
+              ) : (
+                <div className="pro-lock" role="status" data-testid="package-locked">
+                  <strong>Dependency &amp; license-risk audit + SARIF is a Pro feature.</strong>
+                  <p>
+                    Audit dependencies and scripts for license risk (copyleft / missing / unknown),
+                    remote supply-chain specifiers, and lifecycle / shell-piping scripts — and export
+                    SARIF 2.1.0 to gate package.json in CI. Unlock with a license key (verified
+                    locally, works offline forever).
+                  </p>
+                </div>
+              )}
+            </section>
           </>
         )}
 
