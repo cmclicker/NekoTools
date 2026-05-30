@@ -11,12 +11,12 @@ import { parseLicenseInput } from './license-parse.js';
  * NekoLicense sub-app. Wires `@nekotools/lens-license` into the shared
  * web-suite shell as a Project tool tab. Free surface: paste a LICENSE file,
  * see the detected SPDX id + its category and permissions/conditions/
- * limitations, and copy JSON / markdown. Pro (gated by the suite license): an
- * obligations & risk audit (copyleft / AGPL / disclose-source) + SARIF export
- * for CI. Local; detection is heuristic + informational, not legal advice.
+ * limitations, and copy JSON / markdown. Pro (gated by the suite license): a
+ * license compatibility matrix and a NOTICE / attribution generator. Local;
+ * detection is heuristic + informational, not legal advice.
  */
 
-export type LicenseViewMode = 'summary' | 'json' | 'markdown' | 'audit' | 'sarif';
+export type LicenseViewMode = 'summary' | 'json' | 'markdown' | 'compatibility' | 'notice';
 
 export interface NekoLicenseUiState {
   readonly viewMode: LicenseViewMode;
@@ -35,21 +35,21 @@ interface CopyStatus {
   readonly method: 'clipboard-api' | 'execCommand' | 'none';
 }
 
-const PRO_VIEWS = new Set<LicenseViewMode>(['audit', 'sarif']);
-const VIEW_MODES: readonly LicenseViewMode[] = ['summary', 'json', 'markdown', 'audit', 'sarif'];
+const PRO_VIEWS = new Set<LicenseViewMode>(['compatibility', 'notice']);
+const VIEW_MODES: readonly LicenseViewMode[] = ['summary', 'json', 'markdown', 'compatibility', 'notice'];
 const VIEW_LABELS: Record<LicenseViewMode, string> = {
   summary: 'Summary',
   json: 'JSON',
   markdown: 'Markdown',
-  audit: 'Audit ⭐',
-  sarif: 'SARIF ⭐',
+  compatibility: 'Compatibility ⭐',
+  notice: 'NOTICE ⭐',
 };
 const COPY_LABELS: Record<LicenseViewMode, string> = {
   summary: 'Copy markdown summary',
   json: 'Copy JSON',
   markdown: 'Copy markdown summary',
-  audit: 'Copy audit',
-  sarif: 'Copy SARIF',
+  compatibility: 'Copy matrix',
+  notice: 'Copy NOTICE',
 };
 
 const SAMPLE_INPUT = [
@@ -87,10 +87,10 @@ export function LicenseApp({
       ? parsed.json
       : viewMode === 'markdown'
         ? parsed.markdown
-        : viewMode === 'audit'
-          ? parsed.auditReport
-          : viewMode === 'sarif'
-            ? parsed.sarif
+        : viewMode === 'compatibility'
+          ? parsed.compatibility
+          : viewMode === 'notice'
+            ? parsed.notice
             : null; // summary
   const copyText = viewMode === 'summary' ? parsed.markdown : (outputText ?? '');
 
@@ -179,11 +179,12 @@ export function LicenseApp({
 
         {isProView && !proUnlocked ? (
           <div className="pro-lock" role="status" data-testid="license-locked">
-            <strong>{viewMode === 'audit' ? 'Obligations & risk audit' : 'SARIF export'} is a Pro feature.</strong>
+            <strong>{viewMode === 'compatibility' ? 'Compatibility matrix' : 'NOTICE generator'} is a Pro feature.</strong>
             <p>
-              Audit the detected license for copyleft / AGPL network-copyleft risk, source-disclosure
-              and same-license obligations, and SPDX-tag mismatches — and export SARIF 2.1.0 to gate
-              license risk in CI. Unlock with a license key (verified locally, works offline forever).
+              See whether the detected license can be combined into a work distributed under each
+              common target license (permissive / copyleft / proprietary), and generate a
+              ready-to-paste NOTICE / attribution entry. Unlock with a license key (verified locally,
+              works offline forever).
             </p>
           </div>
         ) : viewMode === 'summary' ? (

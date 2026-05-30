@@ -1,6 +1,6 @@
 import type { Exporter } from '@nekotools/contracts';
 
-import { auditLicense, type LicenseAuditSeverity } from './audit.js';
+import type { LicenseCategory } from './license.js';
 import {
   LICENSE_KIND_PARSED,
   LICENSE_PARSED_EXPORT_KINDS,
@@ -86,22 +86,66 @@ export const freeExporters: readonly Exporter<LicenseArtifact>[] = [
 
 // --- Pro exporters (registered in the binary, gated by entitlement) --------
 
-const SARIF_LEVEL: Record<LicenseAuditSeverity, string> = {
-  high: 'error',
-  medium: 'warning',
-  low: 'note',
-  info: 'note',
+/**
+ * Outbound compatibility verdict: can code under the detected license be
+ * included in a larger work distributed under the target license? Deterministic
+ * from license category — informational, NOT legal advice.
+ */
+type CompatVerdict = 'yes' | 'conditions' | 'no' | 'unknown';
+
+const TARGET_LICENSES: readonly { id: string; category: LicenseCategory | 'proprietary' }[] = [
+  { id: 'MIT / BSD / ISC (permissive)', category: 'permissive' },
+  { id: 'Apache-2.0', category: 'permissive' },
+  { id: 'MPL-2.0 (weak copyleft)', category: 'weak-copyleft' },
+  { id: 'GPL-3.0 (copyleft)', category: 'copyleft' },
+  { id: 'Proprietary / closed-source', category: 'proprietary' },
+];
+
+/** Can `source` be combined into a work distributed under `target`? */
+function compatibility(
+  source: LicenseCategory,
+  target: LicenseCategory | 'proprietary',
+): { verdict: CompatVerdict; note: string } {
+  switch (source) {
+    case 'public-domain':
+      return { verdict: 'yes', note: 'public-domain — usable anywhere' };
+    case 'permissive':
+      return target === 'copyleft'
+        ? { verdict: 'yes', note: 'permissive code may be relicensed under copyleft' }
+        : { verdict: 'yes', note: 'attribution notice must be preserved' };
+    case 'weak-copyleft':
+      return target === 'proprietary'
+        ? { verdict: 'conditions', note: 'keep the licensed files under their license + provide source for them' }
+        : { verdict: 'conditions', note: 'file-level source-disclosure applies to the licensed files' };
+    case 'copyleft':
+      return target === 'copyleft'
+        ? { verdict: 'yes', note: 'combining forces the whole work under this copyleft license' }
+        : {
+            verdict: 'no',
+            note: 'including this code forces the entire work under the copyleft license',
+          };
+    default:
+      return { verdict: 'unknown', note: 'classify manually' };
+  }
+}
+
+const VERDICT_LABEL: Record<CompatVerdict, string> = {
+  yes: '✓ yes',
+  conditions: '⚠ with conditions',
+  no: '✗ no',
+  unknown: '? unknown',
 };
 
 /**
- * `license.export.audit.report` (Pro) — an obligations & risk report for the
- * detected license: copyleft / network-copyleft risk, source-disclosure and
- * same-license obligations, and detection-quality signals, each ruleId-keyed
- * with a severity. Pure + local; informational, not legal advice.
+ * `license.export.compatibility` (Pro) — the `compatibility.matrix` capability:
+ * a matrix of whether code under the detected license can be combined into a
+ * larger work distributed under each common target license, with a note per
+ * cell. Deterministic from license category. Pure + local; informational, not
+ * legal advice.
  */
-export const auditReportExporter: Exporter<LicenseArtifact> = {
+export const compatibilityExporter: Exporter<LicenseArtifact> = {
   version: 1,
-  id: 'license.export.audit.report',
+  id: 'license.export.compatibility',
   toolId: TOOL_ID,
   target: 'markdown',
   accepts: LICENSE_PARSED_EXPORT_KINDS,
@@ -109,71 +153,65 @@ export const auditReportExporter: Exporter<LicenseArtifact> = {
   producesExtension: 'md',
   export({ artifacts }) {
     const value = pickParsed(artifacts)?.value;
-    const findings = auditLicense(value);
-    const counts = { high: 0, medium: 0, low: 0, info: 0 };
-    for (const f of findings) counts[f.severity] += 1;
-
-    const lines: string[] = ['# NekoLicense obligations & risk audit', ''];
-    lines.push(
-      `- license: ${value?.primary ?? '(unknown)'}${value?.spdxTag ? ` (SPDX tag: ${value.spdxTag})` : ''}`,
-      `- findings: ${findings.length} (high: ${counts.high}, medium: ${counts.medium}, low: ${counts.low}, info: ${counts.info})`,
-      '',
-    );
-    if (findings.length > 0) {
-      lines.push('| severity | rule | detail |', '| --- | --- | --- |');
-      for (const f of findings) lines.push(`| ${f.severity} | \`${f.ruleId}\` | ${f.detail} |`);
-    } else {
-      lines.push('No copyleft obligations or detection issues — low-risk for typical commercial use.');
+    const meta = value?.meta ?? null;
+    const lines: string[] = ['# NekoLicense compatibility matrix', ''];
+    lines.push(`- detected: ${value?.primary ?? '(unknown)'}`, '');
+    if (meta === null) {
+      lines.push('No known license detected — cannot compute compatibility.');
+      lines.push('', '_Informational only — not legal advice._');
+      return { mimeType: 'text/markdown', extension: 'md', body: lines.join('\n') };
     }
+    lines.push(
+      `Can code under **${meta.spdxId}** (${meta.category}) be included in a work distributed under:`,
+      '',
+      '| target license | combinable? | note |',
+      '| --- | --- | --- |',
+    );
+    for (const t of TARGET_LICENSES) {
+      const { verdict, note } = compatibility(meta.category, t.category);
+      lines.push(`| ${t.id} | ${VERDICT_LABEL[verdict]} | ${note} |`);
+    }
+    lines.push('', '_Informational only — not legal advice._');
     return { mimeType: 'text/markdown', extension: 'md', body: lines.join('\n') };
   },
 };
 
 /**
- * `license.export.sarif` (Pro) — SARIF 2.1.0 of the obligations & risk audit
- * so a LICENSE review drops into CI code-scanning (gate copyleft / AGPL in a
- * commercial codebase). Carries no secret material.
+ * `license.export.notice` (Pro) — the `notice.generate` capability: a
+ * ready-to-paste NOTICE / attribution entry for the detected license (name,
+ * SPDX id, the conditions that require notice preservation, and a copyright
+ * placeholder). Pure + local.
  */
-export const sarifExporter: Exporter<LicenseArtifact> = {
+export const noticeExporter: Exporter<LicenseArtifact> = {
   version: 1,
-  id: 'license.export.sarif',
+  id: 'license.export.notice',
   toolId: TOOL_ID,
-  target: 'json',
+  target: 'plaintext',
   accepts: LICENSE_PARSED_EXPORT_KINDS,
-  producesMimeType: 'application/sarif+json',
-  producesExtension: 'sarif',
+  producesMimeType: 'text/plain',
+  producesExtension: 'txt',
   export({ artifacts }) {
-    const findings = auditLicense(pickParsed(artifacts)?.value);
-    const ruleIds = [...new Set(findings.map((f) => f.ruleId))];
-    const sarif = {
-      version: '2.1.0',
-      $schema: 'https://json.schemastore.org/sarif-2.1.0.json',
-      runs: [
-        {
-          tool: {
-            driver: {
-              name: 'NekoLicense',
-              informationUri: 'https://nekotools.local',
-              rules: ruleIds.map((id) => ({ id })),
-            },
-          },
-          results: findings.map((f) => ({
-            ruleId: f.ruleId,
-            level: SARIF_LEVEL[f.severity],
-            message: { text: f.detail },
-          })),
-        },
-      ],
-    };
-    return {
-      mimeType: 'application/sarif+json',
-      extension: 'sarif',
-      body: JSON.stringify(sarif, null, 2),
-    };
+    const value = pickParsed(artifacts)?.value;
+    const meta = value?.meta ?? null;
+    const lines: string[] = ['# NOTICE — third-party attribution (generated by NekoLicense)', ''];
+    if (meta === null) {
+      lines.push('# No known license detected — add attribution manually.');
+      return { mimeType: 'text/plain', extension: 'txt', body: lines.join('\n') };
+    }
+    lines.push(
+      `${meta.name} (${meta.spdxId})`,
+      'Copyright (c) <year> <copyright holder>',
+      '',
+      `This product includes software licensed under ${meta.spdxId}.`,
+    );
+    if (meta.conditions.length > 0) {
+      lines.push('', `Conditions: ${meta.conditions.join(', ')}.`);
+    }
+    return { mimeType: 'text/plain', extension: 'txt', body: lines.join('\n') };
   },
 };
 
 export const proExporters: readonly Exporter<LicenseArtifact>[] = [
-  auditReportExporter,
-  sarifExporter,
+  compatibilityExporter,
+  noticeExporter,
 ];

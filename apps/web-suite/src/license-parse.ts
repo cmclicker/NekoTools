@@ -10,9 +10,9 @@ import type { Diagnostic, Entitlement } from '@nekotools/contracts';
 
 /**
  * NekoLicense UI parse helper, extracted out of LicenseApp for testability.
- * Output strings come from the real engine exporters. The Pro obligations &
- * risk audit + SARIF are gated: `runExporter` throws EntitlementError for a
- * free caller, surfaced here as null so the UI shows the Pro-lock.
+ * Output strings come from the real engine exporters. The Pro compatibility
+ * matrix + NOTICE generator are gated: `runExporter` throws EntitlementError
+ * for a free caller, surfaced here as null so the UI shows the Pro-lock.
  */
 
 const registry = (() => {
@@ -28,10 +28,10 @@ export interface ParsedLicenseView {
   readonly meta: LicenseMeta | null;
   readonly json: string;
   readonly markdown: string;
-  /** Pro: obligations & risk audit (markdown), or null when not entitled. */
-  readonly auditReport: string | null;
-  /** Pro: SARIF 2.1.0 of the obligations audit, or null when not entitled. */
-  readonly sarif: string | null;
+  /** Pro: license compatibility matrix (markdown), or null when not entitled. */
+  readonly compatibility: string | null;
+  /** Pro: NOTICE / attribution entry, or null when not entitled. */
+  readonly notice: string | null;
   readonly proUnlocked: boolean;
   readonly diagnostics: readonly Diagnostic[];
 }
@@ -68,8 +68,8 @@ export function parseLicenseInput(
     meta: value?.meta ?? null,
     json: run('license.export.json', 'null'),
     markdown: run('license.export.markdown.summary', ''),
-    auditReport: runPro('license.export.audit.report'),
-    sarif: runPro('license.export.sarif'),
+    compatibility: runPro('license.export.compatibility'),
+    notice: runPro('license.export.notice'),
     proUnlocked: entitlement.tier !== 'free',
     diagnostics: result.diagnostics,
   };

@@ -54,25 +54,25 @@ describe('LicenseApp', () => {
     expect(JSON.parse(writes[0] ?? '{}').primary).toBe('MIT');
   });
 
-  it('locks the audit + SARIF Pro views when free', () => {
-    render(<LicenseApp initialInput={MIT} initialUiState={{ viewMode: 'audit' }} />);
+  it('locks the compatibility + NOTICE Pro views when free', () => {
+    render(<LicenseApp initialInput={MIT} initialUiState={{ viewMode: 'compatibility' }} />);
     expect(screen.getByTestId('license-locked')).toBeInTheDocument();
     expect(screen.queryByTestId('license-output')).not.toBeInTheDocument();
   });
 
-  it('unlocks the obligations audit via an injected Pro entitlement', () => {
+  it('unlocks the compatibility matrix via an injected Pro entitlement', () => {
     render(
-      <LicenseApp initialInput={GPL3} initialUiState={{ viewMode: 'audit' }} entitlement={PRO} />,
+      <LicenseApp initialInput={GPL3} initialUiState={{ viewMode: 'compatibility' }} entitlement={PRO} />,
     );
     const out = screen.getByTestId('license-output').textContent ?? '';
-    expect(out).toContain('# NekoLicense obligations & risk audit');
-    expect(out).toContain('license.copyleft');
+    expect(out).toContain('# NekoLicense compatibility matrix');
+    expect(out).toContain('GPL-3.0');
   });
 
-  it('renders SARIF 2.1.0 in the SARIF view when Pro', () => {
-    render(<LicenseApp initialInput={MIT} initialUiState={{ viewMode: 'sarif' }} entitlement={PRO} />);
-    expect(JSON.parse(screen.getByTestId('license-output').textContent ?? '{}').version).toBe(
-      '2.1.0',
-    );
+  it('renders the NOTICE entry in the NOTICE view when Pro', () => {
+    render(<LicenseApp initialInput={MIT} initialUiState={{ viewMode: 'notice' }} entitlement={PRO} />);
+    const out = screen.getByTestId('license-output').textContent ?? '';
+    expect(out).toContain('# NOTICE');
+    expect(out).toContain('MIT');
   });
 });
