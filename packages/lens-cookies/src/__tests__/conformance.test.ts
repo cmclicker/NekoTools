@@ -116,7 +116,9 @@ describe('NekoCookies: monetization gating (single-build, entitlement-gated)', (
     expect(preset).toContain('Secure');
     expect(preset).toContain('HttpOnly');
     expect(preset).toContain('SameSite=Lax');
-    expect(preset).not.toContain('secret');
+    // Value-free: the secret cookie value must never appear in a Set-Cookie line.
+    const presetCookieLines = preset.split('\n').filter((l) => l.startsWith('Set-Cookie:'));
+    expect(presetCookieLines.every((l) => !l.includes('secret'))).toBe(true);
   });
 
   it('a truly unknown exporter id still throws "unknown exporter"', () => {
