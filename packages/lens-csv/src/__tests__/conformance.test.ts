@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
-import type { Workspace } from '@nekotools/contracts';
+import type { Entitlement, Workspace } from '@nekotools/contracts';
 import {
+  EntitlementError,
   ToolRegistry,
   jsonWorkspaceSerializer,
   runExporter,
@@ -23,6 +24,17 @@ const PRO_EXPORTER_IDS = [
   'csv.export.schema.json',
   'csv.export.cleaning.recipe',
 ];
+
+const PRO: Entitlement = {
+  version: 1,
+  licenseId: 'TEST',
+  licensee: 'Test User',
+  tier: 'pro',
+  features: ['*'],
+  issuedAt: '2026-01-01T00:00:00.000Z',
+  expiresAt: null,
+  signature: 'test',
+};
 
 function registry(): ToolRegistry {
   const r = new ToolRegistry();
@@ -56,13 +68,55 @@ describe('NekoCSV: manifest', () => {
     expect(csvManifest.entitlements.pro).toContain('infer.schema');
   });
 
-  it('keeps Pro exporters advertised but unregistered in the free build', () => {
+  it('registers Pro exporters as proExporters (declared, gated, not free)', () => {
     const registration = buildCsvRegistration(clock);
-    const registered = new Set(registration.exporters.map((exporter) => exporter.id));
+    const free = new Set(registration.exporters.map((e) => e.id));
+    const pro = new Set((registration.proExporters ?? []).map((e) => e.id));
     for (const id of PRO_EXPORTER_IDS) {
       expect(csvManifest.exporters).toContain(id);
-      expect(registered.has(id)).toBe(false);
+      expect(pro.has(id)).toBe(true);
+      expect(free.has(id)).toBe(false);
     }
+  });
+});
+
+describe('NekoCSV: monetization gating (single-build, entitlement-gated)', () => {
+  it('a free caller (default entitlement) is refused with EntitlementError', () => {
+    const r = registry();
+    const parsed = parse('name,age\nAda,37\nLinus,55\n');
+    for (const id of PRO_EXPORTER_IDS) {
+      expect(() => runExporter(r, 'csv', id, parsed)).toThrow(EntitlementError);
+    }
+  });
+
+  it('a Pro entitlement unlocks the profile / schema / cleaning-recipe exporters', () => {
+    const r = registry();
+    const parsed = parse('name,age\nAda,37\nLinus,\n');
+
+    const profile = String(runExporter(r, 'csv', 'csv.export.profile.report', parsed, PRO).body);
+    expect(profile).toContain('# NekoCSV column profile');
+    expect(profile).toContain('`age`');
+    expect(profile).toContain('integer');
+
+    const schema = JSON.parse(
+      String(runExporter(r, 'csv', 'csv.export.schema.json', parsed, PRO).body),
+    ) as { type?: string; properties?: Record<string, { type?: string }>; required?: string[] };
+    expect(schema.type).toBe('object');
+    expect(schema.properties?.['name']?.type).toBe('string');
+    expect(schema.required).toContain('name'); // name fully populated; age has a blank
+    expect(schema.required).not.toContain('age');
+
+    const recipe = JSON.parse(
+      String(runExporter(r, 'csv', 'csv.export.cleaning.recipe', parsed, PRO).body),
+    ) as { tool?: string; steps?: { op: string; target?: string }[] };
+    expect(recipe.tool).toBe('csv');
+    expect(recipe.steps?.some((s) => s.op === 'fill-blanks' && s.target === 'age')).toBe(true);
+  });
+
+  it('a truly unknown exporter id still throws "unknown exporter"', () => {
+    expect(() =>
+      runExporter(registry(), 'csv', 'csv.export.nope', { artifacts: [], diagnostics: [] }, PRO),
+    ).toThrow(/unknown exporter/);
   });
 });
 
