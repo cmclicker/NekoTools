@@ -3,12 +3,13 @@ import type { CookieSet } from './kinds.js';
 
 /**
  * NekoCookies security & privacy posture audit. The Pro
- * `cookie.export.audit.report` and `cookie.export.sarif` exporters render
- * these findings. The free parser already surfaces the per-cookie issues as
- * diagnostics; this audit is the deeper, ruleId-keyed, security-impact-ranked
- * analysis CI consumes. It reuses the parser's diagnostic codes as ruleIds
- * for the overlapping checks (so a SARIF ruleId matches the diagnostic a user
- * already sees), elevates severities by real impact (missing Secure on a
+ * `cookie.export.audit.report` and `cookie.export.policy.preset` exporters
+ * render these findings. The free parser already surfaces the per-cookie
+ * issues as diagnostics; this audit is the deeper, ruleId-keyed,
+ * security-impact-ranked analysis the report consumes. It reuses the parser's
+ * diagnostic codes as ruleIds for the overlapping checks (so a finding's
+ * ruleId matches the diagnostic a user already sees), elevates severities by
+ * real impact (missing Secure on a
  * session cookie is high, not a flat warning), and adds posture rules the
  * free tier does not run (broad Domain, Partitioned-without-Secure,
  * SameSite=None privacy surface). Attribute rules only apply in `set-cookie`

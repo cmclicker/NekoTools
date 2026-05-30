@@ -15,8 +15,9 @@ import type { Diagnostic, Entitlement } from '@nekotools/contracts';
  * provide. The `mode` hint selects Set-Cookie (response, with attributes)
  * vs Cookie (request, name=value pairs) parsing. Output strings come from
  * the real engine exporters so the tab can't drift from the engine. The Pro
- * audit report + SARIF are gated: `runExporter` throws EntitlementError for a
- * free caller, surfaced here as null so the UI shows the Pro-lock.
+ * audit report + policy preset are gated: `runExporter` throws
+ * EntitlementError for a free caller, surfaced here as null so the UI shows
+ * the Pro-lock.
  */
 
 const SHARED_UTF8_ENCODER = new TextEncoder();
@@ -40,8 +41,8 @@ export interface ParsedCookieView {
   readonly markdown: string;
   /** Pro: security & privacy audit report (markdown), or null when not entitled. */
   readonly auditReport: string | null;
-  /** Pro: SARIF 2.1.0 of the cookie audit, or null when not entitled. */
-  readonly sarif: string | null;
+  /** Pro: hardened policy-preset template, or null when not entitled. */
+  readonly policyPreset: string | null;
   readonly proUnlocked: boolean;
   readonly diagnostics: readonly Diagnostic[];
   readonly inputBytes: number;
@@ -84,7 +85,7 @@ export function parseCookieInput(
     normalized: run('cookie.export.normalized', ''),
     markdown: run('cookie.export.markdown.summary', ''),
     auditReport: runPro('cookie.export.audit.report'),
-    sarif: runPro('cookie.export.sarif'),
+    policyPreset: runPro('cookie.export.policy.preset'),
     proUnlocked: entitlement.tier !== 'free',
     diagnostics: result.diagnostics,
     inputBytes: bytes,

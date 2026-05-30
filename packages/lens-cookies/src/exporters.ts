@@ -1,6 +1,6 @@
 import type { Exporter } from '@nekotools/contracts';
 
-import { auditCookies, type CookieAuditSeverity } from './audit.js';
+import { auditCookies } from './audit.js';
 import {
   COOKIE_KIND_PARSED,
   COOKIE_PARSED_EXPORT_KINDS,
@@ -130,13 +130,6 @@ export const freeExporters: readonly Exporter<CookieArtifact>[] = [
 
 // --- Pro exporters (registered in the binary, gated by entitlement) --------
 
-const SARIF_LEVEL: Record<CookieAuditSeverity, string> = {
-  high: 'error',
-  medium: 'warning',
-  low: 'note',
-  info: 'note',
-};
-
 /**
  * `cookie.export.audit.report` (Pro) — a security & privacy posture report:
  * every ruleId-keyed finding (missing Secure/HttpOnly, SameSite issues,
@@ -176,51 +169,54 @@ export const auditReportExporter: Exporter<CookieArtifact> = {
   },
 };
 
+/** The hardened attribute set every preset cookie carries (canonical order). */
+function hardenedAttributes(name: string): string[] {
+  // __Host- is the strongest binding: requires Secure + Path=/ and NO Domain.
+  const isHost = name.startsWith('__Host-');
+  const out: string[] = [];
+  if (!isHost) out.push('Domain=example.com');
+  out.push('Path=/', 'Secure', 'HttpOnly', 'SameSite=Lax');
+  return out;
+}
+
 /**
- * `cookie.export.sarif` (Pro) — SARIF 2.1.0 of the cookie audit so a
- * Set-Cookie review drops into CI code-scanning. Value-free; the ruleIds
- * match the diagnostic codes shown in the free tier.
+ * `cookie.export.policy.preset` (Pro) — the `policy.packs` capability: a
+ * ready-to-adopt hardened Set-Cookie template generated from the parsed
+ * cookies. Each cookie is re-emitted with a safe attribute set (Secure,
+ * HttpOnly, SameSite=Lax, Path=/; __Host- cookies keep the strict no-Domain
+ * binding) so a team can standardize on it. Values are replaced with a
+ * `<value>` placeholder — the preset is a policy, not the secret. A leading
+ * comment block explains the applied policy. Pure + local.
  */
-export const sarifExporter: Exporter<CookieArtifact> = {
+export const policyPresetExporter: Exporter<CookieArtifact> = {
   version: 1,
-  id: 'cookie.export.sarif',
+  id: 'cookie.export.policy.preset',
   toolId: TOOL_ID,
-  target: 'json',
+  target: 'plaintext',
   accepts: COOKIE_PARSED_EXPORT_KINDS,
-  producesMimeType: 'application/sarif+json',
-  producesExtension: 'sarif',
+  producesMimeType: 'text/plain',
+  producesExtension: 'txt',
   export({ artifacts }) {
-    const findings = auditCookies(pickParsed(artifacts)?.value);
-    const ruleIds = [...new Set(findings.map((f) => f.ruleId))];
-    const sarif = {
-      version: '2.1.0',
-      $schema: 'https://json.schemastore.org/sarif-2.1.0.json',
-      runs: [
-        {
-          tool: {
-            driver: {
-              name: 'NekoCookies',
-              informationUri: 'https://nekotools.local',
-              rules: ruleIds.map((id) => ({ id })),
-            },
-          },
-          results: findings.map((f) => ({
-            ruleId: f.ruleId,
-            level: SARIF_LEVEL[f.severity],
-            message: { text: f.target ? `[${f.target}] ${f.detail}` : f.detail },
-          })),
-        },
-      ],
-    };
-    return {
-      mimeType: 'application/sarif+json',
-      extension: 'sarif',
-      body: JSON.stringify(sarif, null, 2),
-    };
+    const value = pickParsed(artifacts)?.value;
+    const cookies = value?.cookies ?? [];
+    const lines: string[] = [
+      '# NekoCookies hardened policy preset',
+      '#  applied: Secure + HttpOnly + SameSite=Lax + Path=/ (Domain dropped for __Host-)',
+      '#  values shown as <value> — this is a policy template, not your secrets',
+      '',
+    ];
+    if (cookies.length === 0) {
+      lines.push('# (no cookies parsed)');
+    } else {
+      for (const c of cookies) {
+        lines.push(`Set-Cookie: ${c.name}=<value>; ${hardenedAttributes(c.name).join('; ')}`);
+      }
+    }
+    return { mimeType: 'text/plain', extension: 'txt', body: lines.join('\n') };
   },
 };
 
 export const proExporters: readonly Exporter<CookieArtifact>[] = [
   auditReportExporter,
-  sarifExporter,
+  policyPresetExporter,
 ];

@@ -21,9 +21,9 @@ export interface BuildCookiesRegistrationOptions {
 
 /**
  * Build a NekoCookies registration for the runtime. Free exporters run for
- * everyone; the Pro exporters (security audit report, SARIF) are registered
- * as `proExporters` and gated by `runExporter` behind a valid entitlement
- * (single-build-gated model, same as NekoJWT / NekoCSP).
+ * everyone; the Pro exporters (security audit report, hardened policy preset)
+ * are registered as `proExporters` and gated by `runExporter` behind a valid
+ * entitlement (single-build-gated model, same as NekoJWT / NekoCSP).
  */
 export function buildCookiesRegistration(
   clock: Clock = FIXED_CLOCK('1970-01-01T00:00:00.000Z'),

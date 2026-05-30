@@ -77,7 +77,7 @@ describe('NekoCookies: manifest', () => {
 });
 
 describe('NekoCookies: monetization gating (single-build, entitlement-gated)', () => {
-  const proExporterIds = ['cookie.export.audit.report', 'cookie.export.sarif'];
+  const proExporterIds = ['cookie.export.audit.report', 'cookie.export.policy.preset'];
 
   it('Pro exporters are declared AND registered as proExporters, not free', () => {
     const reg = buildCookiesRegistration(clock);
@@ -89,8 +89,8 @@ describe('NekoCookies: monetization gating (single-build, entitlement-gated)', (
     }
   });
 
-  it('does not register the future policy-preset generator as an exporter', () => {
-    expect(cookiesManifest.exporters).not.toContain('cookie.export.policy.preset');
+  it('declares the matching pro entitlement features', () => {
+    expect(cookiesManifest.entitlements.pro).toContain('export.audit.report');
     expect(cookiesManifest.entitlements.pro).toContain('export.policy.preset');
   });
 
@@ -102,7 +102,7 @@ describe('NekoCookies: monetization gating (single-build, entitlement-gated)', (
     }
   });
 
-  it('a Pro entitlement unlocks the audit report + SARIF exporters', () => {
+  it('a Pro entitlement unlocks the audit report + policy preset exporters', () => {
     const r = registry();
     const parsed = parse('sid=secret; SameSite=None');
 
@@ -110,15 +110,13 @@ describe('NekoCookies: monetization gating (single-build, entitlement-gated)', (
     expect(report).toContain('# NekoCookies security audit');
     expect(report).toContain('cookie.insecure');
 
-    const sarifResult = runExporter(r, 'cookies', 'cookie.export.sarif', parsed, PRO);
-    expect(sarifResult.mimeType).toBe('application/sarif+json');
-    expect(sarifResult.extension).toBe('sarif');
-    const sarif = JSON.parse(String(sarifResult.body));
-    expect(sarif.version).toBe('2.1.0');
-    expect(sarif.runs[0].tool.driver.name).toBe('NekoCookies');
-    expect(
-      sarif.runs[0].results.some((x: { ruleId: string }) => x.ruleId === 'cookie.samesite_none_insecure'),
-    ).toBe(true);
+    const preset = String(runExporter(r, 'cookies', 'cookie.export.policy.preset', parsed, PRO).body);
+    expect(preset).toContain('# NekoCookies hardened policy preset');
+    expect(preset).toContain('Set-Cookie: sid=<value>;');
+    expect(preset).toContain('Secure');
+    expect(preset).toContain('HttpOnly');
+    expect(preset).toContain('SameSite=Lax');
+    expect(preset).not.toContain('secret');
   });
 
   it('a truly unknown exporter id still throws "unknown exporter"', () => {

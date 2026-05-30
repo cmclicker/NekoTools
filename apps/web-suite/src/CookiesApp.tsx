@@ -14,11 +14,12 @@ import { parseCookieInput } from './cookies-parse.js';
  * Cookie header, see the cookies broken down with their attributes, read the
  * security/privacy hints, and copy a JSON / normalized / value-free markdown
  * summary. Pro (gated by the suite license): a deep security & privacy audit
- * + SARIF export for CI. Cookie values are masked by default (they are often
- * session secrets); everything runs locally — no cookie is ever set or sent.
+ * + a hardened policy-preset template. Cookie values are masked by default
+ * (they are often session secrets); everything runs locally — no cookie is
+ * ever set or sent.
  */
 
-export type CookiesViewMode = 'table' | 'json' | 'normalized' | 'markdown' | 'audit' | 'sarif';
+export type CookiesViewMode = 'table' | 'json' | 'normalized' | 'markdown' | 'audit' | 'preset';
 
 export interface NekoCookiesUiState {
   readonly mode: CookieMode;
@@ -39,14 +40,14 @@ interface CopyStatus {
   readonly method: 'clipboard-api' | 'execCommand' | 'none';
 }
 
-const PRO_VIEWS = new Set<CookiesViewMode>(['audit', 'sarif']);
+const PRO_VIEWS = new Set<CookiesViewMode>(['audit', 'preset']);
 const VIEW_MODES: readonly CookiesViewMode[] = [
   'table',
   'json',
   'normalized',
   'markdown',
   'audit',
-  'sarif',
+  'preset',
 ];
 const VIEW_LABELS: Record<CookiesViewMode, string> = {
   table: 'Table',
@@ -54,7 +55,7 @@ const VIEW_LABELS: Record<CookiesViewMode, string> = {
   normalized: 'Normalized',
   markdown: 'Markdown',
   audit: 'Audit ⭐',
-  sarif: 'SARIF ⭐',
+  preset: 'Policy preset ⭐',
 };
 const COPY_LABELS: Record<CookiesViewMode, string> = {
   table: 'Copy markdown summary',
@@ -62,7 +63,7 @@ const COPY_LABELS: Record<CookiesViewMode, string> = {
   normalized: 'Copy normalized',
   markdown: 'Copy markdown summary',
   audit: 'Copy audit',
-  sarif: 'Copy SARIF',
+  preset: 'Copy preset',
 };
 
 const SAMPLE_INPUT = [
@@ -107,8 +108,8 @@ export function CookiesApp({
           ? parsed.markdown
           : viewMode === 'audit'
             ? parsed.auditReport
-            : viewMode === 'sarif'
-              ? parsed.sarif
+            : viewMode === 'preset'
+              ? parsed.policyPreset
               : null; // table
   // Copy target: table copies the value-free markdown summary; others copy their own output.
   const copyText = viewMode === 'table' ? parsed.markdown : (outputText ?? '');
@@ -237,12 +238,12 @@ export function CookiesApp({
         {parsed.cookies.length > 0 ? (
           isProView && !proUnlocked ? (
             <div className="pro-lock" role="status" data-testid="cookies-locked">
-              <strong>{viewMode === 'audit' ? 'Security audit' : 'SARIF export'} is a Pro feature.</strong>
+              <strong>{viewMode === 'audit' ? 'Security audit' : 'Policy preset'} is a Pro feature.</strong>
               <p>
                 Audit cookies for missing Secure/HttpOnly, SameSite issues, __Host-/__Secure- prefix
-                violations, broad Domain scope, and Partitioned-without-Secure — and export SARIF
-                2.1.0 to wire NekoCookies into CI code-scanning. Value-free output. Unlock with a
-                license key (verified locally, works offline forever).
+                violations, broad Domain scope, and Partitioned-without-Secure — and generate a
+                hardened Set-Cookie policy preset your team can standardize on. Value-free output.
+                Unlock with a license key (verified locally, works offline forever).
               </p>
             </div>
           ) : viewMode === 'table' ? (
