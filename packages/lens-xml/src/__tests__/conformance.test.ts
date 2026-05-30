@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
-import type { Artifact, Workspace } from '@nekotools/contracts';
+import type { Artifact, Entitlement, Workspace } from '@nekotools/contracts';
 import {
+  EntitlementError,
   ToolRegistry,
   jsonWorkspaceSerializer,
   runExporter,
@@ -13,6 +14,17 @@ import { FIXED_CLOCK, XML_KIND_PARSED, buildXmlRegistration, xmlManifest } from 
 import type { XmlParsedArtifact } from '../kinds.js';
 
 const clock = FIXED_CLOCK('2026-05-28T00:00:00.000Z');
+
+const PRO: Entitlement = {
+  version: 1,
+  licenseId: 'TEST',
+  licensee: 'Test User',
+  tier: 'pro',
+  features: ['*'],
+  issuedAt: '2026-01-01T00:00:00.000Z',
+  expiresAt: null,
+  signature: 'test',
+};
 
 function registry(): ToolRegistry {
   const r = new ToolRegistry();
@@ -53,22 +65,48 @@ describe('NekoXML: manifest', () => {
   });
 });
 
-describe('NekoXML: monetization safety', () => {
+describe('NekoXML: monetization gating (single-build, entitlement-gated)', () => {
   const registration = buildXmlRegistration(clock);
   const proExporterIds = ['xml.export.xpath.report', 'xml.export.xsd'];
 
-  it('no Pro exporter is registered in the free build', () => {
-    const registered = new Set(registration.exporters.map((e) => e.id));
-    for (const id of proExporterIds) expect(registered.has(id)).toBe(false);
+  it('Pro exporters are declared AND registered as proExporters, not free', () => {
+    const free = new Set(registration.exporters.map((e) => e.id));
+    const pro = new Set((registration.proExporters ?? []).map((e) => e.id));
+    for (const id of proExporterIds) {
+      expect(xmlManifest.exporters).toContain(id);
+      expect(pro.has(id)).toBe(true);
+      expect(free.has(id)).toBe(false);
+    }
   });
 
-  it('runExporter throws "unknown exporter" for every Pro exporter id', () => {
+  it('a free caller (default entitlement) is refused with EntitlementError', () => {
     const r = registry();
+    const parsed = parseText('<catalog><item id="1"><name>A</name></item><item id="2"><name>B</name></item></catalog>');
     for (const id of proExporterIds) {
-      expect(() => runExporter(r, 'xml', id, { artifacts: [], diagnostics: [] })).toThrow(
-        /unknown exporter/,
-      );
+      expect(() => runExporter(r, 'xml', id, parsed)).toThrow(EntitlementError);
     }
+  });
+
+  it('a Pro entitlement unlocks the path-inventory + XSD exporters', () => {
+    const r = registry();
+    const parsed = parseText('<catalog><item id="1"><name>A</name></item><item id="2"><name>B</name></item></catalog>');
+
+    const report = String(runExporter(r, 'xml', 'xml.export.xpath.report', parsed, PRO).body);
+    expect(report).toContain('# NekoXML path inventory');
+    expect(report).toContain('`/catalog/item`');
+    expect(report).toContain('`/catalog/item/name`');
+
+    const xsd = String(runExporter(r, 'xml', 'xml.export.xsd', parsed, PRO).body);
+    expect(xsd).toContain('<xs:schema xmlns:xs="http://www.w3.org/2001/XMLSchema">');
+    expect(xsd).toContain('<xs:element name="catalog">');
+    expect(xsd).toContain('maxOccurs="unbounded"'); // item repeats under catalog
+    expect(xsd).toContain('<xs:attribute name="id" type="xs:string"/>');
+  });
+
+  it('a truly unknown exporter id still throws "unknown exporter"', () => {
+    expect(() =>
+      runExporter(registry(), 'xml', 'xml.export.nope', { artifacts: [], diagnostics: [] }, PRO),
+    ).toThrow(/unknown exporter/);
   });
 
   it('free entitlements match exactly the implemented vertical-slice set', () => {
