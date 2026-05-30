@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
-import type { Artifact, Workspace } from '@nekotools/contracts';
+import type { Artifact, Entitlement, Workspace } from '@nekotools/contracts';
 import {
+  EntitlementError,
   ToolRegistry,
   jsonWorkspaceSerializer,
   runExporter,
@@ -13,6 +14,17 @@ import { FIXED_CLOCK, buildIniRegistration, iniManifest } from '../index.js';
 import type { IniParsedArtifact } from '../kinds.js';
 
 const clock = FIXED_CLOCK('2026-05-28T00:00:00.000Z');
+
+const PRO: Entitlement = {
+  version: 1,
+  licenseId: 'TEST',
+  licensee: 'Test User',
+  tier: 'pro',
+  features: ['*'],
+  issuedAt: '2026-01-01T00:00:00.000Z',
+  expiresAt: null,
+  signature: 'test',
+};
 
 function registry(): ToolRegistry {
   const r = new ToolRegistry();
@@ -56,19 +68,47 @@ describe('NekoINI: manifest', () => {
   });
 });
 
-describe('NekoINI: monetization safety', () => {
+describe('NekoINI: monetization gating (single-build, entitlement-gated)', () => {
   const registration = buildIniRegistration(clock);
   const proExporterIds = ['ini.export.env', 'ini.export.toml'];
-  it('no Pro exporter is registered, and each throws "unknown exporter"', () => {
-    const registered = new Set(registration.exporters.map((e) => e.id));
-    const r = registry();
+
+  it('Pro exporters are declared AND registered as proExporters, not free', () => {
+    const free = new Set(registration.exporters.map((e) => e.id));
+    const pro = new Set((registration.proExporters ?? []).map((e) => e.id));
     for (const id of proExporterIds) {
-      expect(registered.has(id)).toBe(false);
       expect(iniManifest.exporters).toContain(id);
-      expect(() => runExporter(r, 'ini', id, { artifacts: [], diagnostics: [] })).toThrow(
-        /unknown exporter/,
-      );
+      expect(pro.has(id)).toBe(true);
+      expect(free.has(id)).toBe(false);
     }
+  });
+
+  it('a free caller (default entitlement) is refused with EntitlementError', () => {
+    const r = registry();
+    const parsed = parse('debug = true\n[server]\nhost = localhost\nport = 8080\n');
+    for (const id of proExporterIds) {
+      expect(() => runExporter(r, 'ini', id, parsed)).toThrow(EntitlementError);
+    }
+  });
+
+  it('a Pro entitlement unlocks the .env + TOML conversion exporters', () => {
+    const r = registry();
+    const parsed = parse('debug = true\n[server]\nhost = localhost\nport = 8080\n');
+
+    const env = String(runExporter(r, 'ini', 'ini.export.env', parsed, PRO).body);
+    expect(env).toContain('DEBUG=true');
+    expect(env).toContain('SERVER_HOST=localhost');
+    expect(env).toContain('SERVER_PORT=8080');
+
+    const toml = String(runExporter(r, 'ini', 'ini.export.toml', parsed, PRO).body);
+    expect(toml).toContain('debug = "true"'); // raw string, no coercion
+    expect(toml).toContain('[server]');
+    expect(toml).toContain('host = "localhost"');
+  });
+
+  it('a truly unknown exporter id still throws "unknown exporter"', () => {
+    expect(() =>
+      runExporter(registry(), 'ini', 'ini.export.nope', { artifacts: [], diagnostics: [] }, PRO),
+    ).toThrow(/unknown exporter/);
   });
 });
 
