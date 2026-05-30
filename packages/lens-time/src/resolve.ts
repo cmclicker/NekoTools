@@ -136,7 +136,11 @@ function buildInstant(
   const epochMs = Math.trunc(epochMsRaw);
   const date = new Date(epochMs);
 
-  const offsetMinutes = -date.getTimezoneOffset();
+  // `+ 0` normalizes negative zero: on a UTC host `-getTimezoneOffset()` is
+  // `-0`, which survives in memory but serializes to `0` via JSON — breaking
+  // workspace round-trip equality (`-0 !== 0` under toEqual). `+ 0` keeps all
+  // real offsets and collapses `-0` to `0`.
+  const offsetMinutes = -date.getTimezoneOffset() + 0;
   const local: LocalTimeInfo = {
     formatted: formatLocal(date),
     offsetMinutes,
