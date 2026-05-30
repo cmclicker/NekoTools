@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
-import type { Workspace } from '@nekotools/contracts';
+import type { Entitlement, Workspace } from '@nekotools/contracts';
 import {
+  EntitlementError,
   ToolRegistry,
   jsonWorkspaceSerializer,
   runExporter,
@@ -17,6 +18,17 @@ import {
 import type { HeadersDocumentArtifact } from '../kinds.js';
 
 const clock = FIXED_CLOCK('2026-05-27T00:00:00.000Z');
+
+const PRO: Entitlement = {
+  version: 1,
+  licenseId: 'TEST',
+  licensee: 'Test User',
+  tier: 'pro',
+  features: ['*'],
+  issuedAt: '2026-01-01T00:00:00.000Z',
+  expiresAt: null,
+  signature: 'test',
+};
 
 function registry(): ToolRegistry {
   const r = new ToolRegistry();
@@ -70,30 +82,69 @@ describe('NekoHeaders: manifest', () => {
   });
 });
 
-describe('NekoHeaders: monetization safety', () => {
-  const registration = buildHeadersRegistration(clock);
-  const proExporterIds = ['headers.export.audit.report', 'headers.export.cors-csp.pack'];
+const INSECURE = 'HTTP/1.1 200 OK\nContent-Type: text/html\nServer: nginx/1.25\nX-Powered-By: PHP/8.1\n';
 
-  it('no Pro exporter is registered in the free build', () => {
-    const registered = new Set(registration.exporters.map((e) => e.id));
-    for (const id of proExporterIds) expect(registered.has(id)).toBe(false);
-  });
+const SECURE_FULL = `HTTP/1.1 200 OK
+Content-Type: application/json
+Strict-Transport-Security: max-age=63072000; includeSubDomains
+Content-Security-Policy: default-src 'self'
+X-Content-Type-Options: nosniff
+X-Frame-Options: DENY
+Referrer-Policy: no-referrer
+Permissions-Policy: geolocation=()`;
 
-  it('runExporter throws "unknown exporter" for Pro ids', () => {
-    const r = registry();
-    for (const id of proExporterIds) {
-      expect(() => runExporter(r, 'headers', id, { artifacts: [], diagnostics: [] })).toThrow(
-        /unknown exporter/,
-      );
-    }
-  });
+describe('NekoHeaders: monetization gating (single-build, entitlement-gated)', () => {
+  // Implemented + gated Pro exporters.
+  const gatedProIds = ['headers.export.audit.report', 'headers.export.sarif'];
 
-  it('manifest declares Pro exporters not in the registered set', () => {
-    const registered = new Set(registration.exporters.map((e) => e.id));
-    for (const id of proExporterIds) {
+  it('the gated Pro exporters are declared AND registered as proExporters, not free', () => {
+    const reg = buildHeadersRegistration(clock);
+    const proIds = new Set((reg.proExporters ?? []).map((e) => e.id));
+    for (const id of gatedProIds) {
       expect(headersManifest.exporters).toContain(id);
-      expect(registered.has(id)).toBe(false);
+      expect(proIds.has(id)).toBe(true);
+      expect(reg.exporters.some((e) => e.id === id)).toBe(false);
     }
+  });
+
+  it('a free caller (default entitlement) is refused with EntitlementError', () => {
+    const r = registry();
+    const parsed = parse(INSECURE);
+    for (const id of gatedProIds) {
+      expect(() => runExporter(r, 'headers', id, parsed)).toThrow(EntitlementError);
+    }
+  });
+
+  it('a Pro entitlement unlocks the audit report + SARIF', () => {
+    const r = registry();
+    const parsed = parse(INSECURE);
+    const md = String(runExporter(r, 'headers', 'headers.export.audit.report', parsed, PRO).body);
+    expect(md).toContain('# NekoHeaders security audit');
+    expect(md).toContain('ISSUES FOUND');
+    expect(md).toContain('headers.audit.missing_hsts');
+
+    const sarif = JSON.parse(String(runExporter(r, 'headers', 'headers.export.sarif', parsed, PRO).body));
+    expect(sarif.version).toBe('2.1.0');
+    const hsts = sarif.runs[0].results.find((x: { ruleId: string }) => x.ruleId === 'headers.audit.missing_hsts');
+    expect(hsts.level).toBe('error');
+  });
+
+  it('a clean response (all hardening headers, no leaks) audits to PASS', () => {
+    const r = registry();
+    const md = String(runExporter(r, 'headers', 'headers.export.audit.report', parse(SECURE_FULL), PRO).body);
+    expect(md).toContain('PASS');
+    const sarif = JSON.parse(String(runExporter(r, 'headers', 'headers.export.sarif', parse(SECURE_FULL), PRO).body));
+    expect(sarif.runs[0].results).toHaveLength(0);
+  });
+
+  it('cors-csp.pack remains advertised-future (declared, not registered)', () => {
+    const reg = buildHeadersRegistration(clock);
+    const proIds = new Set((reg.proExporters ?? []).map((e) => e.id));
+    expect(headersManifest.exporters).toContain('headers.export.cors-csp.pack');
+    expect(proIds.has('headers.export.cors-csp.pack')).toBe(false);
+    expect(() =>
+      runExporter(registry(), 'headers', 'headers.export.cors-csp.pack', { artifacts: [], diagnostics: [] }, PRO),
+    ).toThrow(/unknown exporter/);
   });
 
   it('free entitlements match exactly the implemented engine-MVP set', () => {

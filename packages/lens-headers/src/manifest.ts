@@ -23,8 +23,10 @@ export const headersManifest: ToolManifest = {
   exporters: [
     'headers.export.json',
     'headers.export.markdown.summary',
-    // Pro — declared as advertising, NOT registered in the free build.
+    // Pro — implemented + gated in this binary.
     'headers.export.audit.report',
+    'headers.export.sarif',
+    // Pro — advertised-future (declared, not yet registered).
     'headers.export.cors-csp.pack',
   ],
   offlinePolicy: DEFAULT_OFFLINE_POLICY,
@@ -45,6 +47,8 @@ export const headersManifest: ToolManifest = {
     ],
     pro: [
       'security.audit',
+      'export.audit.report',
+      'export.sarif',
       'packs.cors-csp',
       'compare.profiles',
       'redaction.presets',

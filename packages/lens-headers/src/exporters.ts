@@ -6,6 +6,7 @@ import {
   type HeadersArtifact,
   type HeadersDocumentArtifact,
 } from './kinds.js';
+import { auditHeaders, type HeaderAuditSeverity } from './audit.js';
 
 const TOOL_ID = 'headers';
 
@@ -78,4 +79,95 @@ export const markdownSummaryExporter: Exporter<HeadersArtifact> = {
 export const freeExporters: readonly Exporter<HeadersArtifact>[] = [
   jsonExporter,
   markdownSummaryExporter,
+];
+
+// --- Pro exporters (registered in the binary, gated by entitlement) --------
+
+const SARIF_LEVEL: Record<HeaderAuditSeverity, string> = {
+  high: 'error',
+  medium: 'warning',
+  low: 'note',
+};
+
+/**
+ * `headers.export.audit.report` (Pro) — a markdown security-posture audit:
+ * missing hardening headers, weak values, permissive CORS, info-leak headers,
+ * with stable rule ids + a verdict.
+ */
+export const auditReportExporter: Exporter<HeadersArtifact> = {
+  version: 1,
+  id: 'headers.export.audit.report',
+  toolId: TOOL_ID,
+  target: 'markdown',
+  accepts: HEADERS_DOCUMENT_EXPORT_KINDS,
+  producesMimeType: 'text/markdown',
+  producesExtension: 'md',
+  export({ artifacts }) {
+    const doc = pickDocuments(artifacts)[0]?.value;
+    const findings = auditHeaders(doc);
+    const counts = { high: 0, medium: 0, low: 0 };
+    for (const f of findings) counts[f.severity] += 1;
+    const lines: string[] = ['# NekoHeaders security audit', ''];
+    lines.push(
+      `- verdict: **${findings.length === 0 ? 'PASS' : 'ISSUES FOUND'}**`,
+      `- findings: ${findings.length} (high: ${counts.high}, medium: ${counts.medium}, low: ${counts.low})`,
+      '',
+    );
+    if (findings.length > 0) {
+      lines.push('| severity | rule | detail |', '| --- | --- | --- |');
+      for (const f of findings) lines.push(`| ${f.severity} | \`${f.ruleId}\` | ${f.detail} |`);
+    } else {
+      lines.push('No security-header issues detected.');
+    }
+    return { mimeType: 'text/markdown', extension: 'md', body: lines.join('\n') };
+  },
+};
+
+/**
+ * `headers.export.sarif` (Pro) — SARIF 2.1.0 of the audit findings so a header
+ * review drops straight into CI code-scanning.
+ */
+export const sarifExporter: Exporter<HeadersArtifact> = {
+  version: 1,
+  id: 'headers.export.sarif',
+  toolId: TOOL_ID,
+  target: 'json',
+  accepts: HEADERS_DOCUMENT_EXPORT_KINDS,
+  producesMimeType: 'application/sarif+json',
+  producesExtension: 'sarif',
+  export({ artifacts }) {
+    const doc = pickDocuments(artifacts)[0]?.value;
+    const findings = auditHeaders(doc);
+    const ruleIds = [...new Set(findings.map((f) => f.ruleId))];
+    const sarif = {
+      version: '2.1.0',
+      $schema: 'https://json.schemastore.org/sarif-2.1.0.json',
+      runs: [
+        {
+          tool: {
+            driver: {
+              name: 'NekoHeaders',
+              informationUri: 'https://nekotools.local',
+              rules: ruleIds.map((id) => ({ id })),
+            },
+          },
+          results: findings.map((f) => ({
+            ruleId: f.ruleId,
+            level: SARIF_LEVEL[f.severity],
+            message: { text: f.detail },
+          })),
+        },
+      ],
+    };
+    return {
+      mimeType: 'application/sarif+json',
+      extension: 'sarif',
+      body: JSON.stringify(sarif, null, 2),
+    };
+  },
+};
+
+export const proExporters: readonly Exporter<HeadersArtifact>[] = [
+  auditReportExporter,
+  sarifExporter,
 ];

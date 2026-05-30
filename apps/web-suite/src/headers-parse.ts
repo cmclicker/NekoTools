@@ -1,4 +1,4 @@
-import { ToolRegistry, runExporter, runParser } from '@nekotools/tool-runtime';
+import { FREE_ENTITLEMENT, ToolRegistry, runExporter, runParser } from '@nekotools/tool-runtime';
 import {
   buildHeadersRegistration,
   FIXED_CLOCK,
@@ -6,7 +6,7 @@ import {
   type HeadersDocument,
   type HeadersDocumentArtifact,
 } from '@nekotools/lens-headers';
-import type { Diagnostic } from '@nekotools/contracts';
+import type { Diagnostic, Entitlement } from '@nekotools/contracts';
 
 /**
  * NekoHeaders UI parse helper — the engine-adapter seam, mirroring
@@ -30,10 +30,18 @@ export interface ParsedHeaders {
   readonly document: HeadersDocument | null;
   /** Headers as a JSON object (name -> value); null when there are none. */
   readonly jsonOutput: string | null;
+  /** Pro: security-posture audit (markdown), or null when not entitled. */
+  readonly auditReport: string | null;
+  /** Pro: SARIF 2.1.0 of the audit, or null when not entitled. */
+  readonly sarif: string | null;
+  readonly proUnlocked: boolean;
   readonly diagnostics: readonly Diagnostic[];
 }
 
-export function parseHeadersText(raw: string): ParsedHeaders {
+export function parseHeadersText(
+  raw: string,
+  entitlement: Entitlement = FREE_ENTITLEMENT,
+): ParsedHeaders {
   const result = runParser(registry, 'headers', 'headers.text', {
     raw,
     source: { kind: 'paste', bytes: utf8ByteLength(raw) },
@@ -41,18 +49,28 @@ export function parseHeadersText(raw: string): ParsedHeaders {
   const doc = result.artifacts.find(
     (a): a is HeadersDocumentArtifact => a.kind === HEADERS_KIND_DOCUMENT,
   );
-  let jsonOutput: string | null = null;
-  if (doc !== undefined && doc.value.entries.length > 0) {
-    jsonOutput = String(
-      runExporter(registry, 'headers', 'headers.export.json', {
-        artifacts: [doc],
-        diagnostics: [],
-      }).body,
-    );
-  }
+  const hasHeaders = doc !== undefined && doc.value.entries.length > 0;
+  const exportInput = { artifacts: doc ? [doc] : [], diagnostics: [] };
+
+  const jsonOutput = hasHeaders
+    ? String(runExporter(registry, 'headers', 'headers.export.json', exportInput).body)
+    : null;
+  // Pro exporters are gated: runExporter throws EntitlementError when free.
+  const runPro = (id: string): string | null => {
+    if (!hasHeaders) return null;
+    try {
+      return String(runExporter(registry, 'headers', id, exportInput, entitlement).body);
+    } catch {
+      return null;
+    }
+  };
+
   return {
     document: doc?.value ?? null,
     jsonOutput,
+    auditReport: runPro('headers.export.audit.report'),
+    sarif: runPro('headers.export.sarif'),
+    proUnlocked: entitlement.tier !== 'free',
     diagnostics: result.diagnostics,
   };
 }
