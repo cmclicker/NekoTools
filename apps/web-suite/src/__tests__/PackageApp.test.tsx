@@ -3,6 +3,17 @@ import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 
 import { PackageApp } from '../PackageApp.js';
 
+const PRO = {
+  version: 1 as const,
+  licenseId: 'X',
+  licensee: 'Buyer',
+  tier: 'pro' as const,
+  features: ['*'],
+  issuedAt: '2026-01-01T00:00:00.000Z',
+  expiresAt: null,
+  signature: 's',
+};
+
 const SAMPLE = JSON.stringify(
   {
     name: '@acme/test',
@@ -82,5 +93,26 @@ describe('PackageApp', () => {
       expect(writes).toHaveLength(1);
     });
     expect(JSON.parse(writes[0]!).name).toBe('@acme/test');
+  });
+
+  it('locks the Pro risk audit when free', () => {
+    render(<PackageApp initialInput={SAMPLE} />);
+    expect(screen.getByTestId('package-locked')).toBeInTheDocument();
+    expect(screen.queryByTestId('package-audit-output')).not.toBeInTheDocument();
+  });
+
+  it('unlocks the dependency & license-risk report with a Pro entitlement', () => {
+    render(<PackageApp initialInput={SAMPLE} entitlement={PRO} />);
+    const out = screen.getByTestId('package-audit-output').textContent ?? '';
+    expect(out).toContain('# NekoPackage risk audit');
+    expect(out).toContain('package.network_shell_script');
+  });
+
+  it('renders SARIF 2.1.0 in the SARIF view when Pro', () => {
+    render(<PackageApp initialInput={SAMPLE} entitlement={PRO} />);
+    fireEvent.click(screen.getByRole('radio', { name: 'SARIF' }));
+    expect(
+      JSON.parse(screen.getByTestId('package-audit-output').textContent ?? '{}').version,
+    ).toBe('2.1.0');
   });
 });

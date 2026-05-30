@@ -1,5 +1,6 @@
 import type { Exporter } from '@nekotools/contracts';
 
+import { auditPackage, type PackageAuditSeverity } from './audit.js';
 import {
   PACKAGE_KIND_MANIFEST,
   PACKAGE_MANIFEST_EXPORT_KINDS,
@@ -105,4 +106,101 @@ export const markdownSummaryExporter: Exporter<PackageArtifact> = {
 export const freeExporters: readonly Exporter<PackageArtifact>[] = [
   jsonSummaryExporter,
   markdownSummaryExporter,
+];
+
+// --- Pro exporters (registered in the binary, gated by entitlement) --------
+
+const SARIF_LEVEL: Record<PackageAuditSeverity, string> = {
+  high: 'error',
+  medium: 'warning',
+  low: 'note',
+  info: 'note',
+};
+
+/**
+ * `package.export.policy.report` (Pro) — a dependency & license-risk policy
+ * report: every ruleId-keyed finding (copyleft/missing/unknown license,
+ * network-shell / lifecycle / destructive scripts, remote / unpinned /
+ * duplicate dependencies) with its severity and target. Pure + local.
+ */
+export const policyReportExporter: Exporter<PackageArtifact> = {
+  version: 1,
+  id: 'package.export.policy.report',
+  toolId: TOOL_ID,
+  target: 'markdown',
+  accepts: PACKAGE_MANIFEST_EXPORT_KINDS,
+  producesMimeType: 'text/markdown',
+  producesExtension: 'md',
+  export({ artifacts }) {
+    const doc = pickManifest(artifacts)?.value;
+    const findings = auditPackage(doc);
+    const counts = { high: 0, medium: 0, low: 0, info: 0 };
+    for (const f of findings) counts[f.severity] += 1;
+
+    const name = doc?.name ?? '(unnamed)';
+    const lines: string[] = ['# NekoPackage risk audit', ''];
+    lines.push(
+      `- package: ${name}${doc?.version ? `@${doc.version}` : ''} (license: ${doc?.license ?? 'none'})`,
+      `- findings: ${findings.length} (high: ${counts.high}, medium: ${counts.medium}, low: ${counts.low}, info: ${counts.info})`,
+      '',
+    );
+    if (findings.length > 0) {
+      lines.push('| severity | rule | target | detail |', '| --- | --- | --- | --- |');
+      for (const f of findings) {
+        lines.push(`| ${f.severity} | \`${f.ruleId}\` | ${f.target ? `\`${f.target}\`` : '—'} | ${f.detail} |`);
+      }
+    } else {
+      lines.push('No dependency or license-risk findings detected.');
+    }
+    return { mimeType: 'text/markdown', extension: 'md', body: lines.join('\n') };
+  },
+};
+
+/**
+ * `package.export.sarif` (Pro) — SARIF 2.1.0 of the risk audit so a
+ * package.json review drops into CI code-scanning. Carries no secret
+ * material; ruleIds match the diagnostic codes shown in the free tier.
+ */
+export const sarifExporter: Exporter<PackageArtifact> = {
+  version: 1,
+  id: 'package.export.sarif',
+  toolId: TOOL_ID,
+  target: 'json',
+  accepts: PACKAGE_MANIFEST_EXPORT_KINDS,
+  producesMimeType: 'application/sarif+json',
+  producesExtension: 'sarif',
+  export({ artifacts }) {
+    const findings = auditPackage(pickManifest(artifacts)?.value);
+    const ruleIds = [...new Set(findings.map((f) => f.ruleId))];
+    const sarif = {
+      version: '2.1.0',
+      $schema: 'https://json.schemastore.org/sarif-2.1.0.json',
+      runs: [
+        {
+          tool: {
+            driver: {
+              name: 'NekoPackage',
+              informationUri: 'https://nekotools.local',
+              rules: ruleIds.map((id) => ({ id })),
+            },
+          },
+          results: findings.map((f) => ({
+            ruleId: f.ruleId,
+            level: SARIF_LEVEL[f.severity],
+            message: { text: f.target ? `[${f.target}] ${f.detail}` : f.detail },
+          })),
+        },
+      ],
+    };
+    return {
+      mimeType: 'application/sarif+json',
+      extension: 'sarif',
+      body: JSON.stringify(sarif, null, 2),
+    };
+  },
+};
+
+export const proExporters: readonly Exporter<PackageArtifact>[] = [
+  policyReportExporter,
+  sarifExporter,
 ];
