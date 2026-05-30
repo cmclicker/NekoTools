@@ -4,12 +4,13 @@ import { DEFAULT_OFFLINE_POLICY } from '@nekotools/contracts';
 import { HEADERS_KIND_DOCUMENT } from './kinds.js';
 
 /**
- * The NekoHeaders manifest (Wave 3 engine + UI MVP).
- *
- * Free ships the parse / validate / basic-security-hints / JSON +
- * markdown export / workspace surface. Pro (advertising only, not
- * registered): deep security audit, CORS/CSP policy packs, profile
- * comparison, redaction, batch audit.
+ * The NekoHeaders manifest. Reading model matches NekoJWT / NekoCSP:
+ * `entitlements.free` ships (engine + UI); `entitlements.pro` advertises
+ * future capabilities; and the two Pro exporter ids
+ * (`headers.export.audit.report`, `headers.export.cors-csp.pack` — the
+ * security.audit / packs.cors-csp capabilities) are registered in this build
+ * but gated behind a valid entitlement (monetization-safety tests assert a
+ * free caller is refused with EntitlementError).
  */
 export const headersManifest: ToolManifest = {
   version: 1,
@@ -23,7 +24,7 @@ export const headersManifest: ToolManifest = {
   exporters: [
     'headers.export.json',
     'headers.export.markdown.summary',
-    // Pro — declared as advertising, NOT registered in the free build.
+    // Pro — registered in this build but gated behind a valid entitlement.
     'headers.export.audit.report',
     'headers.export.cors-csp.pack',
   ],

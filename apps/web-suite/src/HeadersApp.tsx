@@ -1,19 +1,23 @@
 import { useCallback, useMemo, useState, type ChangeEvent } from 'react';
 
-import { Diagnostics } from './Diagnostics.js';
-import { copyToClipboard, type ClipboardDeps } from './clipboard.js';
-import { parseHeadersText } from './headers-parse.js';
+import type { Entitlement } from '@nekotools/contracts';
 import type { HeaderEntry } from '@nekotools/lens-headers';
 
+import { Diagnostics } from './Diagnostics.js';
+import { copyToClipboard, type ClipboardDeps } from './clipboard.js';
+import { useLicenseContext } from './license-store.js';
+import { parseHeadersText } from './headers-parse.js';
+
 /**
- * NekoHeaders sub-app — Wave 3 UI. Wires `@nekotools/lens-headers` into
- * the shared web-suite shell as the fifth tool tab. Paste an HTTP header
- * block, see the parsed Name/Value table or the JSON projection, see
- * diagnostics (malformed lines, duplicate headers, basic security hints),
- * and copy the JSON. The shared `ProSurface` renders via the registry.
+ * NekoHeaders sub-app. Wires `@nekotools/lens-headers` into the shared
+ * web-suite shell as a Web tool tab. Free: paste an HTTP header block, see the
+ * Name/Value table or JSON projection, read diagnostics (malformed lines,
+ * duplicate headers, basic security hints), copy. Pro (gated by the suite
+ * license): a severity-ranked security audit + a hardened CORS/CSP header pack.
+ * All local — no request is ever made to fetch headers from a URL.
  */
 
-export type HeadersViewMode = 'table' | 'json';
+export type HeadersViewMode = 'table' | 'json' | 'markdown' | 'audit' | 'pack';
 
 export interface NekoHeadersUiState {
   readonly viewMode: HeadersViewMode;
@@ -23,12 +27,31 @@ export interface HeadersAppProps {
   readonly initialInput?: string;
   readonly initialUiState?: Partial<NekoHeadersUiState>;
   readonly clipboardDeps?: ClipboardDeps;
+  /** Injected entitlement; defaults to the suite license context. */
+  readonly entitlement?: Entitlement;
 }
 
 interface CopyStatus {
   readonly ok: boolean;
   readonly method: 'clipboard-api' | 'execCommand' | 'none';
 }
+
+const PRO_VIEWS = new Set<HeadersViewMode>(['audit', 'pack']);
+const VIEW_MODES: readonly HeadersViewMode[] = ['table', 'json', 'markdown', 'audit', 'pack'];
+const VIEW_LABELS: Record<HeadersViewMode, string> = {
+  table: 'Table',
+  json: 'JSON',
+  markdown: 'Markdown',
+  audit: 'Audit ⭐',
+  pack: 'CORS/CSP pack ⭐',
+};
+const COPY_LABELS: Record<HeadersViewMode, string> = {
+  table: 'Copy JSON',
+  json: 'Copy JSON',
+  markdown: 'Copy markdown summary',
+  audit: 'Copy audit',
+  pack: 'Copy pack',
+};
 
 const SAMPLE_INPUT = `HTTP/1.1 200 OK
 content-type: application/json
@@ -39,23 +62,45 @@ export function HeadersApp({
   initialInput,
   initialUiState,
   clipboardDeps,
+  entitlement,
 }: HeadersAppProps = {}): JSX.Element {
   const [input, setInput] = useState<string>(initialInput ?? SAMPLE_INPUT);
   const [viewMode, setViewMode] = useState<HeadersViewMode>(initialUiState?.viewMode ?? 'table');
   const [copyStatus, setCopyStatus] = useState<CopyStatus | null>(null);
 
-  const parsed = useMemo(() => parseHeadersText(input), [input]);
+  const license = useLicenseContext();
+  const effectiveEntitlement = entitlement ?? license.entitlement;
+  const parsed = useMemo(
+    () => parseHeadersText(input, effectiveEntitlement),
+    [input, effectiveEntitlement],
+  );
   const entries = parsed.document?.entries ?? [];
   const hasHeaders = entries.length > 0;
+  const proUnlocked = parsed.proUnlocked;
+  const isProView = PRO_VIEWS.has(viewMode);
+
+  const outputText =
+    viewMode === 'json'
+      ? parsed.jsonOutput
+      : viewMode === 'markdown'
+        ? parsed.markdown
+        : viewMode === 'audit'
+          ? parsed.auditReport
+          : viewMode === 'pack'
+            ? parsed.corsCspPack
+            : null; // table
+  // Copy target: table + json copy the JSON; the rest copy their own output.
+  const copyText =
+    viewMode === 'table' ? (parsed.jsonOutput ?? '') : (outputText ?? '');
 
   const handleCopy = useCallback(async () => {
-    if (parsed.jsonOutput === null) {
+    if (copyText === '') {
       setCopyStatus({ ok: false, method: 'none' });
       return;
     }
-    const result = await copyToClipboard(parsed.jsonOutput, clipboardDeps);
+    const result = await copyToClipboard(copyText, clipboardDeps);
     setCopyStatus({ ok: result.ok, method: result.method });
-  }, [parsed.jsonOutput, clipboardDeps]);
+  }, [copyText, clipboardDeps]);
 
   return (
     <section className="tool tool--headers" aria-label="NekoHeaders workbench">
@@ -73,7 +118,8 @@ export function HeadersApp({
           data-testid="headers-input"
         />
         <p className="paste__hint">
-          Parsing runs entirely in your browser. No requests, no network, no telemetry.
+          Parsing and auditing run entirely in your browser. No request is made to fetch headers
+          from a URL.
         </p>
       </section>
 
@@ -81,26 +127,18 @@ export function HeadersApp({
         <div className="results__toolbar">
           <fieldset className="viewmode" aria-label="Headers view mode">
             <legend className="visually-hidden">Headers view mode</legend>
-            <label className={viewMode === 'table' ? 'viewmode--active' : ''}>
-              <input
-                type="radio"
-                name="headersViewMode"
-                value="table"
-                checked={viewMode === 'table'}
-                onChange={() => setViewMode('table')}
-              />
-              Table
-            </label>
-            <label className={viewMode === 'json' ? 'viewmode--active' : ''}>
-              <input
-                type="radio"
-                name="headersViewMode"
-                value="json"
-                checked={viewMode === 'json'}
-                onChange={() => setViewMode('json')}
-              />
-              JSON
-            </label>
+            {VIEW_MODES.map((m) => (
+              <label key={m} className={viewMode === m ? 'viewmode--active' : ''}>
+                <input
+                  type="radio"
+                  name="headersViewMode"
+                  value={m}
+                  checked={viewMode === m}
+                  onChange={() => setViewMode(m)}
+                />
+                {VIEW_LABELS[m]}
+              </label>
+            ))}
           </fieldset>
 
           <div className="copy" role="group" aria-label="Copy affordances">
@@ -108,10 +146,10 @@ export function HeadersApp({
               type="button"
               className="copy__btn"
               onClick={handleCopy}
-              disabled={!hasHeaders}
-              data-testid="headers-copy-json"
+              disabled={copyText === ''}
+              data-testid="headers-copy-output"
             >
-              Copy JSON
+              {COPY_LABELS[viewMode]}
             </button>
           </div>
 
@@ -124,13 +162,23 @@ export function HeadersApp({
             >
               {copyStatus.ok
                 ? `Copied to clipboard (via ${copyStatus.method}).`
-                : 'Copy failed: no headers to copy.'}
+                : 'Copy failed: nothing to copy.'}
             </p>
           ) : null}
         </div>
 
         {hasHeaders ? (
-          viewMode === 'table' ? (
+          isProView && !proUnlocked ? (
+            <div className="pro-lock" role="status" data-testid="headers-locked">
+              <strong>{viewMode === 'audit' ? 'Security audit' : 'CORS/CSP pack'} is a Pro feature.</strong>
+              <p>
+                Get a severity-ranked security-posture audit of these headers (with an A/B/C/F
+                grade), and generate a hardened CORS + CSP header pack (HSTS, CSP, X-Frame-Options,
+                Referrer-Policy, Permissions-Policy) to paste into your server config. Unlock with a
+                license key (verified locally, works offline forever).
+              </p>
+            </div>
+          ) : viewMode === 'table' ? (
             <div className="env-table" data-testid="headers-table">
               <table>
                 <thead>
@@ -152,8 +200,8 @@ export function HeadersApp({
               </table>
             </div>
           ) : (
-            <pre className="yaml-output" data-testid="headers-output" aria-label="Headers as JSON">
-              {parsed.jsonOutput}
+            <pre className="yaml-output" data-testid="headers-output" aria-label={`${viewMode} output`}>
+              {outputText}
             </pre>
           )
         ) : (
