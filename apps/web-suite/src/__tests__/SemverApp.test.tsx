@@ -3,6 +3,17 @@ import { fireEvent, render, screen, waitFor, within } from '@testing-library/rea
 
 import { SemverApp } from '../SemverApp.js';
 
+const PRO = {
+  version: 1 as const,
+  licenseId: 'X',
+  licensee: 'Buyer',
+  tier: 'pro' as const,
+  features: ['*'],
+  issuedAt: '2026-01-01T00:00:00.000Z',
+  expiresAt: null,
+  signature: 's',
+};
+
 describe('SemverApp', () => {
   it('renders a versions table and marks satisfies against the range', () => {
     render(
@@ -59,5 +70,40 @@ describe('SemverApp', () => {
     render(<SemverApp initialInput={'1.2.3'} initialUiState={{ range: '' }} />);
     const table = screen.getByTestId('semver-table');
     expect(within(table).queryByText('satisfies')).not.toBeInTheDocument();
+  });
+
+  it('locks the range-report + bump-plan Pro views when free', () => {
+    render(
+      <SemverApp
+        initialInput={'1.2.0\n2.0.0'}
+        initialUiState={{ range: '^1.0.0', viewMode: 'range-report' }}
+      />,
+    );
+    expect(screen.getByTestId('semver-locked')).toBeInTheDocument();
+    expect(screen.queryByTestId('semver-output')).not.toBeInTheDocument();
+  });
+
+  it('unlocks the range report via an injected Pro entitlement', () => {
+    render(
+      <SemverApp
+        initialInput={'1.2.0\n2.0.0'}
+        initialUiState={{ range: '^1.0.0', viewMode: 'range-report' }}
+        entitlement={PRO}
+      />,
+    );
+    const out = screen.getByTestId('semver-output').textContent ?? '';
+    expect(out).toContain('# NekoSemver range report');
+    expect(out).toContain('range: `^1.0.0`');
+  });
+
+  it('renders the bump plan in the bump-plan view when Pro', () => {
+    render(
+      <SemverApp
+        initialInput={'1.2.0\n2.0.0'}
+        initialUiState={{ range: '^1.0.0', viewMode: 'bump-plan' }}
+        entitlement={PRO}
+      />,
+    );
+    expect(screen.getByTestId('semver-output').textContent ?? '').toContain('# NekoSemver bump plan');
   });
 });

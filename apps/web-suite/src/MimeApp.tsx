@@ -1,7 +1,10 @@
 import { useCallback, useMemo, useState, type ChangeEvent } from 'react';
 
+import type { Entitlement } from '@nekotools/contracts';
+
 import { Diagnostics } from './Diagnostics.js';
 import { copyToClipboard, type ClipboardDeps } from './clipboard.js';
+import { useLicenseContext } from './license-store.js';
 import { parseMimeInput } from './mime-parse.js';
 
 /**
@@ -9,10 +12,11 @@ import { parseMimeInput } from './mime-parse.js';
  * shell as a Web tool tab. Free surface: paste Content-Type strings / MIME
  * types / file extensions (one per line), see essence, suffix, registration
  * tree, parameters, and known extensions, and copy JSON / normalized /
- * markdown. All local.
+ * markdown. Pro (gated by the suite license): export an IANA-lookup Markdown
+ * report or an RFC-4180 CSV grid. All local.
  */
 
-export type MimeViewMode = 'table' | 'json' | 'normalized' | 'markdown';
+export type MimeViewMode = 'table' | 'json' | 'normalized' | 'markdown' | 'iana-lookup' | 'csv';
 
 export interface NekoMimeUiState {
   readonly viewMode: MimeViewMode;
@@ -22,12 +26,40 @@ export interface MimeAppProps {
   readonly initialInput?: string;
   readonly initialUiState?: Partial<NekoMimeUiState>;
   readonly clipboardDeps?: ClipboardDeps;
+  /** Injected entitlement; defaults to the suite license context. */
+  readonly entitlement?: Entitlement;
 }
 
 interface CopyStatus {
   readonly ok: boolean;
   readonly method: 'clipboard-api' | 'execCommand' | 'none';
 }
+
+const PRO_VIEWS = new Set<MimeViewMode>(['iana-lookup', 'csv']);
+const VIEW_MODES: readonly MimeViewMode[] = [
+  'table',
+  'json',
+  'normalized',
+  'markdown',
+  'iana-lookup',
+  'csv',
+];
+const VIEW_LABELS: Record<MimeViewMode, string> = {
+  table: 'Table',
+  json: 'JSON',
+  normalized: 'Essence list',
+  markdown: 'Markdown',
+  'iana-lookup': 'IANA lookup ⭐',
+  csv: 'CSV ⭐',
+};
+const COPY_LABELS: Record<MimeViewMode, string> = {
+  table: 'Copy markdown summary',
+  json: 'Copy JSON',
+  normalized: 'Copy essence list',
+  markdown: 'Copy markdown summary',
+  'iana-lookup': 'Copy IANA lookup',
+  csv: 'Copy CSV',
+};
 
 const SAMPLE_INPUT = [
   'text/html; charset=UTF-8',
@@ -37,27 +69,48 @@ const SAMPLE_INPUT = [
   'report.pdf',
 ].join('\n');
 
-export function MimeApp({ initialInput, initialUiState, clipboardDeps }: MimeAppProps = {}): JSX.Element {
+export function MimeApp({
+  initialInput,
+  initialUiState,
+  clipboardDeps,
+  entitlement,
+}: MimeAppProps = {}): JSX.Element {
   const [input, setInput] = useState<string>(initialInput ?? SAMPLE_INPUT);
   const [viewMode, setViewMode] = useState<MimeViewMode>(initialUiState?.viewMode ?? 'table');
   const [copyStatus, setCopyStatus] = useState<CopyStatus | null>(null);
 
-  const parsed = useMemo(() => parseMimeInput(input), [input]);
+  const license = useLicenseContext();
+  const effectiveEntitlement = entitlement ?? license.entitlement;
+  const parsed = useMemo(
+    () => parseMimeInput(input, effectiveEntitlement),
+    [input, effectiveEntitlement],
+  );
+  const proUnlocked = parsed.proUnlocked;
+  const isProView = PRO_VIEWS.has(viewMode);
 
-  const copyText =
-    viewMode === 'json' ? parsed.json : viewMode === 'normalized' ? parsed.normalized : parsed.markdown;
+  // Text rendered/copied for the non-table views (the table renders its own
+  // grid; its copy affordance falls back to the markdown summary).
+  const outputText =
+    viewMode === 'json'
+      ? parsed.json
+      : viewMode === 'normalized'
+        ? parsed.normalized
+        : viewMode === 'iana-lookup'
+          ? parsed.ianaLookup
+          : viewMode === 'csv'
+            ? parsed.csv
+            : parsed.markdown;
+  const copyText = outputText ?? '';
   const copyDisabled = viewMode === 'table' ? parsed.count === 0 : copyText === '';
 
   const handleCopy = useCallback(async () => {
-    const text =
-      viewMode === 'json' ? parsed.json : viewMode === 'normalized' ? parsed.normalized : parsed.markdown;
-    if (text === '') {
+    if (copyText === '') {
       setCopyStatus({ ok: false, method: 'none' });
       return;
     }
-    const r = await copyToClipboard(text, clipboardDeps);
+    const r = await copyToClipboard(copyText, clipboardDeps);
     setCopyStatus({ ok: r.ok, method: r.method });
-  }, [viewMode, parsed, clipboardDeps]);
+  }, [copyText, clipboardDeps]);
 
   return (
     <section className="tool tool--mime" aria-label="NekoMIME workbench">
@@ -84,7 +137,7 @@ export function MimeApp({ initialInput, initialUiState, clipboardDeps }: MimeApp
         <div className="results__toolbar">
           <fieldset className="viewmode" aria-label="MIME output mode">
             <legend className="visually-hidden">MIME output mode</legend>
-            {(['table', 'json', 'normalized', 'markdown'] as const).map((m) => (
+            {VIEW_MODES.map((m) => (
               <label key={m} className={viewMode === m ? 'viewmode--active' : ''}>
                 <input
                   type="radio"
@@ -93,7 +146,7 @@ export function MimeApp({ initialInput, initialUiState, clipboardDeps }: MimeApp
                   checked={viewMode === m}
                   onChange={() => setViewMode(m)}
                 />
-                {m === 'table' ? 'Table' : m === 'json' ? 'JSON' : m === 'normalized' ? 'Essence list' : 'Markdown'}
+                {VIEW_LABELS[m]}
               </label>
             ))}
           </fieldset>
@@ -106,7 +159,7 @@ export function MimeApp({ initialInput, initialUiState, clipboardDeps }: MimeApp
               disabled={copyDisabled}
               data-testid="mime-copy-output"
             >
-              {viewMode === 'json' ? 'Copy JSON' : viewMode === 'normalized' ? 'Copy essence list' : 'Copy markdown summary'}
+              {COPY_LABELS[viewMode]}
             </button>
           </div>
 
@@ -129,7 +182,19 @@ export function MimeApp({ initialInput, initialUiState, clipboardDeps }: MimeApp
         </ul>
 
         {parsed.count > 0 ? (
-          viewMode === 'table' ? (
+          isProView && !proUnlocked ? (
+            <div className="pro-lock" role="status" data-testid="mime-locked">
+              <strong>
+                {viewMode === 'iana-lookup' ? 'IANA lookup export' : 'CSV export'} is a Pro feature.
+              </strong>
+              <p>
+                Resolve every parsed entry against the bundled IANA common-subset table as a Markdown
+                report, or export the full grid (input, validity, type, subtype, suffix, parameters,
+                extensions, category) as RFC-4180 CSV. Unlock with a license key (verified locally,
+                works offline forever).
+              </p>
+            </div>
+          ) : viewMode === 'table' ? (
             <table className="url-params" data-testid="mime-table">
               <thead>
                 <tr>
@@ -160,7 +225,7 @@ export function MimeApp({ initialInput, initialUiState, clipboardDeps }: MimeApp
             </table>
           ) : (
             <pre className="toml-output" data-testid="mime-output" aria-label={`${viewMode} output`}>
-              {viewMode === 'json' ? parsed.json : viewMode === 'normalized' ? parsed.normalized : parsed.markdown}
+              {outputText}
             </pre>
           )
         ) : (

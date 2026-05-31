@@ -1,7 +1,10 @@
 import { useCallback, useMemo, useState, type ChangeEvent } from 'react';
 
+import type { Entitlement } from '@nekotools/contracts';
+
 import { Diagnostics } from './Diagnostics.js';
 import { copyToClipboard, type ClipboardDeps } from './clipboard.js';
+import { useLicenseContext } from './license-store.js';
 import { parseSemverInput } from './semver-parse.js';
 
 /**
@@ -9,10 +12,17 @@ import { parseSemverInput } from './semver-parse.js';
  * web-suite shell as a Utility tool tab. Free surface: paste versions (one
  * per line), optionally enter a range to test, and see components, the
  * ascending sort, and per-version satisfies — plus JSON / sorted / markdown
- * copy. All local; no registry lookups.
+ * copy. Pro (gated by the suite license): a markdown range report and a
+ * bump plan. All local; no registry lookups.
  */
 
-export type SemverViewMode = 'table' | 'json' | 'sorted' | 'markdown';
+export type SemverViewMode =
+  | 'table'
+  | 'json'
+  | 'sorted'
+  | 'markdown'
+  | 'range-report'
+  | 'bump-plan';
 
 export interface NekoSemverUiState {
   readonly range: string;
@@ -23,6 +33,8 @@ export interface SemverAppProps {
   readonly initialInput?: string;
   readonly initialUiState?: Partial<NekoSemverUiState>;
   readonly clipboardDeps?: ClipboardDeps;
+  /** Injected entitlement; defaults to the suite license context. */
+  readonly entitlement?: Entitlement;
 }
 
 interface CopyStatus {
@@ -30,19 +42,65 @@ interface CopyStatus {
   readonly method: 'clipboard-api' | 'execCommand' | 'none';
 }
 
+const PRO_VIEWS = new Set<SemverViewMode>(['range-report', 'bump-plan']);
+const VIEW_MODES: readonly SemverViewMode[] = [
+  'table',
+  'json',
+  'sorted',
+  'markdown',
+  'range-report',
+  'bump-plan',
+];
+const VIEW_LABELS: Record<SemverViewMode, string> = {
+  table: 'Table',
+  json: 'JSON',
+  sorted: 'Sorted',
+  markdown: 'Markdown',
+  'range-report': 'Range report ⭐',
+  'bump-plan': 'Bump plan ⭐',
+};
+const COPY_LABELS: Record<SemverViewMode, string> = {
+  table: 'Copy markdown summary',
+  json: 'Copy JSON',
+  sorted: 'Copy sorted',
+  markdown: 'Copy markdown summary',
+  'range-report': 'Copy range report',
+  'bump-plan': 'Copy bump plan',
+};
+
 const SAMPLE_INPUT = ['1.2.0', '1.10.0', '1.2.0-rc.1', '2.0.0-beta', '0.9.9'].join('\n');
 
-export function SemverApp({ initialInput, initialUiState, clipboardDeps }: SemverAppProps = {}): JSX.Element {
+export function SemverApp({
+  initialInput,
+  initialUiState,
+  clipboardDeps,
+  entitlement,
+}: SemverAppProps = {}): JSX.Element {
   const [input, setInput] = useState<string>(initialInput ?? SAMPLE_INPUT);
   const [range, setRange] = useState<string>(initialUiState?.range ?? '^1.2.0');
   const [viewMode, setViewMode] = useState<SemverViewMode>(initialUiState?.viewMode ?? 'table');
   const [copyStatus, setCopyStatus] = useState<CopyStatus | null>(null);
 
-  const parsed = useMemo(() => parseSemverInput(input, range), [input, range]);
+  const license = useLicenseContext();
+  const effectiveEntitlement = entitlement ?? license.entitlement;
+  const parsed = useMemo(
+    () => parseSemverInput(input, range, effectiveEntitlement),
+    [input, range, effectiveEntitlement],
+  );
   const hasRange = parsed.range !== null;
+  const proUnlocked = parsed.proUnlocked;
+  const isProView = PRO_VIEWS.has(viewMode);
 
+  const proOutput =
+    viewMode === 'range-report' ? parsed.rangeReport : viewMode === 'bump-plan' ? parsed.bumpPlan : null;
   const copyText =
-    viewMode === 'json' ? parsed.json : viewMode === 'sorted' ? parsed.sorted : parsed.markdown;
+    viewMode === 'json'
+      ? parsed.json
+      : viewMode === 'sorted'
+        ? parsed.sorted
+        : isProView
+          ? (proOutput ?? '')
+          : parsed.markdown;
 
   const handleCopy = useCallback(async () => {
     if (copyText === '') {
@@ -92,7 +150,7 @@ export function SemverApp({ initialInput, initialUiState, clipboardDeps }: Semve
         <div className="results__toolbar">
           <fieldset className="viewmode" aria-label="Semver output mode">
             <legend className="visually-hidden">Semver output mode</legend>
-            {(['table', 'json', 'sorted', 'markdown'] as const).map((m) => (
+            {VIEW_MODES.map((m) => (
               <label key={m} className={viewMode === m ? 'viewmode--active' : ''}>
                 <input
                   type="radio"
@@ -101,7 +159,7 @@ export function SemverApp({ initialInput, initialUiState, clipboardDeps }: Semve
                   checked={viewMode === m}
                   onChange={() => setViewMode(m)}
                 />
-                {m === 'table' ? 'Table' : m === 'json' ? 'JSON' : m === 'sorted' ? 'Sorted' : 'Markdown'}
+                {VIEW_LABELS[m]}
               </label>
             ))}
           </fieldset>
@@ -114,7 +172,7 @@ export function SemverApp({ initialInput, initialUiState, clipboardDeps }: Semve
               disabled={copyText === ''}
               data-testid="semver-copy-output"
             >
-              {viewMode === 'json' ? 'Copy JSON' : viewMode === 'sorted' ? 'Copy sorted' : 'Copy markdown summary'}
+              {COPY_LABELS[viewMode]}
             </button>
           </div>
 
@@ -144,7 +202,24 @@ export function SemverApp({ initialInput, initialUiState, clipboardDeps }: Semve
         </ul>
 
         {parsed.count > 0 ? (
-          viewMode === 'table' ? (
+          isProView ? (
+            !proUnlocked ? (
+              <div className="pro-lock" role="status" data-testid="semver-locked">
+                <strong>
+                  {viewMode === 'range-report' ? 'Range report' : 'Bump plan'} export is a Pro feature.
+                </strong>
+                <p>
+                  Export a markdown report of which versions match the range, or a bump plan of the
+                  candidate next-major / next-minor / next-patch versions. Unlock with a license key
+                  (verified locally, works offline forever).
+                </p>
+              </div>
+            ) : (
+              <pre className="toml-output" data-testid="semver-output" aria-label={`${viewMode} output`}>
+                {proOutput}
+              </pre>
+            )
+          ) : viewMode === 'table' ? (
             <table className="url-params" data-testid="semver-table">
               <thead>
                 <tr>

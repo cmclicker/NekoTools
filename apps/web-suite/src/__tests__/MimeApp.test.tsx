@@ -3,6 +3,17 @@ import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 
 import { MimeApp } from '../MimeApp.js';
 
+const PRO = {
+  version: 1 as const,
+  licenseId: 'X',
+  licensee: 'Buyer',
+  tier: 'pro' as const,
+  features: ['*'],
+  issuedAt: '2026-01-01T00:00:00.000Z',
+  expiresAt: null,
+  signature: 's',
+};
+
 describe('MimeApp', () => {
   it('renders the per-entry table with essence + extensions', () => {
     render(<MimeApp initialInput={'text/html; charset=UTF-8'} />);
@@ -46,5 +57,39 @@ describe('MimeApp', () => {
     fireEvent.click(screen.getByTestId('mime-copy-output'));
     await waitFor(() => expect(writes).toHaveLength(1));
     expect(JSON.parse(writes[0] ?? '{}').entries[0].value.suffix).toBe('xml');
+  });
+
+  it('locks the IANA-lookup + CSV Pro views when free', () => {
+    render(
+      <MimeApp initialInput={'text/html; charset=utf-8'} initialUiState={{ viewMode: 'iana-lookup' }} />,
+    );
+    expect(screen.getByTestId('mime-locked')).toBeInTheDocument();
+    expect(screen.queryByTestId('mime-output')).not.toBeInTheDocument();
+  });
+
+  it('unlocks the IANA-lookup Markdown via an injected Pro entitlement', () => {
+    render(
+      <MimeApp
+        initialInput={'text/html; charset=utf-8'}
+        initialUiState={{ viewMode: 'iana-lookup' }}
+        entitlement={PRO}
+      />,
+    );
+    const out = screen.getByTestId('mime-output').textContent ?? '';
+    expect(out).toContain('# NekoMIME IANA lookup');
+    expect(out).toContain('text/html');
+  });
+
+  it('renders the CSV grid in the csv view when Pro', () => {
+    render(
+      <MimeApp
+        initialInput={'text/html; charset=utf-8'}
+        initialUiState={{ viewMode: 'csv' }}
+        entitlement={PRO}
+      />,
+    );
+    const out = screen.getByTestId('mime-output').textContent ?? '';
+    expect(out).toContain('input,valid,type');
+    expect(out).toContain('charset=utf-8');
   });
 });
