@@ -11,12 +11,16 @@ import { HASH_KIND_DIGEST, HASH_KIND_INPUT } from './kinds.js';
  *     implementation. NekoHash is a single vertical slice (engine + UI in
  *     one PR), so its free set covers both the engine digest and the UI
  *     affordances shipped here.
- *   - `entitlements.pro` is advertising for a future `@nekotools-pro/*`
- *     package; nothing Pro is bundled or enforced here.
- *   - `exporters` may list Pro ids that are declared but NOT registered in
- *     the free build (`buildHashRegistration`). The registry validates only
- *     the forward direction (every registered impl must be declared), so a
- *     declared-but-unregistered Pro exporter id is the advertising surface.
+ *   - `entitlements.pro` advertises the Pro tier. The two declared Pro
+ *     exporters (`hash.export.manifest`, `hash.export.checksum.profile`) are
+ *     registered as gated `proExporters` in `buildHashRegistration`:
+ *     `runExporter` refuses them without a valid entitlement and runs them
+ *     for a Pro caller (single-build, entitlement-gated model — same as
+ *     NekoTOML / NekoJSON). The remaining `entitlements.pro` ids stay
+ *     advertising-only; they depend on future premium engines.
+ *   - `exporters` lists every declared exporter id — free and Pro. The
+ *     registry validates the forward direction (every registered impl must
+ *     be declared).
  */
 export const hashManifest: ToolManifest = {
   version: 1,
@@ -31,7 +35,8 @@ export const hashManifest: ToolManifest = {
     'hash.export.digest',
     'hash.export.json',
     'hash.export.markdown.summary',
-    // Pro — declared as advertising, NOT registered in the free build.
+    // Pro — registered as gated `proExporters`; `runExporter` refuses them
+    // without a valid entitlement (single-build, entitlement-gated model).
     'hash.export.manifest',
     'hash.export.checksum.profile',
   ],
