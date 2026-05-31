@@ -7,7 +7,7 @@ import {
   type DurationParsedArtifact,
   type DurationReport,
 } from './kinds.js';
-import { toBreakdownCsv } from './codegen.js';
+import { toBreakdownCsv, toLocale } from './codegen.js';
 
 const TOOL_ID = 'duration';
 
@@ -88,13 +88,11 @@ export const freeExporters: readonly Exporter<DurationArtifact>[] = [
 
 // --- Pro exporters (registered in the binary, gated by entitlement) --------
 //
-// Backs ONE of the two declared Pro exporter ids — `export.breakdown.csv` —
-// a pure projection of the parsed d/h/m/s components. Generator in
-// `codegen.ts`. The other declared id, `duration.export.locale`
-// (`locale.format`), needs locale-specific human formatting that the
-// manifest's out-of-scope list excludes (bundled i18n data); it stays
-// advertising-only and is NOT registered, so it still throws "unknown
-// exporter" — same partial-build pattern as NekoRegex.
+// Both declared Pro exporter ids, registered + runtime-gated. Generators in
+// `codegen.ts`. `breakdown.csv` is a pure projection of the parsed d/h/m/s
+// components; `locale` renders those components as human text across a fixed
+// locale set using the HOST Intl runtime only (no bundled CLDR/ICU data, no
+// network — what the amended manifest outOfScope now allows).
 
 /** `duration.export.breakdown.csv` (Pro) — per-input d/h/m/s CSV breakdown. */
 export const breakdownCsvExporter: Exporter<DurationArtifact> = {
@@ -111,4 +109,19 @@ export const breakdownCsvExporter: Exporter<DurationArtifact> = {
   },
 };
 
-export const proExporters: readonly Exporter<DurationArtifact>[] = [breakdownCsvExporter];
+/** `duration.export.locale` (Pro) — per-input human text across a locale set (Intl). */
+export const localeExporter: Exporter<DurationArtifact> = {
+  version: 1,
+  id: 'duration.export.locale',
+  toolId: TOOL_ID,
+  target: 'markdown',
+  accepts: DURATION_PARSED_EXPORT_KINDS,
+  producesMimeType: 'text/markdown',
+  producesExtension: 'md',
+  export({ artifacts }) {
+    const value = pickParsed(artifacts)?.value ?? { count: 0, entries: [] };
+    return { mimeType: 'text/markdown', extension: 'md', body: toLocale(value) };
+  },
+};
+
+export const proExporters: readonly Exporter<DurationArtifact>[] = [breakdownCsvExporter, localeExporter];

@@ -70,12 +70,10 @@ describe('NekoDuration: manifest', () => {
 
 describe('NekoDuration: monetization gating (single-build, entitlement-gated)', () => {
   const registration = buildDurationRegistration(clock);
-  // One declared Pro id is built + gated here; the other (locale formatting)
-  // needs i18n data the out-of-scope list excludes, so it stays advertising-only.
-  const builtProIds = ['duration.export.breakdown.csv'];
-  const advertisingOnlyIds = ['duration.export.locale'];
+  // Both declared Pro ids are now built + gated (locale uses host Intl only).
+  const builtProIds = ['duration.export.breakdown.csv', 'duration.export.locale'];
 
-  it('the built Pro exporter is declared AND registered as a proExporter, not free', () => {
+  it('both Pro exporters are declared AND registered as proExporters, not free', () => {
     const free = new Set(registration.exporters.map((e) => e.id));
     const pro = new Set((registration.proExporters ?? []).map((e) => e.id));
     for (const id of builtProIds) {
@@ -85,21 +83,7 @@ describe('NekoDuration: monetization gating (single-build, entitlement-gated)', 
     }
   });
 
-  it('the advertising-only Pro id is declared but registered nowhere (still "unknown exporter")', () => {
-    const free = new Set(registration.exporters.map((e) => e.id));
-    const pro = new Set((registration.proExporters ?? []).map((e) => e.id));
-    const r = registry();
-    for (const id of advertisingOnlyIds) {
-      expect(durationManifest.exporters).toContain(id);
-      expect(free.has(id)).toBe(false);
-      expect(pro.has(id)).toBe(false);
-      expect(() => runExporter(r, 'duration', id, { artifacts: [], diagnostics: [] }, PRO)).toThrow(
-        /unknown exporter/,
-      );
-    }
-  });
-
-  it('a free caller (default entitlement) is refused the built Pro exporter with EntitlementError', () => {
+  it('a free caller (default entitlement) is refused both Pro exporters with EntitlementError', () => {
     const r = registry();
     const parsed = parse('PT1H30M\n90s');
     for (const id of builtProIds) {
@@ -114,6 +98,18 @@ describe('NekoDuration: monetization gating (single-build, entitlement-gated)', 
     expect(csv.split('\n')[0]).toBe('input,totalSeconds,days,hours,minutes,seconds,iso,approximate');
     // PT1H30M = 5400s → 0d 1h 30m 0s.
     expect(csv).toContain('PT1H30M,5400,0,1,30,0,');
+  });
+
+  it('a Pro entitlement unlocks the locale exporter (host Intl, ICU-stable structure)', () => {
+    const r = registry();
+    const parsed = parse('PT1H30M');
+    const md = String(runExporter(r, 'duration', 'duration.export.locale', parsed, PRO).body);
+    expect(md).toContain('# NekoDuration locale formatting');
+    expect(md).toContain('| locale | formatted |');
+    // Assert the locale tags + structure (ICU-stable), not exact localized text
+    // which varies by ICU/Node version.
+    expect(md).toContain('| en |');
+    expect(md).toContain('| ja |');
   });
 
   it('a truly unknown exporter id still throws "unknown exporter"', () => {

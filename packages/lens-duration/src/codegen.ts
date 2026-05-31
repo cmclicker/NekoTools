@@ -1,17 +1,14 @@
 import type { DurationReport } from './kinds.js';
 
 /**
- * NekoDuration Pro generator. Backs ONE of the two declared Pro exporters:
- * `duration.export.breakdown.csv` (pro entitlement `export.breakdown.csv`).
+ * NekoDuration Pro generators, backing both declared Pro exporters:
+ *   - `duration.export.breakdown.csv` (pro `export.breakdown.csv`)
+ *   - `duration.export.locale` (pro `export.locale` / `locale.format`)
  *
- * The other declared Pro id — `duration.export.locale` (`locale.format`) —
- * needs locale-specific human formatting ("1 hour 30 minutes" in other
- * languages), which the manifest's out-of-scope list explicitly excludes and
- * which would require bundled i18n data. It stays advertising-only (not
- * registered), exactly as NekoRegex left suite/snapshot advertising-only.
- *
- * This generator is a pure, deterministic function of the parsed
- * `duration.parsed` entries — no network, no clock, no premium engine.
+ * Both are pure, deterministic functions of the parsed `duration.parsed`
+ * entries — no network, no clock, no premium engine. Locale formatting uses
+ * the HOST `Intl` runtime only (no bundled CLDR/ICU data ships), which is what
+ * the amended manifest outOfScope now allows.
  */
 
 function csvField(s: string): string {
@@ -48,4 +45,53 @@ export function toBreakdownCsv(report: DurationReport): string {
     );
   }
   return rows.join('\n');
+}
+
+/** The fixed locale set the locale export renders each duration in. */
+export const LOCALE_SET = ['en', 'de', 'fr', 'es', 'ja'] as const;
+
+/** Non-zero d/h/m/s components, each formatted via Intl in the given locale. */
+function localizedParts(
+  locale: string,
+  c: { days: number; hours: number; minutes: number; seconds: number },
+): string {
+  const units: [number, Intl.NumberFormatOptions['unit']][] = [
+    [c.days, 'day'],
+    [c.hours, 'hour'],
+    [c.minutes, 'minute'],
+    [c.seconds, 'second'],
+  ];
+  const parts = units
+    .filter(([n]) => n > 0)
+    .map(([n, unit]) =>
+      new Intl.NumberFormat(locale, { style: 'unit', unit, unitDisplay: 'long' }).format(n),
+    );
+  // All-zero duration → render "0 seconds" in-locale rather than empty.
+  if (parts.length === 0) {
+    return new Intl.NumberFormat(locale, { style: 'unit', unit: 'second', unitDisplay: 'long' }).format(0);
+  }
+  return new Intl.ListFormat(locale, { style: 'long', type: 'unit' }).format(parts);
+}
+
+/**
+ * `duration.export.locale` — render each parsed duration's d/h/m/s components
+ * as human text across a fixed locale set, using the host `Intl` runtime only
+ * (Intl.NumberFormat unit style + Intl.ListFormat). No bundled locale data, no
+ * network. Markdown: one section per input, a `| locale | formatted |` table.
+ */
+export function toLocale(report: DurationReport): string {
+  const out: string[] = ['# NekoDuration locale formatting', ''];
+  for (const e of report.entries) {
+    out.push(`## \`${e.input}\``, '');
+    if (!e.valid || e.value === null) {
+      out.push('(invalid duration)', '');
+      continue;
+    }
+    out.push('| locale | formatted |', '| --- | --- |');
+    for (const locale of LOCALE_SET) {
+      out.push(`| ${locale} | ${localizedParts(locale, e.value.components)} |`);
+    }
+    out.push('');
+  }
+  return out.join('\n').trimEnd() + '\n';
 }
