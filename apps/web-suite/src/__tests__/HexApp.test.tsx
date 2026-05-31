@@ -3,6 +3,17 @@ import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 
 import { HexApp } from '../HexApp.js';
 
+const PRO = {
+  version: 1 as const,
+  licenseId: 'X',
+  licensee: 'Buyer',
+  tier: 'pro' as const,
+  features: ['*'],
+  issuedAt: '2026-01-01T00:00:00.000Z',
+  expiresAt: null,
+  signature: 's',
+};
+
 describe('HexApp', () => {
   it('dumps text input with offset + ascii gutter', () => {
     render(<HexApp initialInput={'ABC'} initialUiState={{ mode: 'text' }} />);
@@ -36,6 +47,36 @@ describe('HexApp', () => {
     render(<HexApp initialInput={''} />);
     expect(screen.getByTestId('hex-no-document')).toBeInTheDocument();
     expect(screen.getByText(/hex\.empty_input/)).toBeInTheDocument();
+  });
+
+  it('locks the C-array + base64 Pro views when free', () => {
+    render(<HexApp initialInput={'ABC'} initialUiState={{ mode: 'text', viewMode: 'c-array' }} />);
+    expect(screen.getByTestId('hex-locked')).toBeInTheDocument();
+    expect(screen.queryByTestId('hex-output')).not.toBeInTheDocument();
+  });
+
+  it('unlocks the C array via an injected Pro entitlement', () => {
+    render(
+      <HexApp
+        initialInput={'ABC'}
+        initialUiState={{ mode: 'text', viewMode: 'c-array' }}
+        entitlement={PRO}
+      />,
+    );
+    const out = screen.getByTestId('hex-output').textContent ?? '';
+    expect(out).toContain('unsigned char data[] = {');
+    expect(out).toContain('0x41, 0x42, 0x43');
+  });
+
+  it('renders base64 in the base64 view when Pro', () => {
+    render(
+      <HexApp
+        initialInput={'ABC'}
+        initialUiState={{ mode: 'text', viewMode: 'base64' }}
+        entitlement={PRO}
+      />,
+    );
+    expect(screen.getByTestId('hex-output').textContent).toBe('QUJD');
   });
 
   it('copies the dump via the injected clipboard', async () => {
