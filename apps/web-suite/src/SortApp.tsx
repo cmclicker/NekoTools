@@ -4,6 +4,7 @@ import type { Entitlement } from '@nekotools/contracts';
 import type { SortOptions, SortOrder } from '@nekotools/lens-sort';
 
 import { Diagnostics } from './Diagnostics.js';
+import { FileLoadControl } from './FileLoadControl.js';
 import { copyToClipboard, type ClipboardDeps } from './clipboard.js';
 import { useLicenseContext } from './license-store.js';
 import { parseSortInput } from './sort-parse.js';
@@ -110,6 +111,12 @@ export function SortApp({
         <label htmlFor="sort-paste" className="paste__label">
           Paste lines to sort / dedupe:
         </label>
+        <FileLoadControl
+          onText={(text) => setInput(text)}
+          testId="sort-file"
+          label="…or load a file"
+          ariaLabel="Load a local file to sort"
+        />
         <textarea
           id="sort-paste"
           className="paste__textarea"

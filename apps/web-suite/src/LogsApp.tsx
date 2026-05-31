@@ -4,6 +4,7 @@ import type { Entitlement } from '@nekotools/contracts';
 import type { LogFilter } from '@nekotools/lens-logs';
 
 import { Diagnostics } from './Diagnostics.js';
+import { FileLoadControl } from './FileLoadControl.js';
 import { LogFilterControl, isEmptyFilter } from './LogFilterControl.js';
 import { LogSummaryView } from './LogSummaryView.js';
 import { LogTableView } from './LogTableView.js';
@@ -193,6 +194,12 @@ export function LogsApp({
         <label htmlFor="logs-paste" className="paste__label">
           Paste a log snapshot here:
         </label>
+        <FileLoadControl
+          onText={(text) => setInput(text)}
+          testId="logs-file"
+          label="…or load a .log file"
+          ariaLabel="Load a local log file"
+        />
         <textarea
           id="logs-paste"
           className="paste__textarea"

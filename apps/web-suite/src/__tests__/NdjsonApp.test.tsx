@@ -87,4 +87,15 @@ describe('NdjsonApp', () => {
     );
     expect((screen.getByTestId('ndjson-output').textContent ?? '').split('\n')[0]).toBe('id,name');
   });
+
+  it('loads a local file into the input (read locally, never uploaded)', async () => {
+    render(<NdjsonApp initialInput={'{"a":1}'} />);
+    const file = new File(['{"loaded":true}'], 'sample.ndjson', { type: 'text/plain' });
+    fireEvent.change(screen.getByTestId('ndjson-file'), { target: { files: [file] } });
+    await waitFor(() =>
+      expect((screen.getByTestId('ndjson-input') as HTMLTextAreaElement).value).toContain(
+        '{"loaded":true}',
+      ),
+    );
+  });
 });

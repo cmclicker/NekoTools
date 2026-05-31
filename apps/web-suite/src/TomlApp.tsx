@@ -3,6 +3,7 @@ import { useCallback, useMemo, useState, type ChangeEvent } from 'react';
 import type { Entitlement } from '@nekotools/contracts';
 
 import { Diagnostics } from './Diagnostics.js';
+import { FileLoadControl } from './FileLoadControl.js';
 import { copyToClipboard, type ClipboardDeps } from './clipboard.js';
 import { useLicenseContext } from './license-store.js';
 import { parseTomlInput } from './toml-parse.js';
@@ -116,9 +117,17 @@ export function TomlApp({
   return (
     <section className="tool tool--toml" aria-label="NekoTOML workbench">
       <section className="paste card">
-        <label htmlFor="toml-paste" className="paste__label">
-          Paste TOML here:
-        </label>
+        <div className="paste__head">
+          <label htmlFor="toml-paste" className="paste__label">
+            Paste TOML here:
+          </label>
+          <FileLoadControl
+            onText={(text) => setInput(text)}
+            testId="toml-file"
+            label="…or load a file"
+            ariaLabel="Load a local TOML file"
+          />
+        </div>
         <textarea
           id="toml-paste"
           className="paste__textarea"

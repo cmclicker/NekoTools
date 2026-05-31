@@ -3,6 +3,7 @@ import { useCallback, useMemo, useState, type ChangeEvent } from 'react';
 import type { Entitlement } from '@nekotools/contracts';
 
 import { Diagnostics } from './Diagnostics.js';
+import { FileLoadControl } from './FileLoadControl.js';
 import { copyToClipboard, type ClipboardDeps } from './clipboard.js';
 import { useLicenseContext } from './license-store.js';
 import { parseYamlText } from './yaml-parse.js';
@@ -94,9 +95,17 @@ export function YamlApp({
   return (
     <section className="tool tool--yaml" aria-label="NekoYAML workbench">
       <section className="paste card">
-        <label htmlFor="yaml-paste" className="paste__label">
-          Paste YAML here:
-        </label>
+        <div className="paste__head">
+          <label htmlFor="yaml-paste" className="paste__label">
+            Paste YAML here:
+          </label>
+          <FileLoadControl
+            onText={(text) => setInput(text)}
+            testId="yaml-file"
+            label="…or load a file"
+            ariaLabel="Load a local YAML file"
+          />
+        </div>
         <textarea
           id="yaml-paste"
           className="paste__textarea"

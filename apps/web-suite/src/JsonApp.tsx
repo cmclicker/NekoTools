@@ -4,6 +4,7 @@ import { buildJsonRegistration, FIXED_CLOCK } from '@nekotools/lens-json';
 import type { Entitlement } from '@nekotools/contracts';
 
 import { Diagnostics } from './Diagnostics.js';
+import { FileLoadControl } from './FileLoadControl.js';
 import { TreeView } from './TreeView.js';
 import { TextView } from './TextView.js';
 import { TableView } from './TableView.js';
@@ -151,9 +152,17 @@ export function JsonApp({
   return (
     <section className="tool tool--json" aria-label="NekoJSON workbench">
       <section className="paste card">
-        <label htmlFor="paste-textarea" className="paste__label">
-          Paste JSON here:
-        </label>
+        <div className="paste__head">
+          <label htmlFor="paste-textarea" className="paste__label">
+            Paste JSON here:
+          </label>
+          <FileLoadControl
+            onText={(text) => setInput(text)}
+            testId="json-file"
+            label="…or load a file"
+            ariaLabel="Load a local JSON file"
+          />
+        </div>
         <textarea
           id="paste-textarea"
           className="paste__textarea"

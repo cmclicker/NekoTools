@@ -97,4 +97,15 @@ describe('XmlApp', () => {
     expect(out).toContain('<xs:schema xmlns:xs="http://www.w3.org/2001/XMLSchema">');
     expect(out).toContain('<xs:element name=');
   });
+
+  it('loads a local file into the input (read locally, never uploaded)', async () => {
+    render(<XmlApp initialInput={'<a>x</a>'} />);
+    const file = new File(['<r loaded="true"/>'], 'sample.xml', { type: 'text/plain' });
+    fireEvent.change(screen.getByTestId('xml-file'), { target: { files: [file] } });
+    await waitFor(() =>
+      expect((screen.getByTestId('xml-input') as HTMLTextAreaElement).value).toContain(
+        'loaded="true"',
+      ),
+    );
+  });
 });

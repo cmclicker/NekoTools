@@ -100,4 +100,15 @@ describe('TomlApp', () => {
     );
     expect(screen.getByTestId('toml-output').textContent ?? '').toContain('"type": "object"');
   });
+
+  it('loads a local file into the input (read locally, never uploaded)', async () => {
+    render(<TomlApp initialInput={'title = "x"'} />);
+    const file = new File(['loaded = true'], 'sample.toml', { type: 'text/plain' });
+    fireEvent.change(screen.getByTestId('toml-file'), { target: { files: [file] } });
+    await waitFor(() =>
+      expect((screen.getByTestId('toml-input') as HTMLTextAreaElement).value).toContain(
+        'loaded = true',
+      ),
+    );
+  });
 });

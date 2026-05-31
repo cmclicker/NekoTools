@@ -95,4 +95,15 @@ describe('IniApp', () => {
     expect(out).toContain('[server]');
     expect(out).toContain('host = "localhost"');
   });
+
+  it('loads a local file into the input (read locally, never uploaded)', async () => {
+    render(<IniApp initialInput={'[server]\nhost = localhost'} />);
+    const file = new File(['[s]\nloaded=true'], 'sample.ini', { type: 'text/plain' });
+    fireEvent.change(screen.getByTestId('ini-file'), { target: { files: [file] } });
+    await waitFor(() =>
+      expect((screen.getByTestId('ini-input') as HTMLTextAreaElement).value).toContain(
+        'loaded=true',
+      ),
+    );
+  });
 });

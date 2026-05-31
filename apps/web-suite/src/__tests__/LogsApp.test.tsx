@@ -236,4 +236,19 @@ describe('LogsApp integration', () => {
     expect(out).toContain('# NekoLogs message clusters');
     expect(out).toContain('db timeout id=<num>');
   });
+
+  it('loads a local file into the input (read locally, never uploaded)', async () => {
+    render(<LogsApp initialInput={'a bare line'} />);
+    const file = new File(
+      ['2026-05-21 10:00:05 [WARN] cache miss for user 4821'],
+      'sample.log',
+      { type: 'text/plain' },
+    );
+    fireEvent.change(screen.getByTestId('logs-file'), { target: { files: [file] } });
+    await waitFor(() =>
+      expect((screen.getByTestId('logs-input') as HTMLTextAreaElement).value).toContain(
+        'cache miss for user 4821',
+      ),
+    );
+  });
 });

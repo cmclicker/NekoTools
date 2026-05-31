@@ -79,4 +79,13 @@ describe('SortApp', () => {
     expect(out).toContain('3,banana');
     expect(out).toContain('2,apple');
   });
+
+  it('loads a local file into the input (read locally, never uploaded)', async () => {
+    render(<SortApp initialInput={'x\ny'} />);
+    const file = new File(['banana\napple'], 'sample.txt', { type: 'text/plain' });
+    fireEvent.change(screen.getByTestId('sort-file'), { target: { files: [file] } });
+    await waitFor(() =>
+      expect((screen.getByTestId('sort-input') as HTMLTextAreaElement).value).toContain('banana'),
+    );
+  });
 });

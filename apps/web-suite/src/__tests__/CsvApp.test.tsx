@@ -115,4 +115,13 @@ describe('CsvApp', () => {
     expect(out).toContain('"tool": "csv"');
     expect(out).toContain('"steps"');
   });
+
+  it('loads a local file into the input (read locally, never uploaded)', async () => {
+    render(<CsvApp initialInput={'x,y\n1,2'} />);
+    const file = new File(['a,b\n1,2'], 'sample.csv', { type: 'text/plain' });
+    fireEvent.change(screen.getByTestId('csv-file'), { target: { files: [file] } });
+    await waitFor(() =>
+      expect((screen.getByTestId('csv-input') as HTMLTextAreaElement).value).toContain('a,b'),
+    );
+  });
 });
