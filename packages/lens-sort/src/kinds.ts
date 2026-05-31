@@ -20,6 +20,13 @@ export interface SortReport {
   readonly outputCount: number;
   readonly removed: number;
   readonly lines: readonly string[];
+  /**
+   * The original input lines, before sort/dedupe/trim. Retained so the Pro
+   * `sort.export.diff` exporter can show a real input→output diff. Optional
+   * for backward compatibility with workspaces serialized before this field
+   * existed.
+   */
+  readonly inputLines?: readonly string[];
 }
 
 export type SortParsedArtifact = Artifact<'sort.parsed', SortReport>;

@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
-import type { Workspace } from '@nekotools/contracts';
+import type { Entitlement, Workspace } from '@nekotools/contracts';
 import {
+  EntitlementError,
   ToolRegistry,
   jsonWorkspaceSerializer,
   runExporter,
@@ -13,6 +14,17 @@ import { buildDiffRegistration, DIFF_KIND_RESULT, FIXED_CLOCK, diffManifest } fr
 import type { DiffResult, DiffResultArtifact } from '../kinds.js';
 
 const clock = FIXED_CLOCK('2026-05-27T00:00:00.000Z');
+
+const PRO: Entitlement = {
+  version: 1,
+  licenseId: 'TEST',
+  licensee: 'Test User',
+  tier: 'pro',
+  features: ['*'],
+  issuedAt: '2026-01-01T00:00:00.000Z',
+  expiresAt: null,
+  signature: 'test',
+};
 
 function registry(opts?: { largeInputBytes?: number }): ToolRegistry {
   const r = new ToolRegistry();
@@ -70,34 +82,69 @@ describe('NekoDiff: manifest', () => {
   });
 });
 
-describe('NekoDiff: monetization safety', () => {
+describe('NekoDiff: monetization gating (single-build, entitlement-gated)', () => {
   const registration = buildDiffRegistration(clock);
   const proExporterIds = ['diff.export.semantic', 'diff.export.bundle.signed'];
 
-  it('no Pro exporter is registered in the free build', () => {
-    const registered = new Set(registration.exporters.map((e) => e.id));
-    for (const id of proExporterIds) expect(registered.has(id)).toBe(false);
+  it('both Pro exporters are declared AND registered as proExporters, not free', () => {
+    const free = new Set(registration.exporters.map((e) => e.id));
+    const pro = new Set((registration.proExporters ?? []).map((e) => e.id));
+    for (const id of proExporterIds) {
+      expect(diffManifest.exporters).toContain(id);
+      expect(pro.has(id)).toBe(true);
+      expect(free.has(id)).toBe(false);
+    }
   });
 
   it('no graph projector is registered in the free build', () => {
     expect(registration.graphProjectors ?? []).toHaveLength(0);
   });
 
-  it('runExporter throws "unknown exporter" for every Pro exporter id', () => {
+  it('a free caller (default entitlement) is refused both Pro exporters with EntitlementError', () => {
     const r = registry();
+    const parsed = runDiff('diff.json', '{"a":1}', '{"a":2}');
     for (const id of proExporterIds) {
-      expect(() => runExporter(r, 'diff', id, { artifacts: [], diagnostics: [] })).toThrow(
-        /unknown exporter/,
-      );
+      expect(() => runExporter(r, 'diff', id, parsed)).toThrow(EntitlementError);
     }
   });
 
-  it('the manifest declares Pro exporters that are NOT in the registered set', () => {
-    const registered = new Set(registration.exporters.map((e) => e.id));
-    for (const id of proExporterIds) {
-      expect(diffManifest.exporters).toContain(id);
-      expect(registered.has(id)).toBe(false);
-    }
+  it('a Pro entitlement unlocks the semantic diff + signable bundle', () => {
+    const r = registry();
+    const parsed = runDiff('diff.json', '{"a":1}', '{"a":2}');
+
+    const semantic = String(runExporter(r, 'diff', 'diff.export.semantic', parsed, PRO).body);
+    expect(semantic).toContain('# NekoDiff semantic diff (json)');
+    expect(semantic).toContain('## Changed keys'); // json mode surfaces key paths
+    expect(semantic).toContain('changed: a');
+
+    // Bundle without a signature → valid unsigned signable bundle.
+    const unsigned = JSON.parse(
+      String(runExporter(r, 'diff', 'diff.export.bundle.signed', parsed, PRO).body),
+    ) as { tool?: string; signature?: string | null; contentDigest?: string; note?: string };
+    expect(unsigned.tool).toBe('diff');
+    expect(unsigned.signature).toBeNull();
+    expect(typeof unsigned.contentDigest).toBe('string');
+    expect(unsigned.note).toMatch(/unsigned signable bundle/i);
+
+    // Bundle WITH an out-of-band signature supplied via options → embedded.
+    const signed = JSON.parse(
+      String(
+        runExporter(r, 'diff', 'diff.export.bundle.signed', {
+          artifacts: parsed.artifacts,
+          diagnostics: parsed.diagnostics,
+          options: { signature: 'ZmFrZXNpZw', keyId: 'vendor-key-1' },
+        }, PRO).body,
+      ),
+    ) as { signature?: string | null; keyId?: string | null; note?: string };
+    expect(signed.signature).toBe('ZmFrZXNpZw');
+    expect(signed.keyId).toBe('vendor-key-1');
+    expect(signed.note).toMatch(/signed bundle/i);
+  });
+
+  it('a truly unknown exporter id still throws "unknown exporter"', () => {
+    expect(() =>
+      runExporter(registry(), 'diff', 'diff.export.nope', { artifacts: [], diagnostics: [] }, PRO),
+    ).toThrow(/unknown exporter/);
   });
 
   it('free entitlements match exactly the implemented vertical-slice set', () => {

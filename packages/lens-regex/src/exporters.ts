@@ -2,16 +2,23 @@ import type { Exporter } from '@nekotools/contracts';
 
 import {
   REGEX_KIND_MATCHSET,
+  REGEX_KIND_SUITE,
   REGEX_MATCHSET_EXPORT_KINDS,
+  REGEX_SUITE_EXPORT_KINDS,
   type RegexArtifact,
   type RegexMatchSetArtifact,
+  type RegexSuiteArtifact,
 } from './kinds.js';
-import { toExplain, toRedactionRecipe } from './codegen.js';
+import { toExplain, toRedactionRecipe, toSnapshotReport, toSuiteReport } from './codegen.js';
 
 const TOOL_ID = 'regex';
 
 function pickMatchSet(artifacts: readonly RegexArtifact[]): RegexMatchSetArtifact | undefined {
   return artifacts.find((a): a is RegexMatchSetArtifact => a.kind === REGEX_KIND_MATCHSET);
+}
+
+function pickSuite(artifacts: readonly RegexArtifact[]): RegexSuiteArtifact | undefined {
+  return artifacts.find((a): a is RegexSuiteArtifact => a.kind === REGEX_KIND_SUITE);
 }
 
 /** Full match analysis as pretty-printed JSON. */
@@ -107,13 +114,15 @@ export const freeExporters: readonly Exporter<RegexArtifact>[] = [
 
 // --- Pro exporters (registered in the binary, gated by entitlement) --------
 //
-// These back TWO of the four declared Pro exporter ids — `explain.mode` and
-// `redaction.recipes` — both pure functions of the parsed `regex.matchset`
-// (native tokenization, no remote/LLM, no eval). Generators live in
-// `codegen.ts`. The other two declared ids (`regex.export.suite`,
-// `regex.export.snapshot`) need saved multi-case suites / regression
-// baselines, but `canSaveWorkspace` is false and the artifact holds one test
-// run — so they remain advertising-only and are NOT registered here.
+// These back ALL FOUR declared Pro exporter ids, each a pure function of its
+// parsed artifact (native tokenization / matching, no remote/LLM, no eval;
+// generators live in `codegen.ts`):
+//
+//   - `regex.export.explain`          / `regex.export.redaction.recipe`
+//        consume a single-run `regex.matchset`.
+//   - `regex.export.suite`            / `regex.export.snapshot`
+//        consume a multi-case `regex.suite` (pasted via the suite parser's
+//        `cases` hint — nothing is persisted; `canSaveWorkspace` is false).
 
 /** `regex.export.explain` (Pro) — local structural pattern explanation. */
 export const explainExporter: Exporter<RegexArtifact> = {
@@ -149,7 +158,45 @@ export const redactionRecipeExporter: Exporter<RegexArtifact> = {
   },
 };
 
+/** `regex.export.suite` (Pro) — markdown report of a multi-case test suite. */
+export const suiteReportExporter: Exporter<RegexArtifact> = {
+  version: 1,
+  id: 'regex.export.suite',
+  toolId: TOOL_ID,
+  target: 'markdown',
+  accepts: REGEX_SUITE_EXPORT_KINDS,
+  producesMimeType: 'text/markdown',
+  producesExtension: 'md',
+  export({ artifacts }) {
+    const suite = pickSuite(artifacts)?.value;
+    const body =
+      suite === undefined ? '# NekoRegex test suite\n\n(no suite)' : toSuiteReport(suite);
+    return { mimeType: 'text/markdown', extension: 'md', body };
+  },
+};
+
+/** `regex.export.snapshot` (Pro) — deterministic regression baseline as JSON. */
+export const snapshotExporter: Exporter<RegexArtifact> = {
+  version: 1,
+  id: 'regex.export.snapshot',
+  toolId: TOOL_ID,
+  target: 'json',
+  accepts: REGEX_SUITE_EXPORT_KINDS,
+  producesMimeType: 'application/json',
+  producesExtension: 'json',
+  export({ artifacts }) {
+    const suite = pickSuite(artifacts)?.value;
+    const body =
+      suite === undefined
+        ? JSON.stringify({ tool: 'regex', kind: 'suite-snapshot', caseCount: 0, cases: [] }, null, 2)
+        : toSnapshotReport(suite);
+    return { mimeType: 'application/json', extension: 'json', body };
+  },
+};
+
 export const proExporters: readonly Exporter<RegexArtifact>[] = [
   explainExporter,
   redactionRecipeExporter,
+  suiteReportExporter,
+  snapshotExporter,
 ];

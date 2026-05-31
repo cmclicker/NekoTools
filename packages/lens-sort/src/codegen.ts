@@ -1,19 +1,14 @@
 import type { SortReport } from './kinds.js';
 
 /**
- * NekoSort Pro generator. Backs ONE of the two declared Pro exporters:
- * `sort.export.frequency` (pro entitlement `frequency.count`).
+ * NekoSort Pro generators, backing both declared Pro exporters:
+ *   - `sort.export.frequency` (pro `frequency.count`)
+ *   - `sort.export.diff` (pro `export.diff`)
  *
- * The other declared Pro id — `sort.export.diff` (`export.diff`) — would
- * diff the original input against the transformed output, but the
- * `sort.parsed` artifact retains only the OUTPUT lines + counts, not the
- * pre-transform input. A faithful input/output diff therefore needs data the
- * artifact does not carry, so it stays advertising-only (not registered) —
- * the same "artifact doesn't retain the inputs" disqualifier as NekoYAML's
- * roundtrip diff.
- *
- * This generator is a pure, deterministic function of the parsed
- * `sort.parsed` lines — no network, no clock, no premium engine.
+ * The diff exporter compares the original input lines against the transformed
+ * output. The `sort.parsed` artifact now retains `inputLines` (added with this
+ * exporter), so a faithful input→output diff is a pure function of the
+ * artifact — no network, no clock, no premium engine.
  */
 
 export interface FrequencyRow {
@@ -58,4 +53,52 @@ export function toFrequencyCsv(report: SortReport): string {
     rows.push(`${r.count},${csvField(r.line)}`);
   }
   return rows.join('\n');
+}
+
+/**
+ * `sort.export.diff` — a unified-diff-style view of the transform: lines
+ * present in the input but dropped from the output are `- removed`; lines in
+ * the output absent from the input would be `+ added` (sort/dedupe/trim never
+ * invents lines, so adds are rare but handled for completeness); lines present
+ * in both are context ` `. Because sort reorders, this is a multiset
+ * membership diff (by line value + occurrence count), not a positional diff —
+ * which is the honest shape for a sort/dedupe transform. Pure function of the
+ * retained `inputLines` + result `lines`.
+ */
+export function toInputOutputDiff(report: SortReport): string {
+  const input = report.inputLines ?? [];
+  const output = report.lines;
+
+  // Multiset counts so dedupe shows the right number of removed duplicates.
+  const outCounts = new Map<string, number>();
+  for (const l of output) outCounts.set(l, (outCounts.get(l) ?? 0) + 1);
+  const inCounts = new Map<string, number>();
+  for (const l of input) inCounts.set(l, (inCounts.get(l) ?? 0) + 1);
+
+  const lines: string[] = [
+    `--- input (${input.length} line${input.length === 1 ? '' : 's'})`,
+    `+++ output (${output.length} line${output.length === 1 ? '' : 's'})`,
+  ];
+
+  // Removed: input occurrences beyond what the output keeps (dropped/deduped),
+  // walked in input order so the diff reads against the original.
+  const keptBudget = new Map(outCounts);
+  for (const l of input) {
+    const budget = keptBudget.get(l) ?? 0;
+    if (budget > 0) {
+      keptBudget.set(l, budget - 1);
+      lines.push(`  ${l}`);
+    } else {
+      lines.push(`- ${l}`);
+    }
+  }
+
+  // Added: any output line whose count exceeds the input's (defensive; sort
+  // transforms don't add lines, but keep the diff total/honest).
+  for (const [l, outN] of outCounts) {
+    const extra = outN - (inCounts.get(l) ?? 0);
+    for (let i = 0; i < extra; i++) lines.push(`+ ${l}`);
+  }
+
+  return lines.join('\n');
 }

@@ -35,6 +35,9 @@ export function makeDiagnostic(
  *   - regex.expensive_pattern (warning) — heuristic catastrophic-backtracking risk.
  *   - regex.match_limit       (warning) — match list truncated at the configured cap.
  *   - regex.no_matches        (info)    — valid pattern, zero matches in the sample.
+ *   - regex.suite_invalid     (error)   — the `cases` hint is missing or not a JSON array.
+ *   - regex.suite_empty       (info)    — the suite ran with zero cases.
+ *   - regex.suite_failed      (warning) — at least one asserted case did not meet its expected count.
  */
 export const REGEX_DIAGNOSTIC_CODES = {
   emptyPattern: 'regex.empty_pattern',
@@ -44,6 +47,9 @@ export const REGEX_DIAGNOSTIC_CODES = {
   expensivePattern: 'regex.expensive_pattern',
   matchLimit: 'regex.match_limit',
   noMatches: 'regex.no_matches',
+  suiteInvalid: 'regex.suite_invalid',
+  suiteEmpty: 'regex.suite_empty',
+  suiteFailed: 'regex.suite_failed',
 } as const;
 
 /**

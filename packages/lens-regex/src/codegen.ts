@@ -1,19 +1,21 @@
-import type { RegexMatchSet } from './kinds.js';
+import type { RegexMatchSet, RegexSuite, RegexSuiteCase } from './kinds.js';
 
 /**
- * NekoRegex Pro generators. Back two of the four declared Pro exporters:
- * `regex.export.explain` (pro entitlement `explain.mode`) and
- * `regex.export.redaction.recipe` (pro entitlement `redaction.recipes`).
+ * NekoRegex Pro generators backing the four declared Pro exporters:
  *
- * The other two declared Pro ids — `regex.export.suite` (`suites.saved`)
- * and `regex.export.snapshot` (`snapshots.regression`) — require saved
- * multi-case test suites / regression baselines, but the free build sets
- * `capabilities.canSaveWorkspace: false` and a `regex.matchset` artifact
- * holds a single test run, not a suite. They depend on the future saved-
- * workspace engine and stay advertising-only (not registered).
+ *   - `regex.export.explain`          (`explain.mode`)          — a `regex.matchset`
+ *   - `regex.export.redaction.recipe` (`redaction.recipes`)     — a `regex.matchset`
+ *   - `regex.export.suite`            (`suites.saved`/`batch.test-cases`) — a `regex.suite`
+ *   - `regex.export.snapshot`         (`snapshots.regression`)  — a `regex.suite`
  *
- * Both generators here are pure, deterministic functions of a parsed
- * `regex.matchset` — native tokenization only, no remote/LLM explanation
+ * The suite + snapshot generators consume a multi-case `regex.suite` artifact
+ * (pasted in via the suite parser's `cases` hint — nothing is persisted, since
+ * `capabilities.canSaveWorkspace` is false). The snapshot is a DETERMINISTIC
+ * regression baseline: re-running the same cases and diffing the snapshot text
+ * detects drift.
+ *
+ * Every generator here is a pure, deterministic function of its parsed
+ * artifact — native tokenization / matching only, no remote/LLM explanation
  * (matching the manifest's out-of-scope note), no eval, no network.
  */
 
@@ -261,4 +263,119 @@ export function toRedactionRecipe(set: RegexMatchSet, replacement = '[REDACTED]'
       'Descriptive recipe — apply it yourself or via the Pro recipe-pack runner. ' +
       'The matcher is forced global so every occurrence is redacted.',
   };
+}
+
+// --- suite report ----------------------------------------------------------
+
+/** A case's display label: its `name`, else a 1-based `case N` fallback. */
+function caseLabel(c: RegexSuiteCase, index: number): string {
+  return c.name ?? `case ${index + 1}`;
+}
+
+/** A case's pass/fail verdict as a stable token. */
+function caseVerdict(c: RegexSuiteCase): 'passed' | 'failed' | 'n/a' {
+  if (c.passed === null) return 'n/a';
+  return c.passed ? 'passed' : 'failed';
+}
+
+/**
+ * `regex.export.suite` — a markdown report of a multi-case test suite: one row
+ * per case (label, pattern, flags, observed match count, expected count, and
+ * pass/fail verdict) plus a summary line of passed/failed counts. Pure.
+ */
+export function toSuiteReport(suite: RegexSuite): string {
+  const out: string[] = ['# NekoRegex test suite', ''];
+  out.push(
+    `**Summary:** ${suite.caseCount} case(s) — ${suite.passedCount} passed, ${suite.failedCount} failed`,
+    '',
+  );
+
+  if (suite.caseCount === 0) {
+    out.push('(no cases)', '');
+    return out.join('\n');
+  }
+
+  out.push('## Cases', '');
+  out.push(
+    '| case | pattern | flags | matches | expected | result |',
+    '| --- | --- | --- | --- | --- | --- |',
+  );
+  suite.cases.forEach((c, i) => {
+    const pattern = `\`/${c.pattern}/\``.replace(/\|/g, '\\|');
+    const flags = c.flags === '' ? '(none)' : `\`${c.flags}\``;
+    const expected = c.expectedMatchCount === undefined ? '—' : String(c.expectedMatchCount);
+    out.push(
+      `| ${caseLabel(c, i)} | ${pattern} | ${flags} | ${c.matchCount} | ${expected} | ${caseVerdict(c)} |`,
+    );
+  });
+  out.push('');
+
+  // Surface invalid cases explicitly — a compile failure is a suite concern.
+  const invalid = suite.cases
+    .map((c, i) => ({ c, i }))
+    .filter(({ c }) => !c.valid);
+  if (invalid.length > 0) {
+    out.push('## Invalid cases', '');
+    for (const { c, i } of invalid) {
+      out.push(`- **${caseLabel(c, i)}**: ${c.error ?? 'unknown error'}`);
+    }
+    out.push('');
+  }
+
+  return out.join('\n');
+}
+
+// --- snapshot --------------------------------------------------------------
+
+/** One case's deterministic baseline line within a regression snapshot. */
+export interface RegexSnapshotCase {
+  readonly name: string;
+  readonly pattern: string;
+  readonly flags: string;
+  readonly sample: string;
+  readonly valid: boolean;
+  readonly matchCount: number;
+  /** The matched substrings, in match order — the drift-detection payload. */
+  readonly matched: readonly string[];
+}
+
+export interface RegexSnapshot {
+  readonly tool: 'regex';
+  readonly kind: 'suite-snapshot';
+  readonly caseCount: number;
+  readonly cases: readonly RegexSnapshotCase[];
+}
+
+/**
+ * Build the structured regression baseline for a suite. Stable + deterministic:
+ * cases keep their input order, each carries its pattern/flags/sample plus the
+ * observed match count and the matched substrings. Re-running the same cases
+ * and comparing this structure (or its JSON form) flags any drift.
+ */
+export function toSnapshot(suite: RegexSuite): RegexSnapshot {
+  return {
+    tool: 'regex',
+    kind: 'suite-snapshot',
+    caseCount: suite.caseCount,
+    cases: suite.cases.map((c, i) => ({
+      name: caseLabel(c, i),
+      pattern: c.pattern,
+      flags: c.flags,
+      sample: c.sample,
+      valid: c.valid,
+      matchCount: c.matchCount,
+      matched: c.matches.map((m) => m.value),
+    })),
+  };
+}
+
+/**
+ * `regex.export.snapshot` — a DETERMINISTIC regression snapshot of a suite as
+ * pretty JSON. This is the baseline you commit and re-run: each case's
+ * pattern + flags + sample maps to its match count and matched substrings, so
+ * a textual diff against a later run pinpoints exactly which case drifted.
+ * Pure (delegates to `toSnapshot`).
+ */
+export function toSnapshotReport(suite: RegexSuite): string {
+  return JSON.stringify(toSnapshot(suite), null, 2);
 }

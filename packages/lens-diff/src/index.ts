@@ -1,7 +1,7 @@
 import type { ToolRegistration } from '@nekotools/tool-runtime';
 import { FIXED_CLOCK, type Clock } from '@nekotools/lens-kit';
 
-import { freeExporters } from './exporters.js';
+import { freeExporters, proExporters } from './exporters.js';
 import { diffManifest } from './manifest.js';
 import {
   createDiffJsonParser,
@@ -14,6 +14,7 @@ export * from './diagnostics.js';
 export * from './line-diff.js';
 export * from './normalize.js';
 export * from './parsers.js';
+export * from './codegen.js';
 export * from './exporters.js';
 export * from './manifest.js';
 export { FIXED_CLOCK } from '@nekotools/lens-kit';
@@ -25,10 +26,11 @@ export interface BuildDiffRegistrationOptions {
 }
 
 /**
- * Build a NekoDiff registration for the runtime. The free build registers
- * the three compare parsers (text / json / yaml) plus the three free
- * exporters; the Pro ids declared in the manifest (semantic diff, signed
- * bundle, …) are not registered here.
+ * Build a NekoDiff registration for the runtime. Free exporters run for
+ * everyone. The two Pro exporters (token/key-level semantic diff + signable
+ * bundle) are registered as `proExporters` and gated by `runExporter` behind a
+ * valid entitlement (single-build runtime-gated model). The ignore-order,
+ * recipe, batch, and policy-drift Pro features remain advertising-only.
  */
 export function buildDiffRegistration(
   clock: Clock = FIXED_CLOCK('1970-01-01T00:00:00.000Z'),
@@ -46,5 +48,6 @@ export function buildDiffRegistration(
       createDiffYamlParser(deps),
     ],
     exporters: freeExporters,
+    proExporters,
   };
 }

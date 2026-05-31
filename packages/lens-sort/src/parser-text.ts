@@ -58,11 +58,14 @@ function parseSort(input: ParserInput, producedAt: string): ParserResult<SortArt
       makeDiagnostic(diagIds(), 'info', SORT_DIAGNOSTIC_CODES.emptyInput, 'input is empty'),
     );
     return {
-      artifacts: [makeArtifact(artIds(), producedAt, input, { options, inputCount: 0, outputCount: 0, removed: 0, lines: [] })],
+      artifacts: [makeArtifact(artIds(), producedAt, input, { options, inputCount: 0, outputCount: 0, removed: 0, lines: [], inputLines: [] })],
       diagnostics,
     };
   }
 
+  // The original input lines, before transform — retained for the Pro diff
+  // exporter. Mirrors transformLines' own `raw.split(/\r?\n/)`.
+  const inputLines = input.raw.split(/\r?\n/);
   const result = transformLines(input.raw, options);
   if (result.removed > 0) {
     diagnostics.push(
@@ -81,6 +84,7 @@ function parseSort(input: ParserInput, producedAt: string): ParserResult<SortArt
     outputCount: result.outputCount,
     removed: result.removed,
     lines: result.lines,
+    inputLines,
   };
   return { artifacts: [makeArtifact(artIds(), producedAt, input, report)], diagnostics };
 }

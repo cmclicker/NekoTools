@@ -6,11 +6,16 @@ import {
   type DiffArtifact,
   type DiffResultArtifact,
 } from './kinds.js';
+import { toSemanticDiff, toSignedBundle } from './codegen.js';
 
 const TOOL_ID = 'diff';
 
 function pickResults(artifacts: readonly DiffArtifact[]): readonly DiffResultArtifact[] {
   return artifacts.filter((a): a is DiffResultArtifact => a.kind === DIFF_KIND_RESULT);
+}
+
+function pickResult(artifacts: readonly DiffArtifact[]): DiffResultArtifact | undefined {
+  return pickResults(artifacts)[0];
 }
 
 /**
@@ -107,4 +112,57 @@ export const freeExporters: readonly Exporter<DiffArtifact>[] = [
   unifiedDiffExporter,
   jsonSummaryExporter,
   markdownSummaryExporter,
+];
+
+// --- Pro exporters (registered in the binary, gated by entitlement) --------
+//
+// Both declared Pro ids, registered + runtime-gated. Generators in codegen.ts.
+// `semantic` is a token/JSON-key-level diff (honest scope — not a per-language
+// AST). `bundle.signed` emits a canonical signable bundle; the Ed25519
+// signature, if any, is supplied via ExportInput.options (computed out-of-band
+// by the owner-side tooling, since exporters are synchronous).
+
+/** `diff.export.semantic` (Pro) — token/key-level semantic diff. */
+export const semanticDiffExporter: Exporter<DiffArtifact> = {
+  version: 1,
+  id: 'diff.export.semantic',
+  toolId: TOOL_ID,
+  target: 'markdown',
+  accepts: DIFF_RESULT_EXPORT_KINDS,
+  producesMimeType: 'text/markdown',
+  producesExtension: 'md',
+  export({ artifacts }) {
+    const r = pickResult(artifacts);
+    const body = r === undefined ? '# NekoDiff semantic diff\n\n(no diff result)' : toSemanticDiff(r.value);
+    return { mimeType: 'text/markdown', extension: 'md', body };
+  },
+};
+
+/** `diff.export.bundle.signed` (Pro) — canonical signable bundle (JSON). */
+export const signedBundleExporter: Exporter<DiffArtifact> = {
+  version: 1,
+  id: 'diff.export.bundle.signed',
+  toolId: TOOL_ID,
+  target: 'json',
+  accepts: DIFF_RESULT_EXPORT_KINDS,
+  producesMimeType: 'application/json',
+  producesExtension: 'json',
+  export({ artifacts, options }) {
+    const r = pickResult(artifacts);
+    if (r === undefined) {
+      return { mimeType: 'application/json', extension: 'json', body: 'null' };
+    }
+    const signature = typeof options?.['signature'] === 'string' ? (options['signature'] as string) : null;
+    const keyId = typeof options?.['keyId'] === 'string' ? (options['keyId'] as string) : null;
+    return {
+      mimeType: 'application/json',
+      extension: 'json',
+      body: toSignedBundle(r.value, signature, keyId),
+    };
+  },
+};
+
+export const proExporters: readonly Exporter<DiffArtifact>[] = [
+  semanticDiffExporter,
+  signedBundleExporter,
 ];

@@ -9,14 +9,25 @@ import type { Artifact } from '@nekotools/contracts';
  *                      pattern's group metadata. A single parser run
  *                      produces exactly one of these (best-effort even for
  *                      an invalid pattern, so the UI never throws).
+ *   `regex.suite`    — a multi-case test suite: several pattern+flags+sample
+ *                      cases run together, each optionally asserting an
+ *                      expected match count. A single suite-parser run
+ *                      produces exactly one of these. The suite is PASTED in
+ *                      (via the `cases` hint); nothing is persisted, because
+ *                      `capabilities.canSaveWorkspace` is false.
  */
 export const REGEX_KIND_MATCHSET = 'regex.matchset';
+export const REGEX_KIND_SUITE = 'regex.suite';
 
-export const ALL_REGEX_KINDS = [REGEX_KIND_MATCHSET] as const;
+export const ALL_REGEX_KINDS = [REGEX_KIND_MATCHSET, REGEX_KIND_SUITE] as const;
 
 /** Exporters render `regex.matchset`; a narrow `accepts` list keeps the
  * runtime from handing the wrong artifact to an exporter. */
 export const REGEX_MATCHSET_EXPORT_KINDS = [REGEX_KIND_MATCHSET] as const;
+
+/** Suite exporters (`regex.export.suite` / `regex.export.snapshot`) render
+ * `regex.suite` only — they never touch a single-run `regex.matchset`. */
+export const REGEX_SUITE_EXPORT_KINDS = [REGEX_KIND_SUITE] as const;
 
 /** A single numbered capture group within a match. */
 export interface RegexCaptureGroup {
@@ -86,4 +97,45 @@ export interface RegexMatchSet {
 }
 
 export type RegexMatchSetArtifact = Artifact<'regex.matchset', RegexMatchSet>;
-export type RegexArtifact = RegexMatchSetArtifact;
+
+/**
+ * One case within a `regex.suite`: a pattern + flags run over a sample, with
+ * an optional asserted match count. `passed` is the verdict — `true`/`false`
+ * when `expectedMatchCount` was supplied, otherwise `null` (the case ran for
+ * observation only, no assertion).
+ */
+export interface RegexSuiteCase {
+  /** Optional human label for the case. */
+  readonly name?: string;
+  readonly pattern: string;
+  /** The flag string applied to this case's pattern. */
+  readonly flags: string;
+  readonly sample: string;
+  /** When given, the case asserts the match count equals this number. */
+  readonly expectedMatchCount?: number;
+  /** True when the pattern (+ flags) compiled and the match ran. */
+  readonly valid: boolean;
+  /** RegExp construction error message when `valid` is false, else null. */
+  readonly error: string | null;
+  readonly matchCount: number;
+  readonly matches: readonly RegexMatch[];
+  /**
+   * `true`/`false` against `expectedMatchCount`; `null` when no expectation
+   * was supplied (the case is informational, not asserted).
+   */
+  readonly passed: boolean | null;
+}
+
+/** The parsed body of a `regex.suite` artifact: a batch of test cases. */
+export interface RegexSuite {
+  readonly caseCount: number;
+  readonly cases: readonly RegexSuiteCase[];
+  /** Cases that asserted an expected count AND met it. */
+  readonly passedCount: number;
+  /** Cases that asserted an expected count AND missed it. */
+  readonly failedCount: number;
+}
+
+export type RegexSuiteArtifact = Artifact<'regex.suite', RegexSuite>;
+
+export type RegexArtifact = RegexMatchSetArtifact | RegexSuiteArtifact;
