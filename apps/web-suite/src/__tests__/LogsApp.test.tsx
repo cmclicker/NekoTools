@@ -13,6 +13,27 @@ const SAMPLE = [
   '2026-05-21 10:00:30 [INFO] request completed',
 ].join('\n');
 
+// A Pro entitlement: tier !== 'free' is all the UI gate checks; the
+// engine itself verifies signatures elsewhere.
+const PRO = {
+  version: 1 as const,
+  licenseId: 'X',
+  licensee: 'Buyer',
+  tier: 'pro' as const,
+  features: ['*'],
+  issuedAt: '2026-01-01T00:00:00.000Z',
+  expiresAt: null,
+  signature: 's',
+};
+
+// Two "db timeout id=NN" lines collapse to one `db timeout id=<num>`
+// template in the clusters export — mirrors the engine conformance input.
+const CLUSTER_SAMPLE = [
+  '2026-05-21T00:00:00Z error db timeout id=42',
+  '2026-05-21T00:00:01Z error db timeout id=99',
+  '2026-05-21T00:00:02Z info ok',
+].join('\n');
+
 describe('LogsApp integration', () => {
   it('parses the initial input and shows the table view by default', () => {
     render(<LogsApp initialInput={SAMPLE} />);
@@ -166,5 +187,53 @@ describe('LogsApp integration', () => {
     const rows = screen.getAllByTestId('log-row');
     expect(rows).toHaveLength(2);
     expect(screen.getByTestId('logs-matched-count').textContent).toMatch(/matched\s*2\s*of\s*4/i);
+  });
+
+  it('locks the incident Pro view when free (no Pro output rendered)', () => {
+    render(<LogsApp initialInput={SAMPLE} initialUiState={{ viewMode: 'incident' }} />);
+    expect(screen.getByTestId('logs-locked')).toBeInTheDocument();
+    expect(screen.queryByTestId('logs-pro-output')).not.toBeInTheDocument();
+  });
+
+  it('locks the histogram and clusters Pro views when free', () => {
+    const { rerender } = render(
+      <LogsApp initialInput={SAMPLE} initialUiState={{ viewMode: 'histogram' }} />,
+    );
+    expect(screen.getByTestId('logs-locked')).toBeInTheDocument();
+    rerender(<LogsApp initialInput={SAMPLE} initialUiState={{ viewMode: 'clusters' }} />);
+    expect(screen.getByTestId('logs-locked')).toBeInTheDocument();
+    expect(screen.queryByTestId('logs-pro-output')).not.toBeInTheDocument();
+  });
+
+  it('unlocks the incident report under a Pro entitlement', () => {
+    render(
+      <LogsApp initialInput={SAMPLE} initialUiState={{ viewMode: 'incident' }} entitlement={PRO} />,
+    );
+    expect(screen.queryByTestId('logs-locked')).not.toBeInTheDocument();
+    const out = screen.getByTestId('logs-pro-output').textContent ?? '';
+    expect(out).toContain('# NekoLogs incident report');
+    expect(out).toContain('severity:');
+  });
+
+  it('unlocks the histogram SVG under a Pro entitlement', () => {
+    render(
+      <LogsApp initialInput={SAMPLE} initialUiState={{ viewMode: 'histogram' }} entitlement={PRO} />,
+    );
+    const out = screen.getByTestId('logs-pro-output').textContent ?? '';
+    expect(out).toContain('<svg');
+    expect(out).toContain('</svg>');
+  });
+
+  it('unlocks message clusters and collapses repeated lines to a template under Pro', () => {
+    render(
+      <LogsApp
+        initialInput={CLUSTER_SAMPLE}
+        initialUiState={{ viewMode: 'clusters' }}
+        entitlement={PRO}
+      />,
+    );
+    const out = screen.getByTestId('logs-pro-output').textContent ?? '';
+    expect(out).toContain('# NekoLogs message clusters');
+    expect(out).toContain('db timeout id=<num>');
   });
 });

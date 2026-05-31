@@ -1,17 +1,21 @@
 import { useCallback, useMemo, useState, type ChangeEvent } from 'react';
 
+import type { Entitlement } from '@nekotools/contracts';
+
 import { Diagnostics } from './Diagnostics.js';
 import { copyToClipboard, type ClipboardDeps } from './clipboard.js';
+import { useLicenseContext } from './license-store.js';
 import { parseIniInput } from './ini-parse.js';
 
 /**
  * NekoINI sub-app. Wires `@nekotools/lens-ini` into the shared web-suite
  * shell as a DATA tool tab. Free surface: paste INI / .properties /
  * .editorconfig, see sections + entries, convert to JSON, normalize, and
- * copy. All local.
+ * copy. Pro (gated by the suite license): convert the document to dotenv
+ * (.env) or TOML. All local.
  */
 
-export type IniViewMode = 'sections' | 'json' | 'normalized' | 'markdown';
+export type IniViewMode = 'sections' | 'json' | 'normalized' | 'markdown' | 'env' | 'toml';
 
 export interface NekoIniUiState {
   readonly viewMode: IniViewMode;
@@ -21,12 +25,40 @@ export interface IniAppProps {
   readonly initialInput?: string;
   readonly initialUiState?: Partial<NekoIniUiState>;
   readonly clipboardDeps?: ClipboardDeps;
+  /** Injected entitlement; defaults to the suite license context. */
+  readonly entitlement?: Entitlement;
 }
 
 interface CopyStatus {
   readonly ok: boolean;
   readonly method: 'clipboard-api' | 'execCommand' | 'none';
 }
+
+const PRO_VIEWS = new Set<IniViewMode>(['env', 'toml']);
+const VIEW_MODES: readonly IniViewMode[] = [
+  'sections',
+  'json',
+  'normalized',
+  'markdown',
+  'env',
+  'toml',
+];
+const VIEW_LABELS: Record<IniViewMode, string> = {
+  sections: 'Sections',
+  json: 'JSON',
+  normalized: 'Normalized',
+  markdown: 'Markdown',
+  env: 'dotenv ⭐',
+  toml: 'TOML ⭐',
+};
+const COPY_LABELS: Record<IniViewMode, string> = {
+  sections: 'Copy JSON',
+  json: 'Copy JSON',
+  normalized: 'Copy normalized',
+  markdown: 'Copy markdown summary',
+  env: 'Copy dotenv',
+  toml: 'Copy TOML',
+};
 
 const SAMPLE_INPUT = [
   '; app configuration',
@@ -41,27 +73,50 @@ const SAMPLE_INPUT = [
   'pool : 10',
 ].join('\n');
 
-export function IniApp({ initialInput, initialUiState, clipboardDeps }: IniAppProps = {}): JSX.Element {
+export function IniApp({
+  initialInput,
+  initialUiState,
+  clipboardDeps,
+  entitlement,
+}: IniAppProps = {}): JSX.Element {
   const [input, setInput] = useState<string>(initialInput ?? SAMPLE_INPUT);
   const [viewMode, setViewMode] = useState<IniViewMode>(initialUiState?.viewMode ?? 'sections');
   const [copyStatus, setCopyStatus] = useState<CopyStatus | null>(null);
 
-  const parsed = useMemo(() => parseIniInput(input), [input]);
+  const license = useLicenseContext();
+  const effectiveEntitlement = entitlement ?? license.entitlement;
+  const parsed = useMemo(
+    () => parseIniInput(input, effectiveEntitlement),
+    [input, effectiveEntitlement],
+  );
+  const proUnlocked = parsed.proUnlocked;
+  const isProView = PRO_VIEWS.has(viewMode);
 
-  const copyText =
-    viewMode === 'json' ? parsed.json : viewMode === 'normalized' ? parsed.normalized : parsed.markdown;
+  // Output string for every non-`sections` view; null for a locked Pro view.
+  const output =
+    viewMode === 'json'
+      ? parsed.json
+      : viewMode === 'normalized'
+        ? parsed.normalized
+        : viewMode === 'markdown'
+          ? parsed.markdown
+          : viewMode === 'env'
+            ? parsed.env
+            : viewMode === 'toml'
+              ? parsed.toml
+              : null;
+
+  const copyText = output ?? '';
   const copyDisabled = viewMode === 'sections' ? parsed.keyCount === 0 : copyText === '';
 
   const handleCopy = useCallback(async () => {
-    const text =
-      viewMode === 'json' ? parsed.json : viewMode === 'normalized' ? parsed.normalized : parsed.markdown;
-    if (text === '') {
+    if (copyText === '') {
       setCopyStatus({ ok: false, method: 'none' });
       return;
     }
-    const r = await copyToClipboard(text, clipboardDeps);
+    const r = await copyToClipboard(copyText, clipboardDeps);
     setCopyStatus({ ok: r.ok, method: r.method });
-  }, [viewMode, parsed, clipboardDeps]);
+  }, [copyText, clipboardDeps]);
 
   const hasContent = parsed.sections.some((s) => s.entries.length > 0);
 
@@ -89,7 +144,7 @@ export function IniApp({ initialInput, initialUiState, clipboardDeps }: IniAppPr
         <div className="results__toolbar">
           <fieldset className="viewmode" aria-label="INI output mode">
             <legend className="visually-hidden">INI output mode</legend>
-            {(['sections', 'json', 'normalized', 'markdown'] as const).map((m) => (
+            {VIEW_MODES.map((m) => (
               <label key={m} className={viewMode === m ? 'viewmode--active' : ''}>
                 <input
                   type="radio"
@@ -98,7 +153,7 @@ export function IniApp({ initialInput, initialUiState, clipboardDeps }: IniAppPr
                   checked={viewMode === m}
                   onChange={() => setViewMode(m)}
                 />
-                {m === 'sections' ? 'Sections' : m === 'json' ? 'JSON' : m === 'normalized' ? 'Normalized' : 'Markdown'}
+                {VIEW_LABELS[m]}
               </label>
             ))}
           </fieldset>
@@ -111,7 +166,7 @@ export function IniApp({ initialInput, initialUiState, clipboardDeps }: IniAppPr
               disabled={copyDisabled}
               data-testid="ini-copy-output"
             >
-              {viewMode === 'json' ? 'Copy JSON' : viewMode === 'normalized' ? 'Copy normalized' : 'Copy markdown summary'}
+              {COPY_LABELS[viewMode]}
             </button>
           </div>
 
@@ -155,9 +210,18 @@ export function IniApp({ initialInput, initialUiState, clipboardDeps }: IniAppPr
                 </div>
               ))}
             </div>
+          ) : isProView && !proUnlocked ? (
+            <div className="pro-lock" role="status" data-testid="ini-locked">
+              <strong>{viewMode === 'env' ? 'dotenv (.env) export' : 'TOML export'} is a Pro feature.</strong>
+              <p>
+                Convert this document to a dotenv file or a TOML document (sections become tables,
+                values stay raw strings). Unlock with a license key (verified locally, works offline
+                forever).
+              </p>
+            </div>
           ) : (
             <pre className="toml-output" data-testid="ini-output" aria-label={`${viewMode} output`}>
-              {viewMode === 'json' ? parsed.json : viewMode === 'normalized' ? parsed.normalized : parsed.markdown}
+              {output}
             </pre>
           )
         ) : (

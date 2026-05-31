@@ -3,6 +3,17 @@ import { fireEvent, render, screen, waitFor, within } from '@testing-library/rea
 
 import { IniApp } from '../IniApp.js';
 
+const PRO = {
+  version: 1 as const,
+  licenseId: 'X',
+  licensee: 'Buyer',
+  tier: 'pro' as const,
+  features: ['*'],
+  issuedAt: '2026-01-01T00:00:00.000Z',
+  expiresAt: null,
+  signature: 's',
+};
+
 describe('IniApp', () => {
   it('renders sections + entries with counts', () => {
     render(<IniApp initialInput={'[server]\nhost = localhost\nport = 8080'} />);
@@ -47,5 +58,41 @@ describe('IniApp', () => {
     fireEvent.click(screen.getByTestId('ini-copy-output'));
     await waitFor(() => expect(writes).toHaveLength(1));
     expect(JSON.parse(writes[0] ?? '{}')).toEqual({ s: { k: 'v' } });
+  });
+
+  it('locks the dotenv + TOML Pro views when free', () => {
+    render(
+      <IniApp
+        initialInput={'[server]\nhost = localhost'}
+        initialUiState={{ viewMode: 'env' }}
+      />,
+    );
+    expect(screen.getByTestId('ini-locked')).toBeInTheDocument();
+    expect(screen.queryByTestId('ini-output')).not.toBeInTheDocument();
+  });
+
+  it('unlocks the dotenv view via an injected Pro entitlement', () => {
+    render(
+      <IniApp
+        initialInput={'[server]\nhost = localhost'}
+        initialUiState={{ viewMode: 'env' }}
+        entitlement={PRO}
+      />,
+    );
+    expect(screen.queryByTestId('ini-locked')).not.toBeInTheDocument();
+    expect(screen.getByTestId('ini-output').textContent ?? '').toContain('SERVER_HOST=localhost');
+  });
+
+  it('unlocks the TOML view via an injected Pro entitlement', () => {
+    render(
+      <IniApp
+        initialInput={'[server]\nhost = localhost'}
+        initialUiState={{ viewMode: 'toml' }}
+        entitlement={PRO}
+      />,
+    );
+    const out = screen.getByTestId('ini-output').textContent ?? '';
+    expect(out).toContain('[server]');
+    expect(out).toContain('host = "localhost"');
   });
 });

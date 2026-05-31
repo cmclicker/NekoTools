@@ -1,5 +1,6 @@
 import { useCallback, useMemo, useState, type ChangeEvent } from 'react';
 
+import type { Entitlement } from '@nekotools/contracts';
 import type { LogFilter } from '@nekotools/lens-logs';
 
 import { Diagnostics } from './Diagnostics.js';
@@ -8,6 +9,7 @@ import { LogSummaryView } from './LogSummaryView.js';
 import { LogTableView } from './LogTableView.js';
 import { LogTextView } from './LogTextView.js';
 import { copyToClipboard, type ClipboardDeps } from './clipboard.js';
+import { useLicenseContext } from './license-store.js';
 import { applyLogFilter, parseLogText } from './logs-parse.js';
 
 /**
@@ -20,9 +22,31 @@ import { applyLogFilter, parseLogText } from './logs-parse.js';
  * The structured filter is the engine-backed predicate. The search box
  * is a pure view narrowing layered on top of whatever the filter
  * produced — same split NekoEnv draws between its parser and its search.
+ *
+ * Pro (gated by the suite license): an incident report, a histogram SVG,
+ * and message-pattern clusters. Each is a real engine exporter run via
+ * logs-parse; a free caller gets the Pro-lock, same as NekoHex/NekoHeaders.
  */
 
-export type LogViewMode = 'table' | 'text' | 'summary';
+export type LogViewMode = 'table' | 'text' | 'summary' | 'incident' | 'histogram' | 'clusters';
+
+const PRO_VIEWS = new Set<LogViewMode>(['incident', 'histogram', 'clusters']);
+const VIEW_MODES: readonly LogViewMode[] = [
+  'table',
+  'text',
+  'summary',
+  'incident',
+  'histogram',
+  'clusters',
+];
+const VIEW_LABELS: Record<LogViewMode, string> = {
+  table: 'Table',
+  text: 'Text',
+  summary: 'Summary',
+  incident: 'Incident ⭐',
+  histogram: 'Histogram ⭐',
+  clusters: 'Clusters ⭐',
+};
 
 export interface NekoLogsUiState {
   readonly viewMode: LogViewMode;
@@ -35,6 +59,8 @@ export interface LogsAppProps {
   readonly initialInput?: string;
   readonly initialUiState?: Partial<NekoLogsUiState>;
   readonly clipboardDeps?: ClipboardDeps;
+  /** Injected entitlement; defaults to the suite license context. */
+  readonly entitlement?: Entitlement;
 }
 
 interface CopyStatus {
@@ -64,6 +90,7 @@ export function LogsApp({
   initialInput,
   initialUiState,
   clipboardDeps,
+  entitlement,
 }: LogsAppProps = {}): JSX.Element {
   const [input, setInput] = useState<string>(initialInput ?? SAMPLE_INPUT);
   const [viewMode, setViewMode] = useState<LogViewMode>(
@@ -80,7 +107,22 @@ export function LogsApp({
   );
   const [copyStatus, setCopyStatus] = useState<CopyStatus | null>(null);
 
-  const parsed = useMemo(() => parseLogText(input), [input]);
+  const license = useLicenseContext();
+  const effectiveEntitlement = entitlement ?? license.entitlement;
+  const parsed = useMemo(
+    () => parseLogText(input, effectiveEntitlement),
+    [input, effectiveEntitlement],
+  );
+  const proUnlocked = parsed.proUnlocked;
+  const isProView = PRO_VIEWS.has(viewMode);
+  const proOutputText =
+    viewMode === 'incident'
+      ? parsed.incidentReport
+      : viewMode === 'histogram'
+        ? parsed.histogramSvg
+        : viewMode === 'clusters'
+          ? parsed.patternsClusters
+          : null;
 
   const filterActive = !isEmptyFilter(filter);
 
@@ -170,36 +212,18 @@ export function LogsApp({
         <div className="results__toolbar">
           <fieldset className="viewmode" aria-label="Logs view mode">
             <legend className="visually-hidden">Logs view mode</legend>
-            <label className={viewMode === 'table' ? 'viewmode--active' : ''}>
-              <input
-                type="radio"
-                name="logsViewMode"
-                value="table"
-                checked={viewMode === 'table'}
-                onChange={() => setViewMode('table')}
-              />
-              Table
-            </label>
-            <label className={viewMode === 'text' ? 'viewmode--active' : ''}>
-              <input
-                type="radio"
-                name="logsViewMode"
-                value="text"
-                checked={viewMode === 'text'}
-                onChange={() => setViewMode('text')}
-              />
-              Text
-            </label>
-            <label className={viewMode === 'summary' ? 'viewmode--active' : ''}>
-              <input
-                type="radio"
-                name="logsViewMode"
-                value="summary"
-                checked={viewMode === 'summary'}
-                onChange={() => setViewMode('summary')}
-              />
-              Summary
-            </label>
+            {VIEW_MODES.map((m) => (
+              <label key={m} className={viewMode === m ? 'viewmode--active' : ''}>
+                <input
+                  type="radio"
+                  name="logsViewMode"
+                  value={m}
+                  checked={viewMode === m}
+                  onChange={() => setViewMode(m)}
+                />
+                {VIEW_LABELS[m]}
+              </label>
+            ))}
           </fieldset>
 
           <label className="search">
@@ -268,11 +292,38 @@ export function LogsApp({
           ) : null}
         </div>
 
-        {viewMode === 'table' || viewMode === 'summary' ? (
+        {!isProView && (viewMode === 'table' || viewMode === 'summary') ? (
           <LogFilterControl filter={filter} onFilterChange={setFilter} />
         ) : null}
 
-        {viewMode === 'table' ? (
+        {isProView ? (
+          !proUnlocked ? (
+            <div className="pro-lock" role="status" data-testid="logs-locked">
+              <strong>
+                {viewMode === 'incident'
+                  ? 'Incident report'
+                  : viewMode === 'histogram'
+                    ? 'Histogram SVG'
+                    : 'Message clusters'}{' '}
+                is a Pro feature.
+              </strong>
+              <p>
+                Turn this snapshot into a shareable markdown incident report (severity, level
+                breakdown, time range), a stacked-bar histogram SVG, or message-pattern clusters
+                that collapse repeated lines into templates. Unlock with a license key (verified
+                locally, works offline forever).
+              </p>
+            </div>
+          ) : (
+            <pre
+              className="yaml-output"
+              data-testid="logs-pro-output"
+              aria-label={`${viewMode} output`}
+            >
+              {proOutputText}
+            </pre>
+          )
+        ) : viewMode === 'table' ? (
           parsed.document !== null ? (
             <LogTableView
               entries={tableEntries}
