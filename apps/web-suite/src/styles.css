@@ -2285,6 +2285,8 @@ code {
   flex-wrap: wrap;
 }
 
+/* Shared FileLoadControl (the default class); .secrets__file mirrors it. */
+.file-load,
 .secrets__file {
   font-size: 0.8125rem;
   display: inline-flex;
@@ -2292,6 +2294,7 @@ code {
   gap: 0.4rem;
 }
 
+.file-load input[type='file'],
 .secrets__file input[type='file'] {
   font: inherit;
   font-size: 0.75rem;

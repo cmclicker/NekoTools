@@ -3,6 +3,7 @@ import { useCallback, useEffect, useMemo, useRef, useState, type ChangeEvent } f
 import type { Entitlement } from '@nekotools/contracts';
 
 import { Diagnostics } from './Diagnostics.js';
+import { FileLoadControl } from './FileLoadControl.js';
 import { copyToClipboard, type ClipboardDeps } from './clipboard.js';
 import { useLicenseContext } from './license-store.js';
 import { scanSecrets } from './secrets-parse.js';
@@ -224,17 +225,6 @@ export function SecretsApp({
     setCopyStatus({ ok: r.ok, method: r.method });
   }, [copyText, clipboardDeps]);
 
-  const handleFile = useCallback((e: ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (file === undefined) return;
-    const reader = new FileReader();
-    reader.onload = () => {
-      if (typeof reader.result === 'string') setInput(reader.result);
-    };
-    reader.readAsText(file); // local read only — never uploaded
-    e.target.value = ''; // allow re-selecting the same file
-  }, []);
-
   const toggleSeverity = useCallback((sev: Severity) => {
     setEnabled((prev) => {
       const next = new Set(prev);
@@ -266,15 +256,13 @@ export function SecretsApp({
           <label htmlFor="secrets-paste" className="paste__label">
             Paste text to scan for leaked credentials:
           </label>
-          <label className="secrets__file" data-testid="secrets-file-label">
-            <span>Load a local file</span>
-            <input
-              type="file"
-              onChange={handleFile}
-              data-testid="secrets-file"
-              aria-label="Load a local file to scan"
-            />
-          </label>
+          <FileLoadControl
+            onText={(text) => setInput(text)}
+            className="secrets__file"
+            testId="secrets-file"
+            label="Load a local file"
+            ariaLabel="Load a local file to scan"
+          />
         </div>
         <textarea
           id="secrets-paste"
