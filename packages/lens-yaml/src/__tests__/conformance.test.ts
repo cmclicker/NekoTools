@@ -3,8 +3,9 @@ import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 import { describe, expect, it } from 'vitest';
-import type { Workspace } from '@nekotools/contracts';
+import type { Entitlement, Workspace } from '@nekotools/contracts';
 import {
+  EntitlementError,
   ToolRegistry,
   jsonWorkspaceSerializer,
   runExporter,
@@ -27,6 +28,17 @@ import type {
 } from '../kinds.js';
 
 const clock = FIXED_CLOCK('2026-05-27T00:00:00.000Z');
+
+const PRO: Entitlement = {
+  version: 1,
+  licenseId: 'TEST',
+  licensee: 'Test User',
+  tier: 'pro',
+  features: ['*'],
+  issuedAt: '2026-01-01T00:00:00.000Z',
+  expiresAt: null,
+  signature: 'test',
+};
 
 function registry(): ToolRegistry {
   const r = new ToolRegistry();
@@ -73,34 +85,66 @@ describe('NekoYAML: manifest', () => {
   });
 });
 
-describe('NekoYAML: monetization safety', () => {
+describe('NekoYAML: monetization gating (single-build, entitlement-gated)', () => {
   const registration = buildYamlRegistration(clock);
   const proExporterIds = ['yaml.export.schema.report', 'yaml.export.roundtrip.diff'];
 
-  it('no Pro exporter is registered in the free build', () => {
-    const registered = new Set(registration.exporters.map((e) => e.id));
-    for (const id of proExporterIds) expect(registered.has(id)).toBe(false);
+  it('Pro exporters are declared AND registered as proExporters, not free', () => {
+    const proIds = new Set((registration.proExporters ?? []).map((e) => e.id));
+    const free = new Set(registration.exporters.map((e) => e.id));
+    for (const id of proExporterIds) {
+      expect(yamlManifest.exporters).toContain(id);
+      expect(proIds.has(id)).toBe(true);
+      expect(free.has(id)).toBe(false);
+    }
   });
 
   it('no graph projector is registered in the free build', () => {
     expect(registration.graphProjectors ?? []).toHaveLength(0);
   });
 
-  it('runExporter throws "unknown exporter" for every Pro exporter id', () => {
+  it('a free caller (default entitlement) is refused with EntitlementError', () => {
     const r = registry();
+    const parsed = parseText('a: &x 1\nb: *x # comment\n');
     for (const id of proExporterIds) {
-      expect(() => runExporter(r, 'yaml', id, { artifacts: [], diagnostics: [] })).toThrow(
-        /unknown exporter/,
-      );
+      expect(() =>
+        runExporter(r, 'yaml', id, { artifacts: parsed.artifacts, diagnostics: parsed.diagnostics }),
+      ).toThrow(EntitlementError);
     }
   });
 
-  it('the manifest declares Pro exporters that are NOT in the registered set', () => {
-    const registered = new Set(registration.exporters.map((e) => e.id));
-    for (const id of proExporterIds) {
-      expect(yamlManifest.exporters).toContain(id);
-      expect(registered.has(id)).toBe(false);
-    }
+  it('a Pro entitlement unlocks the structure report + round-trip fidelity report', () => {
+    const r = registry();
+    const parsed = parseText('name: Neko\nport: 8080\nalias: &x 1\nref: *x # note\n');
+
+    const report = String(
+      runExporter(r, 'yaml', 'yaml.export.schema.report', {
+        artifacts: parsed.artifacts,
+        diagnostics: parsed.diagnostics,
+      }, PRO).body,
+    );
+    expect(report).toContain('# NekoYAML structure report');
+    expect(report).toContain('not schema validation, not schema inference');
+    expect(report).toContain('top-level type: mapping');
+    expect(report).toContain('anchors: yes');
+    expect(report).toContain('YAML comments are not represented in JSON');
+
+    const diff = String(
+      runExporter(r, 'yaml', 'yaml.export.roundtrip.diff', {
+        artifacts: parsed.artifacts,
+        diagnostics: parsed.diagnostics,
+      }, PRO).body,
+    );
+    expect(diff).toContain('# NekoYAML round-trip fidelity report');
+    expect(diff).toContain('not a byte-level source diff');
+    expect(diff).toContain('structure preserved: yes');
+    expect(diff).toContain('anchors/aliases expanded on round trip: yes');
+  });
+
+  it('a truly unknown exporter id still throws "unknown exporter"', () => {
+    expect(() =>
+      runExporter(registry(), 'yaml', 'yaml.export.nope', { artifacts: [], diagnostics: [] }, PRO),
+    ).toThrow(/unknown exporter/);
   });
 
   it('free entitlements match exactly the implemented engine-MVP set (no UI entries yet)', () => {

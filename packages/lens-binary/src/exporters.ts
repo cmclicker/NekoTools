@@ -1,6 +1,7 @@
 import type { Exporter } from '@nekotools/contracts';
 
 import { ALL_BINARY_KINDS, type BinaryArtifact } from './kinds.js';
+import { toBatchReport, toByteMap } from './codegen.js';
 
 const TOOL_ID = 'binary';
 
@@ -86,4 +87,60 @@ export const allExporters: readonly Exporter<BinaryArtifact>[] = [
   jsonExporter,
   markdownExporter,
   plaintextExporter,
+];
+
+// --- Pro exporters (registered in the binary, gated by entitlement) --------
+//
+// These back the manifest's declared Pro exporter ids (`binary.export.byte-map`
+// / `binary.export.batch.report`). Each derives purely from the
+// already-parsed artifacts — no network, no clock, no premium-engine
+// dependency. Code generation lives in `codegen.ts`. They accept every binary
+// kind (like the free exporters) so the runtime's `accepts` check passes for
+// number / bytes / text artifacts alike.
+
+/**
+ * `binary.export.byte-map` (Pro) — a byte map of the decoded bytes
+ * (offset / hex / decimal / binary / ascii columns), a richer hexdump derived
+ * from the first parsed artifact. Pro entitlement `export.byte-map`
+ * (`inspect.byte-map`).
+ */
+export const byteMapExporter: Exporter<BinaryArtifact> = {
+  version: 1,
+  id: 'binary.export.byte-map',
+  toolId: TOOL_ID,
+  target: 'markdown',
+  accepts: ALL_BINARY_KINDS,
+  producesMimeType: 'text/markdown',
+  producesExtension: 'md',
+  export({ artifacts }) {
+    const first = artifacts[0];
+    const body =
+      first === undefined
+        ? '# NekoBinary byte map\n\n_no artifacts to map_'
+        : toByteMap(first);
+    return { mimeType: 'text/markdown', extension: 'md', body };
+  },
+};
+
+/**
+ * `binary.export.batch.report` (Pro) — a report over every parsed artifact in
+ * the input list: detected input representation, byte length, and a per-artifact
+ * summary (value in each base + byte sum). Pro entitlement `export.batch.report`.
+ */
+export const batchReportExporter: Exporter<BinaryArtifact> = {
+  version: 1,
+  id: 'binary.export.batch.report',
+  toolId: TOOL_ID,
+  target: 'markdown',
+  accepts: ALL_BINARY_KINDS,
+  producesMimeType: 'text/markdown',
+  producesExtension: 'md',
+  export({ artifacts }) {
+    return { mimeType: 'text/markdown', extension: 'md', body: toBatchReport(artifacts) };
+  },
+};
+
+export const proExporters: readonly Exporter<BinaryArtifact>[] = [
+  byteMapExporter,
+  batchReportExporter,
 ];

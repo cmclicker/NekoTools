@@ -3,8 +3,9 @@ import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 import { describe, expect, it } from 'vitest';
-import type { Artifact, Workspace } from '@nekotools/contracts';
+import type { Artifact, Entitlement, Workspace } from '@nekotools/contracts';
 import {
+  EntitlementError,
   ToolRegistry,
   jsonWorkspaceSerializer,
   runExporter,
@@ -12,6 +13,17 @@ import {
   validateManifest,
 } from '@nekotools/tool-runtime';
 import { validate } from '@nekotools/schemas';
+
+const PRO: Entitlement = {
+  version: 1,
+  licenseId: 'TEST',
+  licensee: 'Test User',
+  tier: 'pro',
+  features: ['*'],
+  issuedAt: '2026-01-01T00:00:00.000Z',
+  expiresAt: null,
+  signature: 'test',
+};
 
 import {
   buildCodecRegistration,
@@ -95,33 +107,51 @@ describe('NekoCodec: manifest', () => {
   });
 });
 
-describe('NekoCodec: monetization safety', () => {
+describe('NekoCodec: monetization gating (single-build, entitlement-gated)', () => {
   const registration = buildCodecRegistration(clock);
-
-  it('no Pro exporter is registered in the free build', () => {
-    const registered = new Set(registration.exporters.map((e) => e.id));
-    for (const id of PRO_EXPORTER_IDS) expect(registered.has(id)).toBe(false);
-  });
 
   it('registers no graph projector', () => {
     expect(registration.graphProjectors ?? []).toHaveLength(0);
   });
 
-  it('runExporter throws "unknown exporter" for every Pro exporter id', () => {
-    const r = registry();
+  it('Pro exporters are declared AND registered as proExporters, not free', () => {
+    const proIds = new Set((registration.proExporters ?? []).map((e) => e.id));
+    const free = new Set(registration.exporters.map((e) => e.id));
     for (const id of PRO_EXPORTER_IDS) {
-      expect(() => runExporter(r, 'codec', id, { artifacts: [], diagnostics: [] })).toThrow(
-        /unknown exporter/,
-      );
+      expect(codecManifest.exporters).toContain(id);
+      expect(proIds.has(id)).toBe(true);
+      expect(free.has(id)).toBe(false);
     }
   });
 
-  it('the manifest declares Pro exporters that are NOT in the registered set', () => {
-    const registered = new Set(registration.exporters.map((e) => e.id));
+  it('a free caller (default entitlement) is refused with EntitlementError', () => {
+    const r = registry();
+    const parsed = transform('encode', 'base64', 'hello');
     for (const id of PRO_EXPORTER_IDS) {
-      expect(codecManifest.exporters).toContain(id);
-      expect(registered.has(id)).toBe(false);
+      expect(() => runExporter(r, 'codec', id, parsed)).toThrow(EntitlementError);
     }
+  });
+
+  it('a Pro entitlement unlocks the batch report + recipe bundle exporters', () => {
+    const r = registry();
+    const parsed = transform('encode', 'base64', 'hello');
+
+    const report = String(runExporter(r, 'codec', 'codec.export.batch.report', parsed, PRO).body);
+    expect(report).toContain('# NekoCodec batch report');
+    expect(report).toContain('transforms: 1');
+    expect(report).toContain('| 1 | encode | base64 |');
+
+    const recipe = JSON.parse(
+      String(runExporter(r, 'codec', 'codec.export.recipe.bundle', parsed, PRO).body),
+    ) as { tool?: string; steps?: { operation?: string; codec?: string }[] };
+    expect(recipe.tool).toBe('codec');
+    expect(recipe.steps?.[0]).toEqual({ operation: 'encode', codec: 'base64' });
+  });
+
+  it('a truly unknown exporter id still throws "unknown exporter"', () => {
+    expect(() =>
+      runExporter(registry(), 'codec', 'codec.export.nope', { artifacts: [], diagnostics: [] }, PRO),
+    ).toThrow(/unknown exporter/);
   });
 
   it('free entitlements match exactly the implemented set', () => {
