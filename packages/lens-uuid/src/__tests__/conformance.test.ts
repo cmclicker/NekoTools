@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
-import type { Artifact, Workspace } from '@nekotools/contracts';
+import type { Artifact, Entitlement, Workspace } from '@nekotools/contracts';
 import {
+  EntitlementError,
   ToolRegistry,
   jsonWorkspaceSerializer,
   runExporter,
@@ -13,6 +14,17 @@ import { FIXED_CLOCK, buildUuidRegistration, uuidManifest } from '../index.js';
 import type { ParsedId, UuidParsedArtifact } from '../kinds.js';
 
 const clock = FIXED_CLOCK('2026-05-28T00:00:00.000Z');
+
+const PRO: Entitlement = {
+  version: 1,
+  licenseId: 'TEST',
+  licensee: 'Test User',
+  tier: 'pro',
+  features: ['*'],
+  issuedAt: '2026-01-01T00:00:00.000Z',
+  expiresAt: null,
+  signature: 'test',
+};
 
 function registry(): ToolRegistry {
   const r = new ToolRegistry();
@@ -59,20 +71,57 @@ describe('NekoUUID: manifest', () => {
   });
 });
 
-describe('NekoUUID: monetization safety', () => {
+describe('NekoUUID: monetization gating (single-build, entitlement-gated)', () => {
   const registration = buildUuidRegistration(clock);
   const proExporterIds = ['uuid.export.namespace.report', 'uuid.export.bulk.csv'];
 
-  it('no Pro exporter is registered, and each throws "unknown exporter"', () => {
-    const registered = new Set(registration.exporters.map((e) => e.id));
-    const r = registry();
+  it('Pro exporters are declared AND registered as proExporters, not free', () => {
+    const proIds = new Set((registration.proExporters ?? []).map((e) => e.id));
+    const free = new Set(registration.exporters.map((e) => e.id));
     for (const id of proExporterIds) {
-      expect(registered.has(id)).toBe(false);
       expect(uuidManifest.exporters).toContain(id);
-      expect(() => runExporter(r, 'uuid', id, { artifacts: [], diagnostics: [] })).toThrow(
-        /unknown exporter/,
-      );
+      expect(proIds.has(id)).toBe(true);
+      expect(free.has(id)).toBe(false);
     }
+  });
+
+  it('a free caller (default entitlement) is refused with EntitlementError', () => {
+    const r = registry();
+    const parsed = {
+      artifacts: parse('550e8400-e29b-41d4-a716-446655440000').artifacts,
+      diagnostics: [],
+    };
+    for (const id of proExporterIds) {
+      expect(() => runExporter(r, 'uuid', id, parsed)).toThrow(EntitlementError);
+    }
+  });
+
+  it('a Pro entitlement unlocks the namespace report + bulk CSV exporters', () => {
+    const r = registry();
+    const parsed = {
+      artifacts: parse('017F22E2-79B0-7CC3-98C4-DC0C0C07398F\nnot-a-uuid').artifacts,
+      diagnostics: [],
+    };
+
+    const report = String(
+      runExporter(r, 'uuid', 'uuid.export.namespace.report', parsed, PRO).body,
+    );
+    expect(report).toContain('# NekoUUID namespace report');
+    expect(report).toContain('- identifiers: 2');
+    expect(report).toContain('version: v7');
+    expect(report).toContain('2022-02-22T19:22:22.000Z');
+    expect(report).toContain('## Summary by version');
+
+    const csv = String(runExporter(r, 'uuid', 'uuid.export.bulk.csv', parsed, PRO).body);
+    expect(csv).toContain('input,valid,version,variant,normalized,timestamp,isNil,isMax');
+    expect(csv).toContain('017f22e2-79b0-7cc3-98c4-dc0c0c07398f');
+    expect(csv).toContain('2022-02-22T19:22:22.000Z');
+  });
+
+  it('a truly unknown exporter id still throws "unknown exporter"', () => {
+    expect(() =>
+      runExporter(registry(), 'uuid', 'uuid.export.nope', { artifacts: [], diagnostics: [] }, PRO),
+    ).toThrow(/unknown exporter/);
   });
 });
 

@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
-import type { Artifact, Workspace } from '@nekotools/contracts';
+import type { Artifact, Entitlement, Workspace } from '@nekotools/contracts';
 import {
+  EntitlementError,
   ToolRegistry,
   jsonWorkspaceSerializer,
   runExporter,
@@ -21,6 +22,17 @@ import {
 import type { UrlParsedArtifact } from '../kinds.js';
 
 const clock = FIXED_CLOCK('2026-05-27T00:00:00.000Z');
+
+const PRO: Entitlement = {
+  version: 1,
+  licenseId: 'TEST',
+  licensee: 'Test User',
+  tier: 'pro',
+  features: ['*'],
+  issuedAt: '2026-01-01T00:00:00.000Z',
+  expiresAt: null,
+  signature: 'test',
+};
 
 function registry(): ToolRegistry {
   const r = new ToolRegistry();
@@ -67,30 +79,72 @@ describe('NekoURL: manifest', () => {
   });
 });
 
-describe('NekoURL: monetization safety', () => {
+describe('NekoURL: monetization gating (single-build, entitlement-gated)', () => {
   const registration = buildUrlRegistration(clock);
   const proExporterIds = ['url.export.batch.audit', 'url.export.redaction.preset'];
 
-  it('no Pro exporter is registered in the free build', () => {
-    const registered = new Set(registration.exporters.map((e) => e.id));
-    for (const id of proExporterIds) expect(registered.has(id)).toBe(false);
-  });
-
-  it('runExporter throws "unknown exporter" for every Pro exporter id', () => {
-    const r = registry();
-    for (const id of proExporterIds) {
-      expect(() => runExporter(r, 'url', id, { artifacts: [], diagnostics: [] })).toThrow(
-        /unknown exporter/,
-      );
-    }
-  });
-
-  it('the manifest declares Pro exporters that are NOT in the registered set', () => {
-    const registered = new Set(registration.exporters.map((e) => e.id));
+  it('Pro exporters are declared AND registered as proExporters, not free', () => {
+    const proIds = new Set((registration.proExporters ?? []).map((e) => e.id));
+    const free = new Set(registration.exporters.map((e) => e.id));
     for (const id of proExporterIds) {
       expect(urlManifest.exporters).toContain(id);
-      expect(registered.has(id)).toBe(false);
+      expect(proIds.has(id)).toBe(true);
+      expect(free.has(id)).toBe(false);
     }
+  });
+
+  it('a free caller (default entitlement) is refused with EntitlementError', () => {
+    const r = registry();
+    const parsed = runParser(r, 'url', 'url.text', {
+      raw: 'https://user:s3cr3t@example.com/p?utm_source=x&a=1#frag',
+      source: { kind: 'paste', bytes: 56 },
+    });
+    for (const id of proExporterIds) {
+      expect(() => runExporter(r, 'url', id, parsed)).toThrow(EntitlementError);
+    }
+  });
+
+  it('a Pro entitlement unlocks the batch audit + redaction preset exporters', () => {
+    const r = registry();
+    const parsed = runParser(r, 'url', 'url.text', {
+      raw: 'http://alice:s3cr3t-token@example.com:8080/p?utm_source=news&fbclid=abc#section',
+      source: { kind: 'paste', bytes: 79 },
+    });
+
+    // Batch audit: severity-ranked markdown table of offline-derivable findings.
+    const audit = String(runExporter(r, 'url', 'url.export.batch.audit', parsed, PRO).body);
+    expect(audit).toContain('# NekoURL audit');
+    expect(audit).toContain('| Severity | Finding | Detail |');
+    expect(audit).toContain('audit.credentials_in_url');
+    expect(audit).toContain('audit.insecure_scheme');
+    expect(audit).toContain('audit.tracking_params');
+    expect(audit).toContain('audit.non_standard_port');
+    // The audit is credential-free — the embedded secret never appears.
+    expect(audit).not.toContain('s3cr3t-token');
+
+    // Redaction preset: a declarative JSON spec derived from real parsed state.
+    const preset = JSON.parse(
+      String(runExporter(r, 'url', 'url.export.redaction.preset', parsed, PRO).body),
+    ) as {
+      kind?: string;
+      valid?: boolean;
+      redact?: { userinfo?: boolean; fragment?: boolean; stripQueryParams?: string[] };
+      sanitizedHref?: string | null;
+    };
+    expect(preset.kind).toBe('redaction-preset');
+    expect(preset.valid).toBe(true);
+    expect(preset.redact?.userinfo).toBe(true);
+    expect(preset.redact?.fragment).toBe(true);
+    expect(preset.redact?.stripQueryParams).toEqual(['utm_source', 'fbclid']);
+    // The worked example is the already-computed credential-free href.
+    expect(preset.sanitizedHref).toBe('http://example.com:8080/p?utm_source=news&fbclid=abc#section');
+    expect(JSON.stringify(preset)).not.toContain('s3cr3t-token');
+  });
+
+  it('a truly unknown exporter id still throws "unknown exporter"', () => {
+    expect(() =>
+      runExporter(registry(), 'url', 'url.export.nope', { artifacts: [], diagnostics: [] }, PRO),
+    ).toThrow(/unknown exporter/);
   });
 
   it('free entitlements match exactly the implemented vertical-slice set', () => {

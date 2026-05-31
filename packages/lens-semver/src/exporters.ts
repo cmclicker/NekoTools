@@ -7,8 +7,11 @@ import {
   type SemverParsedArtifact,
   type SemverReport,
 } from './kinds.js';
+import { bumpPlan, rangeReport } from './codegen.js';
 
 const TOOL_ID = 'semver';
+
+const EMPTY_REPORT: SemverReport = { count: 0, range: null, versions: [], sortedAscending: [] };
 
 function pickParsed(artifacts: readonly SemverArtifact[]): SemverParsedArtifact | undefined {
   return artifacts.find((a): a is SemverParsedArtifact => a.kind === SEMVER_KIND_PARSED);
@@ -87,4 +90,54 @@ export const freeExporters: readonly Exporter<SemverArtifact>[] = [
   jsonExporter,
   sortedExporter,
   markdownSummaryExporter,
+];
+
+// --- Pro exporters (registered in the binary, gated by entitlement) --------
+//
+// These back the manifest's declared Pro exporter ids (`export.range.report` /
+// `export.bump.plan`). Each derives purely from the already-parsed
+// `semver.parsed` report — no network, no registry lookup, no commit history.
+// Generation lives in `codegen.ts`.
+
+/**
+ * `semver.export.range.report` (Pro) — a markdown report of the parsed
+ * versions against the parsed range, using the per-version `satisfies` data
+ * the parser already computed (matching vs non-matching).
+ */
+export const rangeReportExporter: Exporter<SemverArtifact> = {
+  version: 1,
+  id: 'semver.export.range.report',
+  toolId: TOOL_ID,
+  target: 'markdown',
+  accepts: SEMVER_PARSED_EXPORT_KINDS,
+  producesMimeType: 'text/markdown',
+  producesExtension: 'md',
+  export({ artifacts }) {
+    const value = pickParsed(artifacts)?.value ?? EMPTY_REPORT;
+    return { mimeType: 'text/markdown', extension: 'md', body: rangeReport(value) };
+  },
+};
+
+/**
+ * `semver.export.bump.plan` (Pro) — a markdown bump plan presenting the
+ * candidate next-major / next-minor / next-patch versions computed from the
+ * highest valid version's components (bump type is never inferred).
+ */
+export const bumpPlanExporter: Exporter<SemverArtifact> = {
+  version: 1,
+  id: 'semver.export.bump.plan',
+  toolId: TOOL_ID,
+  target: 'markdown',
+  accepts: SEMVER_PARSED_EXPORT_KINDS,
+  producesMimeType: 'text/markdown',
+  producesExtension: 'md',
+  export({ artifacts }) {
+    const value = pickParsed(artifacts)?.value ?? EMPTY_REPORT;
+    return { mimeType: 'text/markdown', extension: 'md', body: bumpPlan(value) };
+  },
+};
+
+export const proExporters: readonly Exporter<SemverArtifact>[] = [
+  rangeReportExporter,
+  bumpPlanExporter,
 ];

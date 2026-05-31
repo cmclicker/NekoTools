@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
-import type { Workspace } from '@nekotools/contracts';
+import type { Entitlement, Workspace } from '@nekotools/contracts';
 import {
+  EntitlementError,
   ToolRegistry,
   jsonWorkspaceSerializer,
   runExporter,
@@ -22,6 +23,17 @@ import {
 } from '../index.js';
 
 const clock = FIXED_CLOCK('2026-05-27T00:00:00.000Z');
+
+const PRO: Entitlement = {
+  version: 1,
+  licenseId: 'TEST',
+  licensee: 'Test User',
+  tier: 'pro',
+  features: ['*'],
+  issuedAt: '2026-01-01T00:00:00.000Z',
+  expiresAt: null,
+  signature: 'test',
+};
 
 function registry(): ToolRegistry {
   const r = new ToolRegistry();
@@ -86,30 +98,54 @@ describe('NekoHash: manifest', () => {
   });
 });
 
-describe('NekoHash: monetization safety', () => {
+describe('NekoHash: monetization gating (single-build, entitlement-gated)', () => {
   const registration = buildHashRegistration(clock);
   const proExporterIds = ['hash.export.manifest', 'hash.export.checksum.profile'];
 
-  it('no Pro exporter is registered in the free build', () => {
-    const registered = new Set(registration.exporters.map((e) => e.id));
-    for (const id of proExporterIds) expect(registered.has(id)).toBe(false);
-  });
-
-  it('runExporter throws "unknown exporter" for every Pro exporter id', () => {
-    const r = registry();
-    for (const id of proExporterIds) {
-      expect(() => runExporter(r, 'hash', id, { artifacts: [], diagnostics: [] })).toThrow(
-        /unknown exporter/,
-      );
-    }
-  });
-
-  it('the manifest declares Pro exporters that are NOT in the registered set', () => {
-    const registered = new Set(registration.exporters.map((e) => e.id));
+  it('Pro exporters are declared AND registered as proExporters, not free', () => {
+    const proIds = new Set((registration.proExporters ?? []).map((e) => e.id));
+    const free = new Set(registration.exporters.map((e) => e.id));
     for (const id of proExporterIds) {
       expect(hashManifest.exporters).toContain(id);
-      expect(registered.has(id)).toBe(false);
+      expect(proIds.has(id)).toBe(true);
+      expect(free.has(id)).toBe(false);
     }
+  });
+
+  it('a free caller (default entitlement) is refused with EntitlementError', async () => {
+    const r = registry();
+    const ctx = { artifacts: [await digestArtifactOf('SHA-256', 'abc')], diagnostics: [] };
+    for (const id of proExporterIds) {
+      expect(() => runExporter(r, 'hash', id, ctx)).toThrow(EntitlementError);
+    }
+  });
+
+  it('a Pro entitlement unlocks the checksum manifest + verification profile', async () => {
+    const r = registry();
+    const ctx = { artifacts: [await digestArtifactOf('SHA-256', 'abc')], diagnostics: [] };
+
+    const manifest = String(runExporter(r, 'hash', 'hash.export.manifest', ctx, PRO).body);
+    // `<hexdigest>  <name>` (sha256sum-style, two spaces, `-` placeholder name).
+    expect(manifest).toContain(`${VECTORS['SHA-256'].abc}  -`);
+
+    const profile = JSON.parse(
+      String(runExporter(r, 'hash', 'hash.export.checksum.profile', ctx, PRO).body),
+    ) as {
+      tool?: string;
+      algorithms?: string[];
+      digests?: { algorithm?: string; hex?: string; base64?: string; inputBytes?: number }[];
+    };
+    expect(profile.tool).toBe('NekoHash');
+    expect(profile.algorithms).toContain('SHA-256');
+    expect(profile.digests?.[0]?.hex).toBe(VECTORS['SHA-256'].abc);
+    expect(profile.digests?.[0]?.inputBytes).toBe(3);
+    expect(typeof profile.digests?.[0]?.base64).toBe('string');
+  });
+
+  it('a truly unknown exporter id still throws "unknown exporter"', () => {
+    expect(() =>
+      runExporter(registry(), 'hash', 'hash.export.nope', { artifacts: [], diagnostics: [] }, PRO),
+    ).toThrow(/unknown exporter/);
   });
 
   it('free entitlements match exactly the implemented vertical-slice set', () => {

@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
-import type { Artifact, Workspace } from '@nekotools/contracts';
+import type { Artifact, Entitlement, Workspace } from '@nekotools/contracts';
 import {
+  EntitlementError,
   ToolRegistry,
   jsonWorkspaceSerializer,
   runExporter,
@@ -20,6 +21,17 @@ import {
 import type { SemverParsedArtifact } from '../kinds.js';
 
 const clock = FIXED_CLOCK('2026-05-28T00:00:00.000Z');
+
+const PRO: Entitlement = {
+  version: 1,
+  licenseId: 'TEST',
+  licensee: 'Test User',
+  tier: 'pro',
+  features: ['*'],
+  issuedAt: '2026-01-01T00:00:00.000Z',
+  expiresAt: null,
+  signature: 'test',
+};
 
 function registry(): ToolRegistry {
   const r = new ToolRegistry();
@@ -69,19 +81,52 @@ describe('NekoSemver: manifest', () => {
   });
 });
 
-describe('NekoSemver: monetization safety', () => {
+describe('NekoSemver: monetization gating (single-build, entitlement-gated)', () => {
   const registration = buildSemverRegistration(clock);
   const proExporterIds = ['semver.export.range.report', 'semver.export.bump.plan'];
-  it('no Pro exporter is registered, and each throws "unknown exporter"', () => {
-    const registered = new Set(registration.exporters.map((e) => e.id));
-    const r = registry();
+
+  it('Pro exporters are declared AND registered as proExporters, not free', () => {
+    const proIds = new Set((registration.proExporters ?? []).map((e) => e.id));
+    const free = new Set(registration.exporters.map((e) => e.id));
     for (const id of proExporterIds) {
-      expect(registered.has(id)).toBe(false);
       expect(semverManifest.exporters).toContain(id);
-      expect(() => runExporter(r, 'semver', id, { artifacts: [], diagnostics: [] })).toThrow(
-        /unknown exporter/,
-      );
+      expect(proIds.has(id)).toBe(true);
+      expect(free.has(id)).toBe(false);
     }
+  });
+
+  it('a free caller (default entitlement) is refused with EntitlementError', () => {
+    const r = registry();
+    const parsed = parse('1.2.0\n2.0.0', '^1.0.0');
+    for (const id of proExporterIds) {
+      expect(() => runExporter(r, 'semver', id, parsed)).toThrow(EntitlementError);
+    }
+  });
+
+  it('a Pro entitlement unlocks the range report + bump plan exporters', () => {
+    const r = registry();
+    const parsed = parse('1.2.0\n2.0.0', '^1.0.0');
+
+    const reportMd = String(runExporter(r, 'semver', 'semver.export.range.report', parsed, PRO).body);
+    expect(reportMd).toContain('# NekoSemver range report');
+    expect(reportMd).toContain('range: `^1.0.0`');
+    expect(reportMd).toContain('| 1.2.0 | yes |');
+    expect(reportMd).toContain('| 2.0.0 | no |');
+
+    const planMd = String(
+      runExporter(r, 'semver', 'semver.export.bump.plan', parse('1.2.3'), PRO).body,
+    );
+    expect(planMd).toContain('# NekoSemver bump plan');
+    expect(planMd).toContain('base version: `1.2.3`');
+    expect(planMd).toContain('| major | 2.0.0 |');
+    expect(planMd).toContain('| minor | 1.3.0 |');
+    expect(planMd).toContain('| patch | 1.2.4 |');
+  });
+
+  it('a truly unknown exporter id still throws "unknown exporter"', () => {
+    expect(() =>
+      runExporter(registry(), 'semver', 'semver.export.nope', { artifacts: [], diagnostics: [] }, PRO),
+    ).toThrow(/unknown exporter/);
   });
 });
 
