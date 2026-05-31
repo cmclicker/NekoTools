@@ -3,6 +3,7 @@ import { useCallback, useMemo, useState, type ChangeEvent } from 'react';
 import type { Entitlement } from '@nekotools/contracts';
 
 import { Diagnostics } from './Diagnostics.js';
+import { FileLoadControl } from './FileLoadControl.js';
 import { copyToClipboard, type ClipboardDeps } from './clipboard.js';
 import { useLicenseContext } from './license-store.js';
 import { runCsv, type CsvDelimiter } from './csv-parse.js';
@@ -112,6 +113,12 @@ export function CsvApp({
         <label htmlFor="csv-paste" className="paste__label">
           Paste CSV or TSV:
         </label>
+        <FileLoadControl
+          onText={(text) => setInput(text)}
+          testId="csv-file"
+          label="…or load a .csv / .tsv file"
+          ariaLabel="Load a local CSV or TSV file"
+        />
         <textarea
           id="csv-paste"
           className="paste__textarea"

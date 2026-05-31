@@ -6,6 +6,7 @@ import { Diagnostics } from './Diagnostics.js';
 import { EnvDiffView } from './EnvDiffView.js';
 import { EnvTableView, mask } from './EnvTableView.js';
 import { EnvTextView } from './EnvTextView.js';
+import { FileLoadControl } from './FileLoadControl.js';
 import { copyToClipboard, type ClipboardDeps } from './clipboard.js';
 import { useLicenseContext } from './license-store.js';
 import { computeEnvDiff, parseEnvText } from './env-parse.js';
@@ -194,6 +195,12 @@ export function EnvApp({
         <label htmlFor="env-paste" className="paste__label">
           Paste a dotenv document here:
         </label>
+        <FileLoadControl
+          onText={(text) => setInput(text)}
+          testId="env-file"
+          label="…or load a .env file"
+          ariaLabel="Load a local dotenv file"
+        />
         <textarea
           id="env-paste"
           className="paste__textarea"
@@ -208,6 +215,12 @@ export function EnvApp({
             <label htmlFor="env-compare" className="paste__label">
               Compare against (a second dotenv document):
             </label>
+            <FileLoadControl
+              onText={(text) => setCompareInput(text)}
+              testId="env-file-2"
+              label="…or load a .env file to compare against"
+              ariaLabel="Load a local dotenv file to compare against"
+            />
             <textarea
               id="env-compare"
               className="paste__textarea"

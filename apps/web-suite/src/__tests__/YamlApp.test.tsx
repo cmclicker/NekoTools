@@ -76,4 +76,15 @@ describe('YamlApp', () => {
     const out = screen.getByTestId('yaml-output').textContent ?? '';
     expect(out).toContain('# NekoYAML structure report');
   });
+
+  it('loads a local file into the input (read locally, never uploaded)', async () => {
+    render(<YamlApp initialInput={'name: nekotools\n'} />);
+    const file = new File(['loaded: true'], 'sample.yaml', { type: 'text/plain' });
+    fireEvent.change(screen.getByTestId('yaml-file'), { target: { files: [file] } });
+    await waitFor(() =>
+      expect((screen.getByTestId('yaml-input') as HTMLTextAreaElement).value).toContain(
+        'loaded: true',
+      ),
+    );
+  });
 });

@@ -3,6 +3,7 @@ import { useCallback, useMemo, useState, type ChangeEvent } from 'react';
 import type { Entitlement } from '@nekotools/contracts';
 
 import { Diagnostics } from './Diagnostics.js';
+import { FileLoadControl } from './FileLoadControl.js';
 import { copyToClipboard, type ClipboardDeps } from './clipboard.js';
 import { useLicenseContext } from './license-store.js';
 import { parseXmlInput } from './xml-parse.js';
@@ -110,9 +111,17 @@ export function XmlApp({
   return (
     <section className="tool tool--xml" aria-label="NekoXML workbench">
       <section className="paste card">
-        <label htmlFor="xml-paste" className="paste__label">
-          Paste XML here:
-        </label>
+        <div className="paste__head">
+          <label htmlFor="xml-paste" className="paste__label">
+            Paste XML here:
+          </label>
+          <FileLoadControl
+            onText={(text) => setInput(text)}
+            testId="xml-file"
+            label="…or load a file"
+            ariaLabel="Load a local XML file"
+          />
+        </div>
         <textarea
           id="xml-paste"
           className="paste__textarea"

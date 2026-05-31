@@ -3,6 +3,7 @@ import { useCallback, useMemo, useState, type ChangeEvent } from 'react';
 import type { Entitlement } from '@nekotools/contracts';
 
 import { Diagnostics } from './Diagnostics.js';
+import { FileLoadControl } from './FileLoadControl.js';
 import { copyToClipboard, type ClipboardDeps } from './clipboard.js';
 import { useLicenseContext } from './license-store.js';
 import { parseNdjsonInput } from './ndjson-parse.js';
@@ -126,6 +127,12 @@ export function NdjsonApp({
         <label htmlFor="ndjson-paste" className="paste__label">
           Paste NDJSON (one JSON value per line):
         </label>
+        <FileLoadControl
+          onText={(text) => setInput(text)}
+          testId="ndjson-file"
+          label="…or load a .ndjson / .jsonl file"
+          ariaLabel="Load a local NDJSON file"
+        />
         <textarea
           id="ndjson-paste"
           className="paste__textarea"

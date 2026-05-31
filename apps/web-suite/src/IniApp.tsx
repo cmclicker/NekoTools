@@ -3,6 +3,7 @@ import { useCallback, useMemo, useState, type ChangeEvent } from 'react';
 import type { Entitlement } from '@nekotools/contracts';
 
 import { Diagnostics } from './Diagnostics.js';
+import { FileLoadControl } from './FileLoadControl.js';
 import { copyToClipboard, type ClipboardDeps } from './clipboard.js';
 import { useLicenseContext } from './license-store.js';
 import { parseIniInput } from './ini-parse.js';
@@ -123,9 +124,17 @@ export function IniApp({
   return (
     <section className="tool tool--ini" aria-label="NekoINI workbench">
       <section className="paste card">
-        <label htmlFor="ini-paste" className="paste__label">
-          Paste INI / .properties / .editorconfig:
-        </label>
+        <div className="paste__head">
+          <label htmlFor="ini-paste" className="paste__label">
+            Paste INI / .properties / .editorconfig:
+          </label>
+          <FileLoadControl
+            onText={(text) => setInput(text)}
+            testId="ini-file"
+            label="…or load a file"
+            ariaLabel="Load a local INI file"
+          />
+        </div>
         <textarea
           id="ini-paste"
           className="paste__textarea"

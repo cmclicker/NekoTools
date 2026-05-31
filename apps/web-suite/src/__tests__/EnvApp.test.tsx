@@ -235,4 +235,24 @@ describe('EnvApp integration', () => {
     expect(out).toContain('services:');
     expect(out).toContain('kind: ConfigMap');
   });
+
+  it('loads a local file into the main input (read locally, never uploaded)', async () => {
+    render(<EnvApp initialInput={'A=1\n'} />);
+    const file = new File(['LOADED=true\n'], 'sample.env', { type: 'text/plain' });
+    fireEvent.change(screen.getByTestId('env-file'), { target: { files: [file] } });
+    await waitFor(() =>
+      expect((screen.getByTestId('env-input') as HTMLTextAreaElement).value).toContain('LOADED=true'),
+    );
+  });
+
+  it('loads a local file into the diff compare-against input', async () => {
+    render(<EnvApp initialInput={SIMPLE_INPUT} initialUiState={{ viewMode: 'diff' }} />);
+    const file = new File(['COMPARE=loaded\n'], 'compare.env', { type: 'text/plain' });
+    fireEvent.change(screen.getByTestId('env-file-2'), { target: { files: [file] } });
+    await waitFor(() =>
+      expect((screen.getByTestId('env-compare-input') as HTMLTextAreaElement).value).toContain(
+        'COMPARE=loaded',
+      ),
+    );
+  });
 });

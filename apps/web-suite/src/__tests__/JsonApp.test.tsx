@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { fireEvent, render, screen } from '@testing-library/react';
+import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 
 import { JsonApp } from '../JsonApp.js';
 
@@ -69,5 +69,13 @@ describe('JsonApp — Pro code-gen views', () => {
     expect(screen.queryByTestId('json-locked')).not.toBeInTheDocument();
     fireEvent.click(screen.getByTestId('json-view-zod'));
     expect(screen.getByTestId('json-locked')).toBeInTheDocument();
+  });
+
+  it('loads a local file into the input (read locally, never uploaded)', async () => {
+    const { container } = render(<JsonApp initialInput={DOC} />);
+    const ta = container.querySelector('textarea') as HTMLTextAreaElement;
+    const file = new File(['{"loaded":true}'], 'sample.json', { type: 'text/plain' });
+    fireEvent.change(screen.getByTestId('json-file'), { target: { files: [file] } });
+    await waitFor(() => expect(ta.value).toContain('"loaded":true'));
   });
 });
