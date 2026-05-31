@@ -3,6 +3,19 @@ import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 
 import { BinaryApp } from '../BinaryApp.js';
 
+// A literal Pro entitlement injected via the `entitlement` prop, so the unlock
+// test doesn't depend on the license context / a pasted key.
+const PRO = {
+  version: 1 as const,
+  licenseId: 'X',
+  licensee: 'Buyer',
+  tier: 'pro' as const,
+  features: ['*'],
+  issuedAt: '2026-01-01T00:00:00.000Z',
+  expiresAt: null,
+  signature: 's',
+};
+
 describe('BinaryApp', () => {
   it('parses decimal input and renders derived hex and binary forms', () => {
     render(<BinaryApp initialInput="42" />);
@@ -58,5 +71,35 @@ describe('BinaryApp', () => {
     });
     expect(writes[0]).toContain('binary.number');
     expect(writes[0]).toContain('42');
+  });
+
+  it('locks the byte-map + batch-report Pro views when free', () => {
+    render(<BinaryApp initialInput="42" initialUiState={{ viewMode: 'byte-map' }} />);
+
+    expect(screen.getByTestId('binary-locked')).toBeInTheDocument();
+    expect(screen.queryByTestId('binary-pro-output')).not.toBeInTheDocument();
+    expect(screen.queryByText('# NekoBinary byte map')).not.toBeInTheDocument();
+  });
+
+  it('unlocks the byte map via an injected Pro entitlement', () => {
+    render(
+      <BinaryApp initialInput="42" initialUiState={{ viewMode: 'byte-map' }} entitlement={PRO} />,
+    );
+
+    const output = screen.getByTestId('binary-pro-output');
+    expect(output.textContent).toContain('# NekoBinary byte map');
+    expect(output.textContent).toContain('| offset | hex | decimal | binary | ascii |');
+    expect(screen.queryByTestId('binary-locked')).not.toBeInTheDocument();
+  });
+
+  it('unlocks the batch report via an injected Pro entitlement and the view switcher', () => {
+    render(<BinaryApp initialInput="42" entitlement={PRO} />);
+
+    // The default free Summary view is shown first; switch to the Pro view.
+    fireEvent.click(screen.getByTestId('binary-view-batch-report'));
+
+    const output = screen.getByTestId('binary-pro-output');
+    expect(output.textContent).toContain('# NekoBinary batch report');
+    expect(screen.queryByTestId('binary-locked')).not.toBeInTheDocument();
   });
 });

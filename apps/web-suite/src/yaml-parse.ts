@@ -1,4 +1,4 @@
-import { ToolRegistry, runExporter, runParser } from '@nekotools/tool-runtime';
+import { FREE_ENTITLEMENT, ToolRegistry, runExporter, runParser } from '@nekotools/tool-runtime';
 import {
   buildYamlRegistration,
   FIXED_CLOCK,
@@ -6,7 +6,7 @@ import {
   type YamlDocument,
   type YamlDocumentArtifact,
 } from '@nekotools/lens-yaml';
-import type { Diagnostic } from '@nekotools/contracts';
+import type { Diagnostic, Entitlement } from '@nekotools/contracts';
 
 /**
  * NekoYAML UI parse helper, extracted out of YamlApp for testability —
@@ -38,6 +38,11 @@ export interface ParsedYaml {
   readonly jsonOutput: string | null;
   /** Normalized (canonical) YAML re-emit; null when there is no document. */
   readonly normalizedYaml: string | null;
+  /** Pro: Markdown structure report of the parsed stream, or null when not entitled. */
+  readonly schemaReport: string | null;
+  /** Pro: Markdown YAML<->JSON round-trip fidelity report, or null when not entitled. */
+  readonly roundtripDiff: string | null;
+  readonly proUnlocked: boolean;
   readonly diagnostics: readonly Diagnostic[];
   readonly inputBytes: number;
 }
@@ -46,9 +51,14 @@ export interface ParsedYaml {
  * Run `yaml.text` over raw YAML input and render the engine's JSON +
  * normalized-YAML exporters. Output strings come from the real engine
  * exporters (not re-derived in the UI), so the tab can't drift from the
- * engine's behavior.
+ * engine's behavior. The Pro structure-report + round-trip-diff exports are
+ * gated: `runExporter` throws EntitlementError for a free caller, surfaced
+ * here as null so the UI shows the Pro-lock (same pattern as hex-parse.ts).
  */
-export function parseYamlText(raw: string): ParsedYaml {
+export function parseYamlText(
+  raw: string,
+  entitlement: Entitlement = FREE_ENTITLEMENT,
+): ParsedYaml {
   const bytes = utf8ByteLength(raw);
   const result = runParser(registry, 'yaml', 'yaml.text', {
     raw,
@@ -58,21 +68,27 @@ export function parseYamlText(raw: string): ParsedYaml {
   const documentArtifact = result.artifacts.find(
     (a): a is YamlDocumentArtifact => a.kind === YAML_KIND_DOCUMENT,
   );
+  const hasDocuments =
+    documentArtifact !== undefined && documentArtifact.value.documents.length > 0;
+  const exportInput = {
+    artifacts: documentArtifact ? [documentArtifact] : [],
+    diagnostics: [],
+  };
+  const runPro = (id: string): string | null => {
+    if (!hasDocuments) return null;
+    try {
+      return String(runExporter(registry, 'yaml', id, exportInput, entitlement).body);
+    } catch {
+      return null;
+    }
+  };
 
   let jsonOutput: string | null = null;
   let normalizedYaml: string | null = null;
-  if (documentArtifact !== undefined && documentArtifact.value.documents.length > 0) {
-    jsonOutput = String(
-      runExporter(registry, 'yaml', 'yaml.export.json', {
-        artifacts: [documentArtifact],
-        diagnostics: [],
-      }).body,
-    );
+  if (hasDocuments) {
+    jsonOutput = String(runExporter(registry, 'yaml', 'yaml.export.json', exportInput).body);
     normalizedYaml = String(
-      runExporter(registry, 'yaml', 'yaml.export.yaml.normalized', {
-        artifacts: [documentArtifact],
-        diagnostics: [],
-      }).body,
+      runExporter(registry, 'yaml', 'yaml.export.yaml.normalized', exportInput).body,
     );
   }
 
@@ -80,6 +96,9 @@ export function parseYamlText(raw: string): ParsedYaml {
     document: documentArtifact?.value ?? null,
     jsonOutput,
     normalizedYaml,
+    schemaReport: runPro('yaml.export.schema.report'),
+    roundtripDiff: runPro('yaml.export.roundtrip.diff'),
+    proUnlocked: entitlement.tier !== 'free',
     diagnostics: result.diagnostics,
     inputBytes: bytes,
   };

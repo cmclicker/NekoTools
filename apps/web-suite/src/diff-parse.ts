@@ -1,4 +1,4 @@
-import { ToolRegistry, runExporter, runParser } from '@nekotools/tool-runtime';
+import { FREE_ENTITLEMENT, ToolRegistry, runExporter, runParser } from '@nekotools/tool-runtime';
 import {
   buildDiffRegistration,
   DIFF_KIND_RESULT,
@@ -7,7 +7,7 @@ import {
   type DiffResult,
   type DiffResultArtifact,
 } from '@nekotools/lens-diff';
-import type { Diagnostic } from '@nekotools/contracts';
+import type { Diagnostic, Entitlement } from '@nekotools/contracts';
 
 /**
  * NekoDiff UI engine-adapter, extracted out of DiffApp for testability —
@@ -42,10 +42,31 @@ export interface DiffOutput {
   readonly jsonSummary: string | null;
   /** Markdown summary string, or null when no result was produced. */
   readonly markdown: string | null;
+  /** Pro: token/key-level semantic diff (markdown), or null when not entitled. */
+  readonly semantic: string | null;
+  /**
+   * Pro: canonical signable bundle (JSON), or null when not entitled. The UI
+   * never signs — this is the unsigned bundle (`signature: null`).
+   */
+  readonly signedBundle: string | null;
+  readonly proUnlocked: boolean;
 }
 
-/** Compare two raw inputs under the given mode and render every free export. */
-export function computeDiff(left: string, right: string, mode: DiffMode): DiffOutput {
+/**
+ * Compare two raw inputs under the given mode and render every export. The
+ * three free exports always render; the two Pro exports (`diff.export.semantic`
+ * and `diff.export.bundle.signed`) are gated: `runExporter` throws
+ * EntitlementError for a free caller, surfaced here as null so the UI shows the
+ * Pro-lock (same pattern as hex-parse.ts). The signed bundle is requested
+ * WITHOUT options, so it is the canonical UNSIGNED signable bundle — the UI
+ * never signs.
+ */
+export function computeDiff(
+  left: string,
+  right: string,
+  mode: DiffMode,
+  entitlement: Entitlement = FREE_ENTITLEMENT,
+): DiffOutput {
   const result = runParser(registry, 'diff', PARSER_BY_MODE[mode], {
     raw: '',
     source: { kind: 'derived', from: ['left', 'right'] },
@@ -56,6 +77,8 @@ export function computeDiff(left: string, right: string, mode: DiffMode): DiffOu
     (a): a is DiffResultArtifact => a.kind === DIFF_KIND_RESULT,
   );
 
+  const proUnlocked = entitlement.tier !== 'free';
+
   if (artifact === undefined) {
     return {
       result: null,
@@ -63,10 +86,21 @@ export function computeDiff(left: string, right: string, mode: DiffMode): DiffOu
       unified: null,
       jsonSummary: null,
       markdown: null,
+      semantic: null,
+      signedBundle: null,
+      proUnlocked,
     };
   }
 
   const exportInput = { artifacts: [artifact], diagnostics: result.diagnostics };
+  const runPro = (id: string): string | null => {
+    try {
+      return String(runExporter(registry, 'diff', id, exportInput, entitlement).body);
+    } catch {
+      return null;
+    }
+  };
+
   return {
     result: artifact.value,
     diagnostics: result.diagnostics,
@@ -75,5 +109,8 @@ export function computeDiff(left: string, right: string, mode: DiffMode): DiffOu
     markdown: String(
       runExporter(registry, 'diff', 'diff.export.markdown.summary', exportInput).body,
     ),
+    semantic: runPro('diff.export.semantic'),
+    signedBundle: runPro('diff.export.bundle.signed'),
+    proUnlocked,
   };
 }

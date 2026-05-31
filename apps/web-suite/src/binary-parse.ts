@@ -1,4 +1,4 @@
-import type { Diagnostic } from '@nekotools/contracts';
+import type { Diagnostic, Entitlement } from '@nekotools/contracts';
 import {
   buildBinaryRegistration,
   type BinaryArtifact,
@@ -6,7 +6,7 @@ import {
   type BinaryNumberArtifact,
   type BinaryTextArtifact,
 } from '@nekotools/lens-binary';
-import { ToolRegistry, runExporter, runParser } from '@nekotools/tool-runtime';
+import { FREE_ENTITLEMENT, ToolRegistry, runExporter, runParser } from '@nekotools/tool-runtime';
 
 export type BinaryInputMode = 'decimal' | 'binary' | 'hex' | 'base64' | 'utf8';
 
@@ -60,11 +60,22 @@ export interface BinaryRun {
   readonly jsonExport: string;
   readonly markdownExport: string;
   readonly plaintextExport: string;
+  /** Pro: a byte map (offset/hex/decimal/binary/ascii) of the decoded bytes,
+   * or null when not entitled. */
+  readonly byteMap: string | null;
+  /** Pro: a batch report over every parsed artifact, or null when not
+   * entitled. */
+  readonly batchReport: string | null;
+  readonly proUnlocked: boolean;
   readonly diagnostics: readonly Diagnostic[];
   readonly inputBytes: number;
 }
 
-export function runBinary(raw: string, mode: BinaryInputMode): BinaryRun {
+export function runBinary(
+  raw: string,
+  mode: BinaryInputMode,
+  entitlement: Entitlement = FREE_ENTITLEMENT,
+): BinaryRun {
   const bytes = utf8ByteLength(raw);
   const result = runParser(registry, 'binary', PARSER_BY_MODE[mode], {
     raw,
@@ -77,6 +88,18 @@ export function runBinary(raw: string, mode: BinaryInputMode): BinaryRun {
     diagnostics: result.diagnostics,
   };
 
+  // The Pro exporters ship in the binary but `runExporter` throws
+  // EntitlementError for a free caller; surface that as null so the UI shows
+  // the Pro-lock (same pattern as hex-parse.ts / hash-parse.ts). They derive
+  // purely from the already-parsed artifacts — no re-parse.
+  const runPro = (id: string): string | null => {
+    try {
+      return String(runExporter(registry, 'binary', id, exportInput, entitlement).body);
+    } catch {
+      return null;
+    }
+  };
+
   return {
     artifact: artifact ?? null,
     summary: artifact === undefined ? null : summarizeArtifact(artifact),
@@ -87,6 +110,9 @@ export function runBinary(raw: string, mode: BinaryInputMode): BinaryRun {
     plaintextExport: String(
       runExporter(registry, 'binary', 'binary.export.plaintext', exportInput).body,
     ),
+    byteMap: runPro('binary.export.byte-map'),
+    batchReport: runPro('binary.export.batch.report'),
+    proUnlocked: entitlement.tier !== 'free',
     diagnostics: result.diagnostics,
     inputBytes: bytes,
   };
