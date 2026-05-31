@@ -1,4 +1,4 @@
-import { ToolRegistry, runExporter, runParser } from '@nekotools/tool-runtime';
+import { FREE_ENTITLEMENT, ToolRegistry, runExporter, runParser } from '@nekotools/tool-runtime';
 import {
   buildHashRegistration,
   digestBytes,
@@ -11,7 +11,7 @@ import {
   type HashDigestDeps,
   type HashInputArtifact,
 } from '@nekotools/lens-hash';
-import type { ArtifactSource, Diagnostic } from '@nekotools/contracts';
+import type { ArtifactSource, Diagnostic, Entitlement } from '@nekotools/contracts';
 
 /**
  * NekoHash UI parse helper, extracted out of HashApp for testability — the
@@ -23,6 +23,12 @@ import type { ArtifactSource, Diagnostic } from '@nekotools/contracts';
  * from the real engine exporters, not re-derived in the UI, so the tab
  * can't drift from the engine. The registry is a module singleton so the
  * parser identity is stable across App re-renders.
+ *
+ * The Pro exporters (`hash.export.manifest` + `hash.export.checksum.profile`)
+ * are *synchronous* projections of the digest artifact the async engine
+ * already produced — they never recompute a hash. They are gated:
+ * `runExporter` throws EntitlementError for a free caller, surfaced here as
+ * null so the UI shows the Pro-lock (same pattern as hex-parse.ts).
  */
 
 const registry = (() => {
@@ -47,6 +53,11 @@ export interface ParsedHash {
   readonly base64: string | null;
   readonly jsonSummary: string | null;
   readonly markdownSummary: string | null;
+  /** Pro: a `sha256sum`-style checksum manifest, or null when not entitled. */
+  readonly manifest: string | null;
+  /** Pro: a JSON verification profile, or null when not entitled. */
+  readonly checksumProfile: string | null;
+  readonly proUnlocked: boolean;
   readonly inputBytes: number;
   readonly algorithm: HashAlgorithm;
   readonly diagnostics: readonly Diagnostic[];
@@ -59,7 +70,28 @@ function digestDepsOf(deps: HashRunnerDeps): HashDigestDeps {
 function renderExports(
   artifact: HashDigestArtifact,
   diagnostics: readonly Diagnostic[],
-): { json: string; markdown: string; digest: string } {
+  entitlement: Entitlement,
+): {
+  json: string;
+  markdown: string;
+  digest: string;
+  manifest: string | null;
+  checksumProfile: string | null;
+} {
+  // Pro exporters ship in the binary but `runExporter` throws EntitlementError
+  // for a free caller; surface that as null so the UI shows the Pro-lock.
+  // These are synchronous projections of the already-computed digest artifact
+  // — no Web Crypto, no recomputation.
+  const runPro = (id: string): string | null => {
+    try {
+      return String(
+        runExporter(registry, 'hash', id, { artifacts: [artifact], diagnostics: [] }, entitlement)
+          .body,
+      );
+    } catch {
+      return null;
+    }
+  };
   return {
     json: String(
       runExporter(registry, 'hash', 'hash.export.json', { artifacts: [artifact], diagnostics: [] })
@@ -77,6 +109,8 @@ function renderExports(
         diagnostics: [],
       }).body,
     ),
+    manifest: runPro('hash.export.manifest'),
+    checksumProfile: runPro('hash.export.checksum.profile'),
   };
 }
 
@@ -85,7 +119,9 @@ function buildParsed(
   inputBytes: number,
   artifact: HashDigestArtifact | undefined,
   diagnostics: readonly Diagnostic[],
+  entitlement: Entitlement,
 ): ParsedHash {
+  const proUnlocked = entitlement.tier !== 'free';
   if (artifact === undefined) {
     return {
       digest: null,
@@ -93,18 +129,24 @@ function buildParsed(
       base64: null,
       jsonSummary: null,
       markdownSummary: null,
+      manifest: null,
+      checksumProfile: null,
+      proUnlocked,
       inputBytes,
       algorithm,
       diagnostics,
     };
   }
-  const ex = renderExports(artifact, diagnostics);
+  const ex = renderExports(artifact, diagnostics, entitlement);
   return {
     digest: artifact.value,
     hex: artifact.value.hex,
     base64: artifact.value.base64,
     jsonSummary: ex.json,
     markdownSummary: ex.markdown,
+    manifest: ex.manifest,
+    checksumProfile: ex.checksumProfile,
+    proUnlocked,
     inputBytes: artifact.value.inputBytes,
     algorithm,
     diagnostics,
@@ -112,11 +154,13 @@ function buildParsed(
 }
 
 /** Ingest raw text (sync parser → `hash.input` + ingest diagnostics), then
- * compute the digest (async). */
+ * compute the digest (async). The Pro exporters run synchronously on the
+ * resulting digest artifact, gated by `entitlement`. */
 export async function hashText(
   raw: string,
   algorithm: HashAlgorithm,
   deps: HashRunnerDeps = {},
+  entitlement: Entitlement = FREE_ENTITLEMENT,
 ): Promise<ParsedHash> {
   const bytes = utf8Encode(raw);
   const parsed = runParser(registry, 'hash', 'hash.text', {
@@ -135,16 +179,25 @@ export async function hashText(
   const result = await digestBytes(algorithm, bytes, digestDepsOf(deps), source);
   diagnostics.push(...result.diagnostics);
 
-  return buildParsed(algorithm, bytes.byteLength, result.artifacts[0], diagnostics);
+  return buildParsed(algorithm, bytes.byteLength, result.artifacts[0], diagnostics, entitlement);
 }
 
-/** Compute the digest of already-read file bytes (no text parse). */
+/** Compute the digest of already-read file bytes (no text parse). The Pro
+ * exporters run synchronously on the resulting digest artifact, gated by
+ * `entitlement`. */
 export async function hashBytes(
   bytes: Uint8Array,
   algorithm: HashAlgorithm,
   source: ArtifactSource,
   deps: HashRunnerDeps = {},
+  entitlement: Entitlement = FREE_ENTITLEMENT,
 ): Promise<ParsedHash> {
   const result = await digestBytes(algorithm, bytes, digestDepsOf(deps), source);
-  return buildParsed(algorithm, bytes.byteLength, result.artifacts[0], [...result.diagnostics]);
+  return buildParsed(
+    algorithm,
+    bytes.byteLength,
+    result.artifacts[0],
+    [...result.diagnostics],
+    entitlement,
+  );
 }

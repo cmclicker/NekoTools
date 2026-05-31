@@ -16,6 +16,19 @@ const SHA256_ABC = 'ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f200
 const SHA512_ABC =
   'ddaf35a193617abacc417349ae20413112e6fa4e89a97ea20a9eeee64b55d39a2192992a274fc1a836ba3c23a3feebbd454d4423643ce80e2a9ac94fa54ca49f';
 
+// A literal Pro entitlement injected via the `entitlement` prop, so the unlock
+// tests don't depend on the license context / a pasted key.
+const PRO = {
+  version: 1 as const,
+  licenseId: 'X',
+  licensee: 'Buyer',
+  tier: 'pro' as const,
+  features: ['*'],
+  issuedAt: '2026-01-01T00:00:00.000Z',
+  expiresAt: null,
+  signature: 's',
+};
+
 describe('HashApp', () => {
   it('computes the SHA-256 digest of pasted text (real vector)', async () => {
     render(<HashApp initialInput="abc" hashDeps={hashDeps} />);
@@ -101,5 +114,56 @@ describe('HashApp', () => {
     expect(summary.algorithm).toBe('SHA-256');
     expect(summary.hex).toBe(SHA256_ABC);
     expect(summary.inputBytes).toBe(3);
+  });
+
+  it('locks the checksum-manifest + verification-profile Pro views when free', async () => {
+    render(
+      <HashApp initialInput="abc" initialUiState={{ viewMode: 'manifest' }} hashDeps={hashDeps} />,
+    );
+    // The lock only appears once a digest exists (async), so wait for it.
+    await waitFor(() => {
+      expect(screen.getByTestId('hash-locked')).toBeInTheDocument();
+    });
+    expect(screen.queryByTestId('hash-pro-output')).not.toBeInTheDocument();
+  });
+
+  it('unlocks the sha256sum-style checksum manifest via an injected Pro entitlement', async () => {
+    render(
+      <HashApp
+        initialInput="abc"
+        initialUiState={{ viewMode: 'manifest' }}
+        hashDeps={hashDeps}
+        entitlement={PRO}
+      />,
+    );
+    await waitFor(() => {
+      expect(screen.getByTestId('hash-pro-output')).toBeInTheDocument();
+    });
+    // `<hexdigest>  -` (two spaces, `-` placeholder name), per the engine.
+    expect(screen.getByTestId('hash-pro-output').textContent).toBe(`${SHA256_ABC}  -`);
+    expect(screen.queryByTestId('hash-locked')).not.toBeInTheDocument();
+  });
+
+  it('unlocks the JSON verification profile via an injected Pro entitlement', async () => {
+    render(
+      <HashApp
+        initialInput="abc"
+        initialUiState={{ viewMode: 'checksum-profile' }}
+        hashDeps={hashDeps}
+        entitlement={PRO}
+      />,
+    );
+    await waitFor(() => {
+      expect(screen.getByTestId('hash-pro-output')).toBeInTheDocument();
+    });
+    const profile = JSON.parse(screen.getByTestId('hash-pro-output').textContent ?? '{}') as {
+      tool?: string;
+      algorithms?: string[];
+      digests?: { algorithm?: string; hex?: string; inputBytes?: number }[];
+    };
+    expect(profile.tool).toBe('NekoHash');
+    expect(profile.algorithms).toContain('SHA-256');
+    expect(profile.digests?.[0]?.hex).toBe(SHA256_ABC);
+    expect(profile.digests?.[0]?.inputBytes).toBe(3);
   });
 });
