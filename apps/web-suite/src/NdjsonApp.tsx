@@ -1,7 +1,10 @@
 import { useCallback, useMemo, useState, type ChangeEvent } from 'react';
 
+import type { Entitlement } from '@nekotools/contracts';
+
 import { Diagnostics } from './Diagnostics.js';
 import { copyToClipboard, type ClipboardDeps } from './clipboard.js';
+import { useLicenseContext } from './license-store.js';
 import { parseNdjsonInput } from './ndjson-parse.js';
 
 /**
@@ -9,9 +12,11 @@ import { parseNdjsonInput } from './ndjson-parse.js';
  * web-suite shell as a DATA tool tab. Free surface: paste NDJSON, see each
  * record (valid/invalid per line) and the inferred shape, convert to a JSON
  * array / normalized NDJSON, and copy. One bad line never sinks the rest.
+ * Pro (gated by the suite license): export an inferred JSON Schema or a
+ * flattened CSV grid. All local.
  */
 
-export type NdjsonViewMode = 'records' | 'shape' | 'json' | 'ndjson' | 'markdown';
+export type NdjsonViewMode = 'records' | 'shape' | 'json' | 'ndjson' | 'markdown' | 'schema' | 'csv';
 
 export interface NekoNdjsonUiState {
   readonly viewMode: NdjsonViewMode;
@@ -21,6 +26,8 @@ export interface NdjsonAppProps {
   readonly initialInput?: string;
   readonly initialUiState?: Partial<NekoNdjsonUiState>;
   readonly clipboardDeps?: ClipboardDeps;
+  /** Injected entitlement; defaults to the suite license context. */
+  readonly entitlement?: Entitlement;
 }
 
 interface CopyStatus {
@@ -34,31 +41,84 @@ const SAMPLE_INPUT = [
   '{"id": 3, "name": "gamma", "active": false, "score": 9.5}',
 ].join('\n');
 
+const PRO_VIEWS = new Set<NdjsonViewMode>(['schema', 'csv']);
+const VIEW_MODES: readonly NdjsonViewMode[] = [
+  'records',
+  'shape',
+  'json',
+  'ndjson',
+  'markdown',
+  'schema',
+  'csv',
+];
+const VIEW_LABELS: Record<NdjsonViewMode, string> = {
+  records: 'Records',
+  shape: 'Shape',
+  json: 'JSON array',
+  ndjson: 'NDJSON',
+  markdown: 'Markdown',
+  schema: 'JSON Schema ⭐',
+  csv: 'CSV ⭐',
+};
+const COPY_LABELS: Record<NdjsonViewMode, string> = {
+  records: 'Copy records',
+  shape: 'Copy shape',
+  json: 'Copy JSON array',
+  ndjson: 'Copy NDJSON',
+  markdown: 'Copy markdown summary',
+  schema: 'Copy JSON Schema',
+  csv: 'Copy CSV',
+};
+
 function previewValue(value: unknown): string {
   const s = JSON.stringify(value);
   return s.length > 80 ? `${s.slice(0, 80)}…` : s;
 }
 
-export function NdjsonApp({ initialInput, initialUiState, clipboardDeps }: NdjsonAppProps = {}): JSX.Element {
+export function NdjsonApp({
+  initialInput,
+  initialUiState,
+  clipboardDeps,
+  entitlement,
+}: NdjsonAppProps = {}): JSX.Element {
   const [input, setInput] = useState<string>(initialInput ?? SAMPLE_INPUT);
   const [viewMode, setViewMode] = useState<NdjsonViewMode>(initialUiState?.viewMode ?? 'records');
   const [copyStatus, setCopyStatus] = useState<CopyStatus | null>(null);
 
-  const parsed = useMemo(() => parseNdjsonInput(input), [input]);
+  const license = useLicenseContext();
+  const effectiveEntitlement = entitlement ?? license.entitlement;
+  const parsed = useMemo(
+    () => parseNdjsonInput(input, effectiveEntitlement),
+    [input, effectiveEntitlement],
+  );
+  const proUnlocked = parsed.proUnlocked;
+  const isProView = PRO_VIEWS.has(viewMode);
 
-  const copyText =
-    viewMode === 'json' ? parsed.json : viewMode === 'ndjson' ? parsed.ndjson : parsed.markdown;
+  // Text outputs (rendered in <pre>); structured views (records/shape) have none.
+  // Pro outputs are null when the caller isn't entitled, which disables copy.
+  const outputText =
+    viewMode === 'json'
+      ? parsed.json
+      : viewMode === 'ndjson'
+        ? parsed.ndjson
+        : viewMode === 'markdown'
+          ? parsed.markdown
+          : viewMode === 'schema'
+            ? parsed.schemaJson
+            : viewMode === 'csv'
+              ? parsed.csv
+              : null;
+  const copyText = outputText ?? '';
   const copyDisabled = (viewMode === 'records' || viewMode === 'shape') ? parsed.count === 0 : copyText === '';
 
   const handleCopy = useCallback(async () => {
-    const text = viewMode === 'json' ? parsed.json : viewMode === 'ndjson' ? parsed.ndjson : parsed.markdown;
-    if (text === '') {
+    if (copyText === '') {
       setCopyStatus({ ok: false, method: 'none' });
       return;
     }
-    const r = await copyToClipboard(text, clipboardDeps);
+    const r = await copyToClipboard(copyText, clipboardDeps);
     setCopyStatus({ ok: r.ok, method: r.method });
-  }, [viewMode, parsed, clipboardDeps]);
+  }, [copyText, clipboardDeps]);
 
   return (
     <section className="tool tool--ndjson" aria-label="NekoNDJSON workbench">
@@ -85,7 +145,7 @@ export function NdjsonApp({ initialInput, initialUiState, clipboardDeps }: Ndjso
         <div className="results__toolbar">
           <fieldset className="viewmode" aria-label="NDJSON output mode">
             <legend className="visually-hidden">NDJSON output mode</legend>
-            {(['records', 'shape', 'json', 'ndjson', 'markdown'] as const).map((m) => (
+            {VIEW_MODES.map((m) => (
               <label key={m} className={viewMode === m ? 'viewmode--active' : ''}>
                 <input
                   type="radio"
@@ -94,7 +154,7 @@ export function NdjsonApp({ initialInput, initialUiState, clipboardDeps }: Ndjso
                   checked={viewMode === m}
                   onChange={() => setViewMode(m)}
                 />
-                {m === 'records' ? 'Records' : m === 'shape' ? 'Shape' : m === 'json' ? 'JSON array' : m === 'ndjson' ? 'NDJSON' : 'Markdown'}
+                {VIEW_LABELS[m]}
               </label>
             ))}
           </fieldset>
@@ -107,7 +167,7 @@ export function NdjsonApp({ initialInput, initialUiState, clipboardDeps }: Ndjso
               disabled={copyDisabled}
               data-testid="ndjson-copy-output"
             >
-              {viewMode === 'json' ? 'Copy JSON array' : viewMode === 'ndjson' ? 'Copy NDJSON' : 'Copy markdown summary'}
+              {COPY_LABELS[viewMode]}
             </button>
           </div>
 
@@ -184,9 +244,17 @@ export function NdjsonApp({ initialInput, initialUiState, clipboardDeps }: Ndjso
                 No shape inferred — records are not all JSON objects.
               </p>
             )
+          ) : isProView && !proUnlocked ? (
+            <div className="pro-lock" role="status" data-testid="ndjson-locked">
+              <strong>{viewMode === 'schema' ? 'JSON Schema export' : 'CSV export'} is a Pro feature.</strong>
+              <p>
+                Infer a JSON Schema from your records or flatten the valid object records into a CSV
+                grid. Unlock with a license key (verified locally, works offline forever).
+              </p>
+            </div>
           ) : (
             <pre className="toml-output" data-testid="ndjson-output" aria-label={`${viewMode} output`}>
-              {viewMode === 'json' ? parsed.json : viewMode === 'ndjson' ? parsed.ndjson : parsed.markdown}
+              {outputText}
             </pre>
           )
         ) : (

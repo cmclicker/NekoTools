@@ -3,6 +3,17 @@ import { fireEvent, render, screen, waitFor, within } from '@testing-library/rea
 
 import { NdjsonApp } from '../NdjsonApp.js';
 
+const PRO = {
+  version: 1 as const,
+  licenseId: 'X',
+  licensee: 'Buyer',
+  tier: 'pro' as const,
+  features: ['*'],
+  issuedAt: '2026-01-01T00:00:00.000Z',
+  expiresAt: null,
+  signature: 's',
+};
+
 describe('NdjsonApp', () => {
   it('renders the records table with per-line validity', () => {
     render(<NdjsonApp initialInput={'{"a":1}\n{bad}\n{"a":3}'} />);
@@ -45,5 +56,35 @@ describe('NdjsonApp', () => {
     fireEvent.click(screen.getByTestId('ndjson-copy-output'));
     await waitFor(() => expect(writes).toHaveLength(1));
     expect(writes[0]).toBe('{"a":1}');
+  });
+
+  it('locks the JSON Schema + CSV Pro views when free', () => {
+    render(
+      <NdjsonApp initialInput={'{"id":1,"name":"a"}\n{"id":2}'} initialUiState={{ viewMode: 'schema' }} />,
+    );
+    expect(screen.getByTestId('ndjson-locked')).toBeInTheDocument();
+    expect(screen.queryByTestId('ndjson-output')).not.toBeInTheDocument();
+  });
+
+  it('unlocks the inferred JSON Schema via an injected Pro entitlement', () => {
+    render(
+      <NdjsonApp
+        initialInput={'{"id":1,"name":"a"}\n{"id":2}'}
+        initialUiState={{ viewMode: 'schema' }}
+        entitlement={PRO}
+      />,
+    );
+    expect(screen.getByTestId('ndjson-output').textContent ?? '').toContain('"type": "object"');
+  });
+
+  it('unlocks the flattened CSV via an injected Pro entitlement', () => {
+    render(
+      <NdjsonApp
+        initialInput={'{"id":1,"name":"a"}\n{"id":2}'}
+        initialUiState={{ viewMode: 'csv' }}
+        entitlement={PRO}
+      />,
+    );
+    expect((screen.getByTestId('ndjson-output').textContent ?? '').split('\n')[0]).toBe('id,name');
   });
 });

@@ -1,4 +1,4 @@
-import { ToolRegistry, runExporter, runParser } from '@nekotools/tool-runtime';
+import { FREE_ENTITLEMENT, ToolRegistry, runExporter, runParser } from '@nekotools/tool-runtime';
 import {
   buildTomlRegistration,
   FIXED_CLOCK,
@@ -7,7 +7,7 @@ import {
   type TomlParsedArtifact,
   type TomlValue,
 } from '@nekotools/lens-toml';
-import type { Diagnostic } from '@nekotools/contracts';
+import type { Diagnostic, Entitlement } from '@nekotools/contracts';
 
 /**
  * NekoTOML UI parse helper, extracted out of TomlApp for testability — the
@@ -43,6 +43,11 @@ export interface ParsedTomlView {
   readonly normalized: string;
   /** Markdown summary of the parse (shape + diagnostics). */
   readonly markdown: string;
+  /** Pro: a TypeScript type for the decoded tree, or null when not entitled. */
+  readonly types: string | null;
+  /** Pro: an inferred JSON Schema for the tree, or null when not entitled. */
+  readonly schemaJson: string | null;
+  readonly proUnlocked: boolean;
   readonly diagnostics: readonly Diagnostic[];
   readonly inputBytes: number;
 }
@@ -52,8 +57,15 @@ export interface ParsedTomlView {
  * normalized-TOML, and markdown exporters. Output strings come from the
  * real engine exporters (not re-derived in the UI), so the tab can't
  * drift from the engine's behavior.
+ *
+ * The Pro TypeScript-types + JSON-Schema exports are gated: `runExporter`
+ * throws EntitlementError for a free caller, surfaced here as null so the
+ * UI shows the Pro-lock (same pattern as hex-parse.ts).
  */
-export function parseTomlInput(raw: string): ParsedTomlView {
+export function parseTomlInput(
+  raw: string,
+  entitlement: Entitlement = FREE_ENTITLEMENT,
+): ParsedTomlView {
   const bytes = utf8ByteLength(raw);
   const result = runParser(registry, 'toml', 'toml.text', {
     raw,
@@ -65,6 +77,14 @@ export function parseTomlInput(raw: string): ParsedTomlView {
   );
   const value: ParsedToml | undefined = artifact?.value;
   const exportInput = { artifacts: artifact ? [artifact] : [], diagnostics: result.diagnostics };
+  const runPro = (id: string): string | null => {
+    if (artifact === undefined) return null;
+    try {
+      return String(runExporter(registry, 'toml', id, exportInput, entitlement).body);
+    } catch {
+      return null;
+    }
+  };
 
   const json = artifact
     ? String(runExporter(registry, 'toml', 'toml.export.json', exportInput).body)
@@ -84,6 +104,9 @@ export function parseTomlInput(raw: string): ParsedTomlView {
     json,
     normalized,
     markdown,
+    types: runPro('toml.export.types'),
+    schemaJson: runPro('toml.export.schema.json'),
+    proUnlocked: entitlement.tier !== 'free',
     diagnostics: result.diagnostics,
     inputBytes: bytes,
   };
