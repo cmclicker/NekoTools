@@ -3,6 +3,17 @@ import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 
 import { CaseApp } from '../CaseApp.js';
 
+const PRO = {
+  version: 1 as const,
+  licenseId: 'X',
+  licensee: 'Buyer',
+  tier: 'pro' as const,
+  features: ['*'],
+  issuedAt: '2026-01-01T00:00:00.000Z',
+  expiresAt: null,
+  signature: 's',
+};
+
 describe('CaseApp', () => {
   it('renders all case forms for the first line', () => {
     render(<CaseApp initialInput={'helloWorld example'} />);
@@ -47,5 +58,35 @@ describe('CaseApp', () => {
     fireEvent.click(screen.getByTestId('case-copy-output'));
     await waitFor(() => expect(writes).toHaveLength(1));
     expect(writes[0]).toContain('# NekoCase export');
+  });
+
+  it('locks the CSV + single-form Pro views when free', () => {
+    render(<CaseApp initialInput={'Hello World'} initialUiState={{ viewMode: 'csv' }} />);
+    expect(screen.getByTestId('case-locked')).toBeInTheDocument();
+    expect(screen.queryByTestId('case-output')).not.toBeInTheDocument();
+  });
+
+  it('unlocks the CSV grid via an injected Pro entitlement', () => {
+    render(
+      <CaseApp
+        initialInput={'Hello World'}
+        initialUiState={{ viewMode: 'csv' }}
+        entitlement={PRO}
+      />,
+    );
+    const out = screen.getByTestId('case-output').textContent ?? '';
+    expect(out.split('\n')[0]).toContain('input,');
+    expect(out).toContain('Hello World,');
+  });
+
+  it('renders the single form (camelCase) when Pro', () => {
+    render(
+      <CaseApp
+        initialInput={'Hello World'}
+        initialUiState={{ viewMode: 'single-form' }}
+        entitlement={PRO}
+      />,
+    );
+    expect(screen.getByTestId('case-output').textContent ?? '').toBe('helloWorld');
   });
 });

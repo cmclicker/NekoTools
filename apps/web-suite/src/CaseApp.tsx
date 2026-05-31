@@ -1,19 +1,22 @@
 import { useCallback, useMemo, useState, type ChangeEvent } from 'react';
 
+import type { Entitlement } from '@nekotools/contracts';
 import { CASE_FORMS } from '@nekotools/lens-case';
 
 import { Diagnostics } from './Diagnostics.js';
 import { copyToClipboard, type ClipboardDeps } from './clipboard.js';
+import { useLicenseContext } from './license-store.js';
 import { parseCaseInput } from './case-parse.js';
 
 /**
  * NekoCase sub-app. Wires `@nekotools/lens-case` into the shared web-suite
  * shell as a Text tool tab. Free surface: paste phrases/identifiers (one
  * per line), see every case form, and copy JSON / slug list / markdown.
- * All local.
+ * Pro (gated by the suite license): a CSV grid of every form, or a single
+ * chosen form (default camelCase) per line. All local.
  */
 
-export type CaseViewMode = 'forms' | 'json' | 'normalized' | 'markdown';
+export type CaseViewMode = 'forms' | 'json' | 'normalized' | 'markdown' | 'csv' | 'single-form';
 
 export interface NekoCaseUiState {
   readonly viewMode: CaseViewMode;
@@ -23,12 +26,32 @@ export interface CaseAppProps {
   readonly initialInput?: string;
   readonly initialUiState?: Partial<NekoCaseUiState>;
   readonly clipboardDeps?: ClipboardDeps;
+  /** Injected entitlement; defaults to the suite license context. */
+  readonly entitlement?: Entitlement;
 }
 
 interface CopyStatus {
   readonly ok: boolean;
   readonly method: 'clipboard-api' | 'execCommand' | 'none';
 }
+
+const PRO_VIEWS = new Set<CaseViewMode>(['csv', 'single-form']);
+const VIEW_MODES: readonly CaseViewMode[] = [
+  'forms',
+  'json',
+  'normalized',
+  'markdown',
+  'csv',
+  'single-form',
+];
+const VIEW_LABELS: Record<CaseViewMode, string> = {
+  forms: 'Forms',
+  json: 'JSON',
+  normalized: 'Slug list',
+  markdown: 'Markdown',
+  csv: 'CSV ⭐',
+  'single-form': 'Single form ⭐',
+};
 
 const SAMPLE_INPUT = 'helloWorld example';
 
@@ -46,28 +69,49 @@ const FORM_LABELS: Record<string, string> = {
   slug: 'slug',
 };
 
-export function CaseApp({ initialInput, initialUiState, clipboardDeps }: CaseAppProps = {}): JSX.Element {
+export function CaseApp({
+  initialInput,
+  initialUiState,
+  clipboardDeps,
+  entitlement,
+}: CaseAppProps = {}): JSX.Element {
   const [input, setInput] = useState<string>(initialInput ?? SAMPLE_INPUT);
   const [viewMode, setViewMode] = useState<CaseViewMode>(initialUiState?.viewMode ?? 'forms');
   const [copyStatus, setCopyStatus] = useState<CopyStatus | null>(null);
 
-  const parsed = useMemo(() => parseCaseInput(input), [input]);
+  const license = useLicenseContext();
+  const effectiveEntitlement = entitlement ?? license.entitlement;
+  const parsed = useMemo(
+    () => parseCaseInput(input, effectiveEntitlement),
+    [input, effectiveEntitlement],
+  );
   const first = parsed.entries[0];
+  const proUnlocked = parsed.proUnlocked;
+  const isProView = PRO_VIEWS.has(viewMode);
 
-  const copyText =
-    viewMode === 'json' ? parsed.json : viewMode === 'normalized' ? parsed.normalized : parsed.markdown;
+  const outputText =
+    viewMode === 'json'
+      ? parsed.json
+      : viewMode === 'normalized'
+        ? parsed.normalized
+        : viewMode === 'markdown'
+          ? parsed.markdown
+          : viewMode === 'csv'
+            ? parsed.csv
+            : viewMode === 'single-form'
+              ? parsed.singleForm
+              : null;
+  const copyText = outputText ?? '';
   const copyDisabled = viewMode === 'forms' ? parsed.count === 0 : copyText === '';
 
   const handleCopy = useCallback(async () => {
-    const text =
-      viewMode === 'json' ? parsed.json : viewMode === 'normalized' ? parsed.normalized : parsed.markdown;
-    if (text === '') {
+    if (copyText === '') {
       setCopyStatus({ ok: false, method: 'none' });
       return;
     }
-    const r = await copyToClipboard(text, clipboardDeps);
+    const r = await copyToClipboard(copyText, clipboardDeps);
     setCopyStatus({ ok: r.ok, method: r.method });
-  }, [viewMode, parsed, clipboardDeps]);
+  }, [copyText, clipboardDeps]);
 
   return (
     <section className="tool tool--case" aria-label="NekoCase workbench">
@@ -94,7 +138,7 @@ export function CaseApp({ initialInput, initialUiState, clipboardDeps }: CaseApp
         <div className="results__toolbar">
           <fieldset className="viewmode" aria-label="Case output mode">
             <legend className="visually-hidden">Case output mode</legend>
-            {(['forms', 'json', 'normalized', 'markdown'] as const).map((m) => (
+            {VIEW_MODES.map((m) => (
               <label key={m} className={viewMode === m ? 'viewmode--active' : ''}>
                 <input
                   type="radio"
@@ -103,7 +147,7 @@ export function CaseApp({ initialInput, initialUiState, clipboardDeps }: CaseApp
                   checked={viewMode === m}
                   onChange={() => setViewMode(m)}
                 />
-                {m === 'forms' ? 'Forms' : m === 'json' ? 'JSON' : m === 'normalized' ? 'Slug list' : 'Markdown'}
+                {VIEW_LABELS[m]}
               </label>
             ))}
           </fieldset>
@@ -116,7 +160,15 @@ export function CaseApp({ initialInput, initialUiState, clipboardDeps }: CaseApp
               disabled={copyDisabled}
               data-testid="case-copy-output"
             >
-              {viewMode === 'json' ? 'Copy JSON' : viewMode === 'normalized' ? 'Copy slug list' : 'Copy markdown summary'}
+              {viewMode === 'json'
+                ? 'Copy JSON'
+                : viewMode === 'normalized'
+                  ? 'Copy slug list'
+                  : viewMode === 'markdown'
+                    ? 'Copy markdown summary'
+                    : viewMode === 'csv'
+                      ? 'Copy CSV'
+                      : 'Copy single form'}
             </button>
           </div>
 
@@ -150,9 +202,18 @@ export function CaseApp({ initialInput, initialUiState, clipboardDeps }: CaseApp
                 ))}
               </dl>
             ) : null
+          ) : isProView && !proUnlocked ? (
+            <div className="pro-lock" role="status" data-testid="case-locked">
+              <strong>{viewMode === 'csv' ? 'CSV grid export' : 'Single-form export'} is a Pro feature.</strong>
+              <p>
+                Export every case form as a CSV grid (one row per input — ready for a bulk-rename
+                sheet) or render a single chosen form (default camelCase), one per line. Unlock with
+                a license key (verified locally, works offline forever).
+              </p>
+            </div>
           ) : (
             <pre className="toml-output" data-testid="case-output" aria-label={`${viewMode} output`}>
-              {viewMode === 'json' ? parsed.json : viewMode === 'normalized' ? parsed.normalized : parsed.markdown}
+              {outputText}
             </pre>
           )
         ) : (

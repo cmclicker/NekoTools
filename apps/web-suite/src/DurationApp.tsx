@@ -1,17 +1,22 @@
 import { useCallback, useMemo, useState, type ChangeEvent } from 'react';
 
+import type { Entitlement } from '@nekotools/contracts';
+
 import { Diagnostics } from './Diagnostics.js';
 import { copyToClipboard, type ClipboardDeps } from './clipboard.js';
+import { useLicenseContext } from './license-store.js';
 import { parseDurationInput } from './duration-parse.js';
 
 /**
  * NekoDuration sub-app. Wires `@nekotools/lens-duration` into the shared
  * web-suite shell as a Utility tool tab. Free surface: paste durations
  * (ISO-8601 / humanized / seconds, one per line), see total seconds +
- * normalized ISO + human form, and copy JSON / ISO list / markdown. Local.
+ * normalized ISO + human form, and copy JSON / ISO list / markdown. Pro
+ * (gated by the suite license): export a per-input d/h/m/s breakdown CSV.
+ * All local.
  */
 
-export type DurationViewMode = 'table' | 'json' | 'normalized' | 'markdown';
+export type DurationViewMode = 'table' | 'json' | 'normalized' | 'markdown' | 'breakdown';
 
 export interface NekoDurationUiState {
   readonly viewMode: DurationViewMode;
@@ -21,6 +26,8 @@ export interface DurationAppProps {
   readonly initialInput?: string;
   readonly initialUiState?: Partial<NekoDurationUiState>;
   readonly clipboardDeps?: ClipboardDeps;
+  /** Injected entitlement; defaults to the suite license context. */
+  readonly entitlement?: Entitlement;
 }
 
 interface CopyStatus {
@@ -28,29 +35,47 @@ interface CopyStatus {
   readonly method: 'clipboard-api' | 'execCommand' | 'none';
 }
 
+const PRO_VIEWS = new Set<DurationViewMode>(['breakdown']);
+
 const SAMPLE_INPUT = ['PT1H30M', '90 min', '1d 2h', '3600', '1.5h'].join('\n');
 
-export function DurationApp({ initialInput, initialUiState, clipboardDeps }: DurationAppProps = {}): JSX.Element {
+export function DurationApp({
+  initialInput,
+  initialUiState,
+  clipboardDeps,
+  entitlement,
+}: DurationAppProps = {}): JSX.Element {
   const [input, setInput] = useState<string>(initialInput ?? SAMPLE_INPUT);
   const [viewMode, setViewMode] = useState<DurationViewMode>(initialUiState?.viewMode ?? 'table');
   const [copyStatus, setCopyStatus] = useState<CopyStatus | null>(null);
 
-  const parsed = useMemo(() => parseDurationInput(input), [input]);
+  const license = useLicenseContext();
+  const effectiveEntitlement = entitlement ?? license.entitlement;
+  const parsed = useMemo(
+    () => parseDurationInput(input, effectiveEntitlement),
+    [input, effectiveEntitlement],
+  );
+  const proUnlocked = parsed.proUnlocked;
+  const isProView = PRO_VIEWS.has(viewMode);
 
   const copyText =
-    viewMode === 'json' ? parsed.json : viewMode === 'normalized' ? parsed.normalized : parsed.markdown;
+    viewMode === 'json'
+      ? parsed.json
+      : viewMode === 'normalized'
+        ? parsed.normalized
+        : viewMode === 'breakdown'
+          ? parsed.breakdownCsv ?? ''
+          : parsed.markdown;
   const copyDisabled = viewMode === 'table' ? parsed.count === 0 : copyText === '';
 
   const handleCopy = useCallback(async () => {
-    const text =
-      viewMode === 'json' ? parsed.json : viewMode === 'normalized' ? parsed.normalized : parsed.markdown;
-    if (text === '') {
+    if (copyText === '') {
       setCopyStatus({ ok: false, method: 'none' });
       return;
     }
-    const r = await copyToClipboard(text, clipboardDeps);
+    const r = await copyToClipboard(copyText, clipboardDeps);
     setCopyStatus({ ok: r.ok, method: r.method });
-  }, [viewMode, parsed, clipboardDeps]);
+  }, [copyText, clipboardDeps]);
 
   return (
     <section className="tool tool--duration" aria-label="NekoDuration workbench">
@@ -76,7 +101,7 @@ export function DurationApp({ initialInput, initialUiState, clipboardDeps }: Dur
         <div className="results__toolbar">
           <fieldset className="viewmode" aria-label="Duration output mode">
             <legend className="visually-hidden">Duration output mode</legend>
-            {(['table', 'json', 'normalized', 'markdown'] as const).map((m) => (
+            {(['table', 'json', 'normalized', 'markdown', 'breakdown'] as const).map((m) => (
               <label key={m} className={viewMode === m ? 'viewmode--active' : ''}>
                 <input
                   type="radio"
@@ -85,7 +110,15 @@ export function DurationApp({ initialInput, initialUiState, clipboardDeps }: Dur
                   checked={viewMode === m}
                   onChange={() => setViewMode(m)}
                 />
-                {m === 'table' ? 'Table' : m === 'json' ? 'JSON' : m === 'normalized' ? 'ISO list' : 'Markdown'}
+                {m === 'table'
+                  ? 'Table'
+                  : m === 'json'
+                    ? 'JSON'
+                    : m === 'normalized'
+                      ? 'ISO list'
+                      : m === 'markdown'
+                        ? 'Markdown'
+                        : 'Breakdown CSV ⭐'}
               </label>
             ))}
           </fieldset>
@@ -98,7 +131,13 @@ export function DurationApp({ initialInput, initialUiState, clipboardDeps }: Dur
               disabled={copyDisabled}
               data-testid="duration-copy-output"
             >
-              {viewMode === 'json' ? 'Copy JSON' : viewMode === 'normalized' ? 'Copy ISO list' : 'Copy markdown summary'}
+              {viewMode === 'json'
+                ? 'Copy JSON'
+                : viewMode === 'normalized'
+                  ? 'Copy ISO list'
+                  : viewMode === 'breakdown'
+                    ? 'Copy breakdown CSV'
+                    : 'Copy markdown summary'}
             </button>
           </div>
 
@@ -142,9 +181,24 @@ export function DurationApp({ initialInput, initialUiState, clipboardDeps }: Dur
                 ))}
               </tbody>
             </table>
+          ) : isProView && !proUnlocked ? (
+            <div className="pro-lock" role="status" data-testid="duration-locked">
+              <strong>Breakdown CSV export is a Pro feature.</strong>
+              <p>
+                Export a spreadsheet-ready CSV with each input&apos;s total seconds and its
+                day/hour/minute/second breakdown alongside the normalized ISO form. Unlock with a
+                license key (verified locally, works offline forever).
+              </p>
+            </div>
           ) : (
             <pre className="toml-output" data-testid="duration-output" aria-label={`${viewMode} output`}>
-              {viewMode === 'json' ? parsed.json : viewMode === 'normalized' ? parsed.normalized : parsed.markdown}
+              {viewMode === 'json'
+                ? parsed.json
+                : viewMode === 'normalized'
+                  ? parsed.normalized
+                  : viewMode === 'breakdown'
+                    ? parsed.breakdownCsv
+                    : parsed.markdown}
             </pre>
           )
         ) : (

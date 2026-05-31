@@ -3,6 +3,17 @@ import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 
 import { ColorApp } from '../ColorApp.js';
 
+const PRO = {
+  version: 1 as const,
+  licenseId: 'X',
+  licensee: 'Buyer',
+  tier: 'pro' as const,
+  features: ['*'],
+  issuedAt: '2026-01-01T00:00:00.000Z',
+  expiresAt: null,
+  signature: 's',
+};
+
 describe('ColorApp', () => {
   it('renders swatches with normalized hex + contrast', () => {
     render(<ColorApp initialInput={'red\nrgb(0, 0, 255)'} />);
@@ -40,5 +51,37 @@ describe('ColorApp', () => {
     fireEvent.click(screen.getByTestId('color-copy-output'));
     await waitFor(() => expect(writes).toHaveLength(1));
     expect(JSON.parse(writes[0] ?? '{}').colors[0].hex).toBe('#ffffff');
+  });
+
+  it('locks the palette + css-vars Pro views when free', () => {
+    render(<ColorApp initialInput={'#3b82f6'} initialUiState={{ viewMode: 'palette' }} />);
+    expect(screen.getByTestId('color-locked')).toBeInTheDocument();
+    expect(screen.queryByTestId('color-output')).not.toBeInTheDocument();
+  });
+
+  it('unlocks the tint/shade palette via an injected Pro entitlement', () => {
+    render(
+      <ColorApp
+        initialInput={'#3b82f6'}
+        initialUiState={{ viewMode: 'palette' }}
+        entitlement={PRO}
+      />,
+    );
+    const out = screen.getByTestId('color-output').textContent ?? '';
+    expect(out).toContain('# NekoColor palette');
+    expect(out).toContain('| 500 |');
+  });
+
+  it('unlocks the CSS custom properties via an injected Pro entitlement', () => {
+    render(
+      <ColorApp
+        initialInput={'#3b82f6'}
+        initialUiState={{ viewMode: 'css-vars' }}
+        entitlement={PRO}
+      />,
+    );
+    const out = screen.getByTestId('color-output').textContent ?? '';
+    expect(out).toContain(':root {');
+    expect(out).toContain('--color-500:');
   });
 });
