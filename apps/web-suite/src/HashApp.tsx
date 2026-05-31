@@ -2,8 +2,9 @@ import { useCallback, useEffect, useState, type ChangeEvent } from 'react';
 
 import { Diagnostics } from './Diagnostics.js';
 import { copyToClipboard, type ClipboardDeps } from './clipboard.js';
+import { useLicenseContext } from './license-store.js';
 import { hashBytes, hashText, type HashRunnerDeps, type ParsedHash } from './hash-parse.js';
-import type { Diagnostic } from '@nekotools/contracts';
+import type { Diagnostic, Entitlement } from '@nekotools/contracts';
 import type { HashAlgorithm } from '@nekotools/lens-hash';
 
 /**
@@ -11,8 +12,9 @@ import type { HashAlgorithm } from '@nekotools/lens-hash';
  * shell as a tool tab. Hash pasted text or a chosen file locally with
  * SHA-256/384/512; see the hex + base64 digest, the input byte length, and
  * the selected algorithm; copy the raw digest / a JSON summary / a Markdown
- * summary. The shared `ProSurface` (Free/Pro) renders automatically via the
- * tool registry; this component is the panel only.
+ * summary. Pro (gated by the suite license): a `sha256sum`-style checksum
+ * manifest + a JSON verification profile, both projected from the digest the
+ * engine already computed — no recomputation.
  *
  * Hashing is async (Web Crypto `crypto.subtle.digest`), so the digest is
  * computed in an effect. `hashDeps.subtle` is injectable so tests do not
@@ -22,8 +24,13 @@ import type { HashAlgorithm } from '@nekotools/lens-hash';
 export type HashSourceMode = 'text' | 'file';
 export type { HashRunnerDeps } from './hash-parse.js';
 
+/** Free: the digest detail view. Pro: the checksum manifest + verification
+ * profile. The digest view is the default (the original primary output). */
+export type HashViewMode = 'digest' | 'manifest' | 'checksum-profile';
+
 export interface NekoHashUiState {
   readonly algorithm: HashAlgorithm;
+  readonly viewMode: HashViewMode;
 }
 
 export interface HashAppProps {
@@ -31,6 +38,8 @@ export interface HashAppProps {
   readonly initialUiState?: Partial<NekoHashUiState>;
   readonly clipboardDeps?: ClipboardDeps;
   readonly hashDeps?: HashRunnerDeps;
+  /** Injected entitlement; defaults to the suite license context. */
+  readonly entitlement?: Entitlement;
 }
 
 type CopyTarget = 'digest' | 'json' | 'markdown';
@@ -43,6 +52,14 @@ interface CopyStatus {
 
 const ALGORITHMS: readonly HashAlgorithm[] = ['SHA-256', 'SHA-384', 'SHA-512'];
 
+const PRO_VIEWS = new Set<HashViewMode>(['manifest', 'checksum-profile']);
+const VIEW_MODES: readonly HashViewMode[] = ['digest', 'manifest', 'checksum-profile'];
+const VIEW_LABELS: Record<HashViewMode, string> = {
+  digest: 'Digest',
+  manifest: 'Checksum manifest ⭐',
+  'checksum-profile': 'Verification profile ⭐',
+};
+
 const SAMPLE_INPUT = 'The quick brown fox jumps over the lazy dog';
 
 const EMPTY_PARSED: ParsedHash = {
@@ -51,6 +68,9 @@ const EMPTY_PARSED: ParsedHash = {
   base64: null,
   jsonSummary: null,
   markdownSummary: null,
+  manifest: null,
+  checksumProfile: null,
+  proUnlocked: false,
   inputBytes: 0,
   algorithm: 'SHA-256',
   diagnostics: [],
@@ -61,15 +81,20 @@ export function HashApp({
   initialUiState,
   clipboardDeps,
   hashDeps,
+  entitlement,
 }: HashAppProps = {}): JSX.Element {
   const [input, setInput] = useState<string>(initialInput ?? SAMPLE_INPUT);
   const [algorithm, setAlgorithm] = useState<HashAlgorithm>(initialUiState?.algorithm ?? 'SHA-256');
+  const [viewMode, setViewMode] = useState<HashViewMode>(initialUiState?.viewMode ?? 'digest');
   const [mode, setMode] = useState<HashSourceMode>('text');
   const [fileBytes, setFileBytes] = useState<Uint8Array | null>(null);
   const [fileName, setFileName] = useState<string | null>(null);
   const [fileError, setFileError] = useState<string | null>(null);
   const [parsed, setParsed] = useState<ParsedHash>(EMPTY_PARSED);
   const [copyStatus, setCopyStatus] = useState<CopyStatus | null>(null);
+
+  const license = useLicenseContext();
+  const effectiveEntitlement = entitlement ?? license.entitlement;
 
   // Recompute the digest whenever the input, file, or algorithm changes.
   // digestBytes reports failures via diagnostics rather than throwing; the
@@ -86,17 +111,19 @@ export function HashApp({
                 algorithm,
                 { kind: 'file', bytes: fileBytes.byteLength, filename: fileName ?? 'file' },
                 hashDeps,
+                effectiveEntitlement,
               )
-            : await hashText(input, algorithm, hashDeps);
+            : await hashText(input, algorithm, hashDeps, effectiveEntitlement);
         if (!cancelled) setParsed(result);
       } catch {
-        if (!cancelled) setParsed({ ...EMPTY_PARSED, algorithm });
+        if (!cancelled)
+          setParsed({ ...EMPTY_PARSED, algorithm, proUnlocked: effectiveEntitlement.tier !== 'free' });
       }
     })();
     return () => {
       cancelled = true;
     };
-  }, [mode, input, algorithm, fileBytes, fileName, hashDeps]);
+  }, [mode, input, algorithm, fileBytes, fileName, hashDeps, effectiveEntitlement]);
 
   const handleTextChange = useCallback((e: ChangeEvent<HTMLTextAreaElement>) => {
     setInput(e.target.value);
@@ -152,6 +179,14 @@ export function HashApp({
     fileDiagnostic !== null ? [fileDiagnostic, ...parsed.diagnostics] : parsed.diagnostics;
 
   const hasDigest = parsed.hex !== null;
+  const proUnlocked = parsed.proUnlocked;
+  const isProView = PRO_VIEWS.has(viewMode);
+  const proOutput =
+    viewMode === 'manifest'
+      ? parsed.manifest
+      : viewMode === 'checksum-profile'
+        ? parsed.checksumProfile
+        : null;
 
   return (
     <section className="tool tool--hash" aria-label="NekoHash workbench">
@@ -201,6 +236,23 @@ export function HashApp({
             ))}
           </fieldset>
 
+          <fieldset className="viewmode" aria-label="Hash view mode">
+            <legend className="visually-hidden">Hash view mode</legend>
+            {VIEW_MODES.map((m) => (
+              <label key={m} className={viewMode === m ? 'viewmode--active' : ''}>
+                <input
+                  type="radio"
+                  name="hashViewMode"
+                  value={m}
+                  checked={viewMode === m}
+                  onChange={() => setViewMode(m)}
+                  data-testid={`hash-view-${m}`}
+                />
+                {VIEW_LABELS[m]}
+              </label>
+            ))}
+          </fieldset>
+
           <div className="copy" role="group" aria-label="Copy affordances">
             <button
               type="button"
@@ -246,7 +298,34 @@ export function HashApp({
           ) : null}
         </div>
 
-        {hasDigest ? (
+        {!hasDigest ? (
+          <div role="status" className="empty-state" data-testid="hash-no-digest">
+            No digest yet. Paste text or choose a file above (or check the diagnostics below).
+          </div>
+        ) : isProView ? (
+          !proUnlocked ? (
+            <div className="pro-lock" role="status" data-testid="hash-locked">
+              <strong>
+                {viewMode === 'manifest' ? 'Checksum manifest' : 'Verification profile'} is a Pro
+                feature.
+              </strong>
+              <p>
+                Export a <code>sha256sum</code>-style checksum manifest, or a structured JSON
+                verification profile (per algorithm: hex, base64, input bytes) you can keep and
+                later compare against. Unlock with a license key (verified locally, works offline
+                forever).
+              </p>
+            </div>
+          ) : (
+            <pre
+              className="toml-output hash-pro-output"
+              data-testid="hash-pro-output"
+              aria-label={`${viewMode} output`}
+            >
+              {proOutput}
+            </pre>
+          )
+        ) : (
           <dl className="hash-digest" data-testid="hash-output">
             <dt>Algorithm</dt>
             <dd data-testid="hash-algorithm">{parsed.algorithm}</dd>
@@ -261,10 +340,6 @@ export function HashApp({
               {parsed.base64}
             </dd>
           </dl>
-        ) : (
-          <div role="status" className="empty-state" data-testid="hash-no-digest">
-            No digest yet. Paste text or choose a file above (or check the diagnostics below).
-          </div>
         )}
 
         <Diagnostics diagnostics={diagnostics} />

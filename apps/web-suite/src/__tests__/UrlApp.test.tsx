@@ -3,6 +3,21 @@ import { fireEvent, render, screen, waitFor, within } from '@testing-library/rea
 
 import { UrlApp } from '../UrlApp.js';
 
+const PRO = {
+  version: 1 as const,
+  licenseId: 'X',
+  licensee: 'Buyer',
+  tier: 'pro' as const,
+  features: ['*'],
+  issuedAt: '2026-01-01T00:00:00.000Z',
+  expiresAt: null,
+  signature: 's',
+};
+
+// A URL with embedded credentials + tracking params + a non-standard port +
+// a fragment, so both Pro exports produce non-trivial content.
+const PRO_INPUT = 'http://alice:s3cr3t-token@example.com:8080/p?utm_source=news&fbclid=abc#section';
+
 describe('UrlApp', () => {
   it('parses a URL and renders the component breakdown + query-param table', () => {
     render(<UrlApp initialInput="https://example.com:8080/a/b?x=1&y=2#frag" />);
@@ -101,5 +116,42 @@ describe('UrlApp', () => {
     fireEvent.click(screen.getByTestId('url-copy-output'));
     await waitFor(() => expect(writes).toHaveLength(1));
     expect(writes[0]).toBe('https://example.com/?a=1');
+  });
+
+  it('locks the audit + redaction Pro views when free', () => {
+    render(<UrlApp initialInput={PRO_INPUT} initialUiState={{ viewMode: 'audit' }} />);
+    expect(screen.getByTestId('url-locked')).toBeInTheDocument();
+    expect(screen.queryByTestId('url-output')).not.toBeInTheDocument();
+  });
+
+  it('unlocks the security audit via an injected Pro entitlement', () => {
+    render(
+      <UrlApp
+        initialInput={PRO_INPUT}
+        initialUiState={{ viewMode: 'audit' }}
+        entitlement={PRO}
+      />,
+    );
+    const out = screen.getByTestId('url-output').textContent ?? '';
+    expect(out).toContain('# NekoURL audit');
+    expect(out).toContain('audit.tracking_params');
+    // The audit is credential-free — the embedded secret never appears.
+    expect(out).not.toContain('s3cr3t-token');
+  });
+
+  it('unlocks the redaction preset via an injected Pro entitlement', () => {
+    render(
+      <UrlApp
+        initialInput={PRO_INPUT}
+        initialUiState={{ viewMode: 'redaction' }}
+        entitlement={PRO}
+      />,
+    );
+    const preset = JSON.parse(screen.getByTestId('url-output').textContent ?? '{}') as {
+      kind?: string;
+      redact?: { stripQueryParams?: string[] };
+    };
+    expect(preset.kind).toBe('redaction-preset');
+    expect(preset.redact?.stripQueryParams).toEqual(['utm_source', 'fbclid']);
   });
 });

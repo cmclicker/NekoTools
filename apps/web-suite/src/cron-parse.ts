@@ -1,4 +1,4 @@
-import { ToolRegistry, runExporter, runParser } from '@nekotools/tool-runtime';
+import { FREE_ENTITLEMENT, ToolRegistry, runExporter, runParser } from '@nekotools/tool-runtime';
 import {
   buildCronRegistration,
   FIXED_CLOCK,
@@ -6,13 +6,16 @@ import {
   type CronField,
   type CronParsedArtifact,
 } from '@nekotools/lens-cron';
-import type { Diagnostic } from '@nekotools/contracts';
+import type { Diagnostic, Entitlement } from '@nekotools/contracts';
 
 /**
  * NekoCron UI parse helper, extracted out of CronApp for testability — the
  * same engine-adapter seam the other tools' `*-parse.ts` modules provide.
  * Next-run times use a clock seeded at module load so the UI shows runs
- * relative to "now"; output strings come from the real engine exporters.
+ * relative to "now"; output strings come from the real engine exporters. The
+ * Pro iCal + timezone-report exports are gated: `runExporter` throws
+ * EntitlementError for a free caller, surfaced here as null so the UI shows
+ * the Pro-lock (same pattern as hex-parse.ts).
  */
 
 const registry = (() => {
@@ -29,10 +32,18 @@ export interface ParsedCronView {
   readonly nextRuns: readonly string[];
   readonly json: string;
   readonly markdown: string;
+  /** Pro: a minimal iCalendar (VCALENDAR) snapshot of the next runs, or null when not entitled. */
+  readonly ical: string | null;
+  /** Pro: a Markdown timezone report of the next runs, or null when not entitled. */
+  readonly timezoneReport: string | null;
+  readonly proUnlocked: boolean;
   readonly diagnostics: readonly Diagnostic[];
 }
 
-export function parseCronInput(raw: string): ParsedCronView {
+export function parseCronInput(
+  raw: string,
+  entitlement: Entitlement = FREE_ENTITLEMENT,
+): ParsedCronView {
   const result = runParser(registry, 'cron', 'cron.text', {
     raw,
     source: { kind: 'paste', bytes: raw.length },
@@ -45,6 +56,14 @@ export function parseCronInput(raw: string): ParsedCronView {
   const exportInput = { artifacts: artifact ? [artifact] : [], diagnostics: result.diagnostics };
   const run = (id: string, fallback: string): string =>
     artifact ? String(runExporter(registry, 'cron', id, exportInput).body) : fallback;
+  const runPro = (id: string): string | null => {
+    if (artifact === undefined) return null;
+    try {
+      return String(runExporter(registry, 'cron', id, exportInput, entitlement).body);
+    } catch {
+      return null;
+    }
+  };
 
   return {
     valid: value?.valid ?? false,
@@ -54,6 +73,9 @@ export function parseCronInput(raw: string): ParsedCronView {
     nextRuns: value?.nextRuns ?? [],
     json: run('cron.export.json', 'null'),
     markdown: run('cron.export.markdown.summary', ''),
+    ical: runPro('cron.export.ical'),
+    timezoneReport: runPro('cron.export.timezone.report'),
+    proUnlocked: entitlement.tier !== 'free',
     diagnostics: result.diagnostics,
   };
 }

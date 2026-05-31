@@ -1,10 +1,11 @@
 import { useCallback, useMemo, useState, type ChangeEvent } from 'react';
 
 import { decodeComponent, encodeComponent } from '@nekotools/lens-url';
-import type { Diagnostic } from '@nekotools/contracts';
+import type { Diagnostic, Entitlement } from '@nekotools/contracts';
 
 import { Diagnostics } from './Diagnostics.js';
 import { copyToClipboard, type ClipboardDeps } from './clipboard.js';
+import { useLicenseContext } from './license-store.js';
 import { parseUrlInput } from './url-parse.js';
 
 /**
@@ -13,12 +14,14 @@ import { parseUrlInput } from './url-parse.js';
  * breakdown + query-parameter table, read the security/privacy hints
  * (credentials present, non-HTTPS, duplicate keys, long query), normalize
  * it, encode/decode components, and copy the normalized URL / params JSON /
- * markdown summary. The shared `ProSurface` (Free/Pro) renders via the tool
- * registry; this component is the panel only. Everything runs locally —
- * NekoURL never resolves or fetches the URL.
+ * markdown summary. Pro (gated by the suite license): a severity-ranked
+ * security/hygiene audit and a declarative JSON redaction preset. The shared
+ * `ProSurface` (Free/Pro) renders via the tool registry; this component is
+ * the panel only. Everything runs locally — NekoURL never resolves or
+ * fetches the URL.
  */
 
-export type UrlViewMode = 'components' | 'normalized' | 'params';
+export type UrlViewMode = 'components' | 'normalized' | 'params' | 'audit' | 'redaction';
 
 export interface NekoUrlUiState {
   readonly viewMode: UrlViewMode;
@@ -28,6 +31,8 @@ export interface UrlAppProps {
   readonly initialInput?: string;
   readonly initialUiState?: Partial<NekoUrlUiState>;
   readonly clipboardDeps?: ClipboardDeps;
+  /** Injected entitlement; defaults to the suite license context. */
+  readonly entitlement?: Entitlement;
 }
 
 interface CopyStatus {
@@ -44,13 +49,22 @@ interface EncodeResult {
 const SAMPLE_INPUT =
   'http://api.example.com:8080/v1/items?id=42&id=43&sort=desc&utm_source=demo#section';
 
+const PRO_VIEWS = new Set<UrlViewMode>(['audit', 'redaction']);
+
 function copyLabel(mode: UrlViewMode): string {
   if (mode === 'normalized') return 'Copy normalized URL';
   if (mode === 'params') return 'Copy params JSON';
+  if (mode === 'audit') return 'Copy audit';
+  if (mode === 'redaction') return 'Copy redaction preset';
   return 'Copy markdown summary';
 }
 
-export function UrlApp({ initialInput, initialUiState, clipboardDeps }: UrlAppProps = {}): JSX.Element {
+export function UrlApp({
+  initialInput,
+  initialUiState,
+  clipboardDeps,
+  entitlement,
+}: UrlAppProps = {}): JSX.Element {
   const [input, setInput] = useState<string>(initialInput ?? SAMPLE_INPUT);
   const [viewMode, setViewMode] = useState<UrlViewMode>(initialUiState?.viewMode ?? 'components');
   const [copyStatus, setCopyStatus] = useState<CopyStatus | null>(null);
@@ -58,14 +72,25 @@ export function UrlApp({ initialInput, initialUiState, clipboardDeps }: UrlAppPr
   const [encodeInput, setEncodeInput] = useState<string>('');
   const [encodeResult, setEncodeResult] = useState<EncodeResult | null>(null);
 
-  const parsed = useMemo(() => parseUrlInput(input), [input]);
+  const license = useLicenseContext();
+  const effectiveEntitlement = entitlement ?? license.entitlement;
+  const parsed = useMemo(
+    () => parseUrlInput(input, effectiveEntitlement),
+    [input, effectiveEntitlement],
+  );
+  const proUnlocked = parsed.proUnlocked;
+  const isProView = PRO_VIEWS.has(viewMode);
 
   const copyText =
     viewMode === 'normalized'
       ? parsed.normalized ?? ''
       : viewMode === 'params'
         ? parsed.paramsJson
-        : parsed.markdown;
+        : viewMode === 'audit'
+          ? parsed.batchAudit ?? ''
+          : viewMode === 'redaction'
+            ? parsed.redactionPreset ?? ''
+            : parsed.markdown;
 
   const handleCopy = useCallback(async () => {
     if (copyText === '') {
@@ -142,6 +167,26 @@ export function UrlApp({ initialInput, initialUiState, clipboardDeps }: UrlAppPr
               />
               Params JSON
             </label>
+            <label className={viewMode === 'audit' ? 'viewmode--active' : ''}>
+              <input
+                type="radio"
+                name="urlViewMode"
+                value="audit"
+                checked={viewMode === 'audit'}
+                onChange={() => setViewMode('audit')}
+              />
+              Audit ⭐
+            </label>
+            <label className={viewMode === 'redaction' ? 'viewmode--active' : ''}>
+              <input
+                type="radio"
+                name="urlViewMode"
+                value="redaction"
+                checked={viewMode === 'redaction'}
+                onChange={() => setViewMode('redaction')}
+              />
+              Redaction preset ⭐
+            </label>
           </fieldset>
 
           <div className="copy" role="group" aria-label="Copy affordances">
@@ -171,7 +216,19 @@ export function UrlApp({ initialInput, initialUiState, clipboardDeps }: UrlAppPr
         </div>
 
         {parsed.valid && c !== null ? (
-          viewMode === 'components' ? (
+          isProView && !proUnlocked ? (
+            <div className="pro-lock" role="status" data-testid="url-locked">
+              <strong>
+                {viewMode === 'audit' ? 'URL audit' : 'Redaction preset'} is a Pro feature.
+              </strong>
+              <p>
+                Run a severity-ranked security/hygiene audit of the URL (credentials in URL,
+                cleartext scheme, tracking params, non-standard port) or export a declarative JSON
+                redaction preset. All derived offline from the parsed components — nothing is
+                fetched. Unlock with a license key (verified locally, works offline forever).
+              </p>
+            </div>
+          ) : viewMode === 'components' ? (
             <div data-testid="url-components">
               <dl className="url-fields">
                 <div className="url-field">
@@ -239,12 +296,8 @@ export function UrlApp({ initialInput, initialUiState, clipboardDeps }: UrlAppPr
               )}
             </div>
           ) : (
-            <pre
-              className="url-output"
-              data-testid="url-output"
-              aria-label={viewMode === 'normalized' ? 'Normalized URL output' : 'Query params JSON output'}
-            >
-              {viewMode === 'normalized' ? parsed.normalized : parsed.paramsJson}
+            <pre className="url-output" data-testid="url-output" aria-label={`${viewMode} output`}>
+              {copyText}
             </pre>
           )
         ) : (

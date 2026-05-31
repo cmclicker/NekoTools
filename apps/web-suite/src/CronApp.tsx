@@ -1,18 +1,23 @@
 import { useCallback, useMemo, useState, type ChangeEvent } from 'react';
 
+import type { Entitlement } from '@nekotools/contracts';
+
 import { Diagnostics } from './Diagnostics.js';
 import { copyToClipboard, type ClipboardDeps } from './clipboard.js';
+import { useLicenseContext } from './license-store.js';
 import { parseCronInput } from './cron-parse.js';
 
 /**
  * NekoCron sub-app. Wires `@nekotools/lens-cron` into the shared web-suite
  * shell as a UTILITY tool tab. Free surface: paste a cron expression, read
  * a plain-English description, see the next run times (UTC) and the
- * expanded field breakdown, and copy a JSON / markdown report. All local —
- * NekoCron only explains expressions; it never schedules anything.
+ * expanded field breakdown, and copy a JSON / markdown report. Pro (gated by
+ * the suite license): export the next runs as an iCalendar (.ics) snapshot or
+ * a Markdown timezone report. All local — NekoCron only explains expressions;
+ * it never schedules anything.
  */
 
-export type CronViewMode = 'overview' | 'json' | 'markdown';
+export type CronViewMode = 'overview' | 'json' | 'markdown' | 'ical' | 'timezone-report';
 
 export interface NekoCronUiState {
   readonly viewMode: CronViewMode;
@@ -22,6 +27,8 @@ export interface CronAppProps {
   readonly initialInput?: string;
   readonly initialUiState?: Partial<NekoCronUiState>;
   readonly clipboardDeps?: ClipboardDeps;
+  /** Injected entitlement; defaults to the suite license context. */
+  readonly entitlement?: Entitlement;
 }
 
 interface CopyStatus {
@@ -29,16 +36,56 @@ interface CopyStatus {
   readonly method: 'clipboard-api' | 'execCommand' | 'none';
 }
 
+const PRO_VIEWS = new Set<CronViewMode>(['ical', 'timezone-report']);
+const VIEW_MODES: readonly CronViewMode[] = ['overview', 'json', 'markdown', 'ical', 'timezone-report'];
+const VIEW_LABELS: Record<CronViewMode, string> = {
+  overview: 'Overview',
+  json: 'JSON',
+  markdown: 'Markdown',
+  ical: 'iCalendar ⭐',
+  'timezone-report': 'Timezone report ⭐',
+};
+const COPY_LABELS: Record<CronViewMode, string> = {
+  overview: 'Copy markdown summary',
+  json: 'Copy JSON',
+  markdown: 'Copy markdown summary',
+  ical: 'Copy iCalendar',
+  'timezone-report': 'Copy timezone report',
+};
+
 const SAMPLE_INPUT = '*/15 9-17 * * 1-5';
 
-export function CronApp({ initialInput, initialUiState, clipboardDeps }: CronAppProps = {}): JSX.Element {
+export function CronApp({
+  initialInput,
+  initialUiState,
+  clipboardDeps,
+  entitlement,
+}: CronAppProps = {}): JSX.Element {
   const [input, setInput] = useState<string>(initialInput ?? SAMPLE_INPUT);
   const [viewMode, setViewMode] = useState<CronViewMode>(initialUiState?.viewMode ?? 'overview');
   const [copyStatus, setCopyStatus] = useState<CopyStatus | null>(null);
 
-  const parsed = useMemo(() => parseCronInput(input), [input]);
+  const license = useLicenseContext();
+  const effectiveEntitlement = entitlement ?? license.entitlement;
+  const parsed = useMemo(
+    () => parseCronInput(input, effectiveEntitlement),
+    [input, effectiveEntitlement],
+  );
+  const proUnlocked = parsed.proUnlocked;
+  const isProView = PRO_VIEWS.has(viewMode);
 
-  const copyText = viewMode === 'json' ? parsed.json : parsed.markdown;
+  const proOutputText =
+    viewMode === 'ical'
+      ? parsed.ical
+      : viewMode === 'timezone-report'
+        ? parsed.timezoneReport
+        : null;
+  const copyText =
+    viewMode === 'json'
+      ? parsed.json
+      : isProView
+        ? (proOutputText ?? '')
+        : parsed.markdown;
 
   const handleCopy = useCallback(async () => {
     if (copyText === '') {
@@ -74,7 +121,7 @@ export function CronApp({ initialInput, initialUiState, clipboardDeps }: CronApp
         <div className="results__toolbar">
           <fieldset className="viewmode" aria-label="Cron output mode">
             <legend className="visually-hidden">Cron output mode</legend>
-            {(['overview', 'json', 'markdown'] as const).map((m) => (
+            {VIEW_MODES.map((m) => (
               <label key={m} className={viewMode === m ? 'viewmode--active' : ''}>
                 <input
                   type="radio"
@@ -83,7 +130,7 @@ export function CronApp({ initialInput, initialUiState, clipboardDeps }: CronApp
                   checked={viewMode === m}
                   onChange={() => setViewMode(m)}
                 />
-                {m === 'overview' ? 'Overview' : m === 'json' ? 'JSON' : 'Markdown'}
+                {VIEW_LABELS[m]}
               </label>
             ))}
           </fieldset>
@@ -96,7 +143,7 @@ export function CronApp({ initialInput, initialUiState, clipboardDeps }: CronApp
               disabled={copyText === ''}
               data-testid="cron-copy-output"
             >
-              {viewMode === 'json' ? 'Copy JSON' : 'Copy markdown summary'}
+              {COPY_LABELS[viewMode]}
             </button>
           </div>
 
@@ -149,6 +196,21 @@ export function CronApp({ initialInput, initialUiState, clipboardDeps }: CronApp
                 </p>
               )}
             </div>
+          ) : isProView && !proUnlocked ? (
+            <div className="pro-lock" role="status" data-testid="cron-locked">
+              <strong>
+                {viewMode === 'ical' ? 'iCalendar export' : 'Timezone report'} is a Pro feature.
+              </strong>
+              <p>
+                Export the computed next runs as a ready-to-import iCalendar (<code>.ics</code>)
+                snapshot, or a Markdown report rendering each UTC instant across major time zones.
+                Unlock with a license key (verified locally, works offline forever).
+              </p>
+            </div>
+          ) : isProView ? (
+            <pre className="toml-output" data-testid="cron-output" aria-label={`${viewMode} output`}>
+              {proOutputText}
+            </pre>
           ) : (
             <pre className="toml-output" data-testid="cron-output" aria-label={`${viewMode} output`}>
               {viewMode === 'json' ? parsed.json : parsed.markdown}

@@ -3,6 +3,17 @@ import { fireEvent, render, screen, waitFor, within } from '@testing-library/rea
 
 import { CronApp } from '../CronApp.js';
 
+const PRO = {
+  version: 1 as const,
+  licenseId: 'X',
+  licensee: 'Buyer',
+  tier: 'pro' as const,
+  features: ['*'],
+  issuedAt: '2026-01-01T00:00:00.000Z',
+  expiresAt: null,
+  signature: 's',
+};
+
 describe('CronApp', () => {
   it('describes an expression and lists next runs + fields', () => {
     render(<CronApp initialInput={'*/15 * * * *'} />);
@@ -48,5 +59,39 @@ describe('CronApp', () => {
     fireEvent.click(screen.getByTestId('cron-copy-output'));
     await waitFor(() => expect(writes).toHaveLength(1));
     expect(writes[0]).toContain('# NekoCron export');
+  });
+
+  it('locks the iCal + timezone-report Pro views when free', () => {
+    render(<CronApp initialInput={'*/15 * * * *'} initialUiState={{ viewMode: 'ical' }} />);
+    expect(screen.getByTestId('cron-locked')).toBeInTheDocument();
+    expect(screen.queryByTestId('cron-output')).not.toBeInTheDocument();
+  });
+
+  it('unlocks the iCalendar export via an injected Pro entitlement', () => {
+    render(
+      <CronApp
+        initialInput={'*/15 * * * *'}
+        initialUiState={{ viewMode: 'ical' }}
+        entitlement={PRO}
+      />,
+    );
+    const out = screen.getByTestId('cron-output').textContent ?? '';
+    expect(out).toContain('BEGIN:VCALENDAR');
+    expect(out).toContain('BEGIN:VEVENT');
+    expect(out).toContain('DTSTART:');
+  });
+
+  it('renders the timezone report when Pro (ICU-stable structure only)', () => {
+    render(
+      <CronApp
+        initialInput={'*/15 * * * *'}
+        initialUiState={{ viewMode: 'timezone-report' }}
+        entitlement={PRO}
+      />,
+    );
+    const out = screen.getByTestId('cron-output').textContent ?? '';
+    expect(out).toContain('# NekoCron timezone report');
+    expect(out).toContain('UTC');
+    expect(out).toContain('Asia/Tokyo');
   });
 });
