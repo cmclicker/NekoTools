@@ -59,7 +59,7 @@ export const durationManifest: ToolManifest = {
   },
   outOfScope: [
     'calendar-aware durations (exact month/year lengths from an anchor date)',
-    'locale-specific human formatting (e.g. "1 hour 30 minutes" in other languages)',
+    'locale formatting beyond the host Intl runtime (no bundled CLDR/ICU data ships; the Pro locale export uses Intl only)',
     'summing or diffing multiple durations (Pro)',
     'leap-second handling',
     'network access of any kind during inspection',
