@@ -71,13 +71,10 @@ describe('NekoSort: manifest', () => {
 
 describe('NekoSort: monetization gating (single-build, entitlement-gated)', () => {
   const registration = buildSortRegistration(clock);
-  // One declared Pro id is built + gated; the other (input/output diff) needs
-  // the pre-transform input the artifact doesn't retain, so it stays
-  // advertising-only.
-  const builtProIds = ['sort.export.frequency'];
-  const advertisingOnlyIds = ['sort.export.diff'];
+  // Both declared Pro ids are now built + gated.
+  const builtProIds = ['sort.export.frequency', 'sort.export.diff'];
 
-  it('the built Pro exporter is declared AND registered as a proExporter, not free', () => {
+  it('both Pro exporters are declared AND registered as proExporters, not free', () => {
     const free = new Set(registration.exporters.map((e) => e.id));
     const pro = new Set((registration.proExporters ?? []).map((e) => e.id));
     for (const id of builtProIds) {
@@ -87,21 +84,7 @@ describe('NekoSort: monetization gating (single-build, entitlement-gated)', () =
     }
   });
 
-  it('the advertising-only Pro id is declared but registered nowhere (still "unknown exporter")', () => {
-    const free = new Set(registration.exporters.map((e) => e.id));
-    const pro = new Set((registration.proExporters ?? []).map((e) => e.id));
-    const r = registry();
-    for (const id of advertisingOnlyIds) {
-      expect(sortManifest.exporters).toContain(id);
-      expect(free.has(id)).toBe(false);
-      expect(pro.has(id)).toBe(false);
-      expect(() => runExporter(r, 'sort', id, { artifacts: [], diagnostics: [] }, PRO)).toThrow(
-        /unknown exporter/,
-      );
-    }
-  });
-
-  it('a free caller (default entitlement) is refused the built Pro exporter with EntitlementError', () => {
+  it('a free caller (default entitlement) is refused both Pro exporters with EntitlementError', () => {
     const r = registry();
     const parsed = parse('banana\napple\nbanana\ncherry\napple\nbanana');
     for (const id of builtProIds) {
@@ -118,6 +101,17 @@ describe('NekoSort: monetization gating (single-build, entitlement-gated)', () =
     expect(csv).toContain('3,banana'); // most frequent first
     expect(csv).toContain('2,apple');
     expect(csv).toContain('1,cherry');
+  });
+
+  it('a Pro entitlement unlocks the input→output diff exporter', () => {
+    const r = registry();
+    // unique=true drops duplicates → the diff must show removed (-) lines.
+    const parsed = parse('banana\napple\nbanana\ncherry', { unique: true });
+    const diff = String(runExporter(r, 'sort', 'sort.export.diff', parsed, PRO).body);
+    expect(diff).toContain('--- input (4 lines)');
+    expect(diff).toContain('+++ output (3 lines)'); // one banana deduped
+    expect(diff).toContain('- banana'); // the dropped duplicate
+    expect(diff).toContain('  apple'); // kept (context)
   });
 
   it('a truly unknown exporter id still throws "unknown exporter"', () => {

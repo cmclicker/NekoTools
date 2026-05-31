@@ -7,7 +7,7 @@ import {
   type SortParsedArtifact,
   type SortReport,
 } from './kinds.js';
-import { toFrequencyCsv } from './codegen.js';
+import { toFrequencyCsv, toInputOutputDiff } from './codegen.js';
 
 const TOOL_ID = 'sort';
 
@@ -80,12 +80,11 @@ export const freeExporters: readonly Exporter<SortArtifact>[] = [
 
 // --- Pro exporters (registered in the binary, gated by entitlement) --------
 //
-// Backs ONE of the two declared Pro exporter ids — `export.frequency` — a
-// pure count over the result lines. Generator in `codegen.ts`. The other
-// declared id, `sort.export.diff` (`export.diff`), would diff the original
-// input vs the output, but the sort.parsed artifact retains only the output
-// lines (not the pre-transform input), so it stays advertising-only and is
-// NOT registered — still throws "unknown exporter".
+// Backs BOTH declared Pro exporter ids — `export.frequency` (count over the
+// result lines) and `export.diff` (input→output diff). Generators in
+// `codegen.ts`. The diff reads the artifact's retained `inputLines` (added
+// alongside this exporter) so the input→output diff is a pure function of the
+// artifact.
 
 /** `sort.export.frequency` (Pro) — count per result line, most frequent first. */
 export const frequencyExporter: Exporter<SortArtifact> = {
@@ -103,4 +102,20 @@ export const frequencyExporter: Exporter<SortArtifact> = {
   },
 };
 
-export const proExporters: readonly Exporter<SortArtifact>[] = [frequencyExporter];
+/** `sort.export.diff` (Pro) — a unified-diff of the input→output transform. */
+export const diffExporter: Exporter<SortArtifact> = {
+  version: 1,
+  id: 'sort.export.diff',
+  toolId: TOOL_ID,
+  target: 'plaintext',
+  accepts: SORT_PARSED_EXPORT_KINDS,
+  producesMimeType: 'text/plain',
+  producesExtension: 'diff',
+  export({ artifacts }) {
+    const value = pickParsed(artifacts)?.value;
+    const body = value === undefined ? '--- input (0 lines)\n+++ output (0 lines)' : toInputOutputDiff(value);
+    return { mimeType: 'text/plain', extension: 'diff', body };
+  },
+};
+
+export const proExporters: readonly Exporter<SortArtifact>[] = [frequencyExporter, diffExporter];
