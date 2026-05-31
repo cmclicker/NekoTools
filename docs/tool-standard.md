@@ -80,9 +80,10 @@ The model is **one build, gated at runtime** — not two apps.
   free caller gets an `EntitlementError`; a Pro entitlement
   (`grantsFeature`, i.e. `features` includes `'*'` or the id) unlocks it.
 - Unlock is an **offline signed license** (Ed25519, verified locally against an
-  embedded public key — `@nekotools/tool-runtime/license`). The vendor keygen
-  CLI (`packages/tool-runtime/scripts/keygen.ts`) mints the signing identity;
-  the private key never enters the repo. Losing the local key never voids the
+  embedded public key — `@nekotools/tool-runtime/license`). The owner-only
+  `@nekotools/vendor-keys` tooling (`tools/vendor-keys`) mints the signing
+  identity (`keygen`) and per-buyer keys (`mint`); the private key never
+  enters the repo. Losing the local key never voids the
   purchase (re-fetchable). The signed `licensee` is surfaced as "Licensed
   to …" — gentle friction against key sharing.
 - The web suite shares one entitlement across every tool via
