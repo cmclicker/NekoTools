@@ -1,17 +1,22 @@
 import { useCallback, useMemo, useState, type ChangeEvent } from 'react';
 
+import type { Entitlement } from '@nekotools/contracts';
+
 import { Diagnostics } from './Diagnostics.js';
 import { copyToClipboard, type ClipboardDeps } from './clipboard.js';
+import { useLicenseContext } from './license-store.js';
 import { parseUnicodeInput } from './unicode-parse.js';
 
 /**
  * NekoUnicode sub-app. Wires `@nekotools/lens-unicode` into the shared
  * web-suite shell as a Utility tool tab. Free surface: paste text, see each
  * code point (U+ hex, decimal, UTF-8/UTF-16 bytes, category, escapes) and
- * summary counts, and copy JSON / U+ list / markdown. All local.
+ * summary counts, and copy JSON / U+ list / markdown. Pro (gated by the suite
+ * license): export a `U+XXXX | char | name` markdown table or a per-codepoint
+ * CSV grid. All local.
  */
 
-export type UnicodeViewMode = 'table' | 'json' | 'normalized' | 'markdown';
+export type UnicodeViewMode = 'table' | 'json' | 'normalized' | 'markdown' | 'names' | 'csv';
 
 export interface NekoUnicodeUiState {
   readonly viewMode: UnicodeViewMode;
@@ -21,6 +26,8 @@ export interface UnicodeAppProps {
   readonly initialInput?: string;
   readonly initialUiState?: Partial<NekoUnicodeUiState>;
   readonly clipboardDeps?: ClipboardDeps;
+  /** Injected entitlement; defaults to the suite license context. */
+  readonly entitlement?: Entitlement;
 }
 
 interface CopyStatus {
@@ -28,29 +35,67 @@ interface CopyStatus {
   readonly method: 'clipboard-api' | 'execCommand' | 'none';
 }
 
+const PRO_VIEWS = new Set<UnicodeViewMode>(['names', 'csv']);
+const VIEW_MODES: readonly UnicodeViewMode[] = ['table', 'json', 'normalized', 'markdown', 'names', 'csv'];
+const VIEW_LABELS: Record<UnicodeViewMode, string> = {
+  table: 'Table',
+  json: 'JSON',
+  normalized: 'U+ list',
+  markdown: 'Markdown',
+  names: 'Names ⭐',
+  csv: 'CSV ⭐',
+};
+const COPY_LABELS: Record<UnicodeViewMode, string> = {
+  table: 'Copy markdown summary',
+  json: 'Copy JSON',
+  normalized: 'Copy U+ list',
+  markdown: 'Copy markdown summary',
+  names: 'Copy names table',
+  csv: 'Copy CSV',
+};
+
 const SAMPLE_INPUT = 'Café 😀 €';
 
-export function UnicodeApp({ initialInput, initialUiState, clipboardDeps }: UnicodeAppProps = {}): JSX.Element {
+export function UnicodeApp({
+  initialInput,
+  initialUiState,
+  clipboardDeps,
+  entitlement,
+}: UnicodeAppProps = {}): JSX.Element {
   const [input, setInput] = useState<string>(initialInput ?? SAMPLE_INPUT);
   const [viewMode, setViewMode] = useState<UnicodeViewMode>(initialUiState?.viewMode ?? 'table');
   const [copyStatus, setCopyStatus] = useState<CopyStatus | null>(null);
 
-  const parsed = useMemo(() => parseUnicodeInput(input), [input]);
+  const license = useLicenseContext();
+  const effectiveEntitlement = entitlement ?? license.entitlement;
+  const parsed = useMemo(
+    () => parseUnicodeInput(input, effectiveEntitlement),
+    [input, effectiveEntitlement],
+  );
+  const proUnlocked = parsed.proUnlocked;
+  const isProView = PRO_VIEWS.has(viewMode);
 
-  const copyText =
-    viewMode === 'json' ? parsed.json : viewMode === 'normalized' ? parsed.normalized : parsed.markdown;
+  const outputText =
+    viewMode === 'json'
+      ? parsed.json
+      : viewMode === 'normalized'
+        ? parsed.normalized
+        : viewMode === 'names'
+          ? parsed.names
+          : viewMode === 'csv'
+            ? parsed.csv
+            : parsed.markdown;
+  const copyText = outputText ?? '';
   const copyDisabled = viewMode === 'table' ? parsed.codepointCount === 0 : copyText === '';
 
   const handleCopy = useCallback(async () => {
-    const text =
-      viewMode === 'json' ? parsed.json : viewMode === 'normalized' ? parsed.normalized : parsed.markdown;
-    if (text === '') {
+    if (copyText === '') {
       setCopyStatus({ ok: false, method: 'none' });
       return;
     }
-    const r = await copyToClipboard(text, clipboardDeps);
+    const r = await copyToClipboard(copyText, clipboardDeps);
     setCopyStatus({ ok: r.ok, method: r.method });
-  }, [viewMode, parsed, clipboardDeps]);
+  }, [copyText, clipboardDeps]);
 
   return (
     <section className="tool tool--unicode" aria-label="NekoUnicode workbench">
@@ -77,7 +122,7 @@ export function UnicodeApp({ initialInput, initialUiState, clipboardDeps }: Unic
         <div className="results__toolbar">
           <fieldset className="viewmode" aria-label="Unicode output mode">
             <legend className="visually-hidden">Unicode output mode</legend>
-            {(['table', 'json', 'normalized', 'markdown'] as const).map((m) => (
+            {VIEW_MODES.map((m) => (
               <label key={m} className={viewMode === m ? 'viewmode--active' : ''}>
                 <input
                   type="radio"
@@ -86,7 +131,7 @@ export function UnicodeApp({ initialInput, initialUiState, clipboardDeps }: Unic
                   checked={viewMode === m}
                   onChange={() => setViewMode(m)}
                 />
-                {m === 'table' ? 'Table' : m === 'json' ? 'JSON' : m === 'normalized' ? 'U+ list' : 'Markdown'}
+                {VIEW_LABELS[m]}
               </label>
             ))}
           </fieldset>
@@ -99,7 +144,7 @@ export function UnicodeApp({ initialInput, initialUiState, clipboardDeps }: Unic
               disabled={copyDisabled}
               data-testid="unicode-copy-output"
             >
-              {viewMode === 'json' ? 'Copy JSON' : viewMode === 'normalized' ? 'Copy U+ list' : 'Copy markdown summary'}
+              {COPY_LABELS[viewMode]}
             </button>
           </div>
 
@@ -128,7 +173,16 @@ export function UnicodeApp({ initialInput, initialUiState, clipboardDeps }: Unic
         </ul>
 
         {parsed.codepointCount > 0 ? (
-          viewMode === 'table' ? (
+          isProView && !proUnlocked ? (
+            <div className="pro-lock" role="status" data-testid="unicode-locked">
+              <strong>{viewMode === 'names' ? 'Names table export' : 'CSV export'} is a Pro feature.</strong>
+              <p>
+                Export every code point as a <code>U+XXXX | char | name</code> markdown table or a
+                spreadsheet-ready CSV grid. Unlock with a license key (verified locally, works offline
+                forever).
+              </p>
+            </div>
+          ) : viewMode === 'table' ? (
             <table className="url-params" data-testid="unicode-table">
               <thead>
                 <tr>
@@ -157,7 +211,7 @@ export function UnicodeApp({ initialInput, initialUiState, clipboardDeps }: Unic
             </table>
           ) : (
             <pre className="toml-output" data-testid="unicode-output" aria-label={`${viewMode} output`}>
-              {viewMode === 'json' ? parsed.json : viewMode === 'normalized' ? parsed.normalized : parsed.markdown}
+              {outputText}
             </pre>
           )
         ) : (
