@@ -15,9 +15,12 @@ import { YAML_KIND_DOCUMENT, YAML_KIND_JSON_PROJECTION } from './kinds.js';
  *     tests.
  *   - `entitlements.pro` is advertising for a future `@nekotools-pro/*`
  *     package; nothing Pro is bundled here.
- *   - `exporters` / `graphProjectors` may list Pro ids that are declared
- *     but NOT registered in the free build. The registry validates only
- *     the forward direction (every registered impl must be declared).
+ *   - `exporters` / `graphProjectors` list Pro ids. The two engine-only
+ *     Pro exporters (`yaml.export.schema.report`, `yaml.export.roundtrip.diff`)
+ *     ARE registered as gated `proExporters` and run only behind a valid
+ *     entitlement. The rest (graph projector, future premium-engine
+ *     features) remain declared-but-not-registered. The registry validates
+ *     only the forward direction (every registered impl must be declared).
  */
 export const yamlManifest: ToolManifest = {
   version: 1,
@@ -34,7 +37,7 @@ export const yamlManifest: ToolManifest = {
     'yaml.export.yaml.normalized',
     'yaml.export.paths',
     'yaml.export.markdown.summary',
-    // Pro — declared as advertising, NOT registered in the free build.
+    // Pro — registered as gated proExporters (single-build, entitlement-gated).
     'yaml.export.schema.report',
     'yaml.export.roundtrip.diff',
   ],

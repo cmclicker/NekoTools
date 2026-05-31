@@ -9,13 +9,17 @@ import { CODEC_KIND_TRANSFORM } from './kinds.js';
  * Reading model (same as the other lenses):
  *   - `entitlements.free` lists features THIS build ships with a working
  *     implementation: the four codecs (encode + decode), binary detection,
- *     the three exporters, the copy affordance, and workspace save.
- *   - `entitlements.pro` is advertising for a future `@nekotools-pro/*`
- *     package; nothing Pro is bundled here (no account, no telemetry, no
- *     remote check).
- *   - `exporters` lists Pro ids that are declared but NOT registered in the
- *     free build. The registry validates only the forward direction (every
- *     registered impl must be declared), so advertising-only ids are safe.
+ *     the three free exporters, the copy affordance, and workspace save.
+ *   - `entitlements.pro` lists Pro capabilities. Two are backed by registered,
+ *     entitlement-gated exporters in this build: `batch.transform`
+ *     (`codec.export.batch.report`) and `recipes.saved` / `chain.transforms`
+ *     (`codec.export.recipe.bundle`). The rest (`redaction.aware`,
+ *     `workspace.snapshots`, `bundle.signed`) remain advertising-only —
+ *     `bundle.signed` in particular is out of scope here (no signing). No
+ *     account, telemetry, or remote check is bundled.
+ *   - `exporters` lists every declared exporter id (free + Pro). The Pro ids
+ *     ship in the binary as `proExporters` and `runExporter` refuses them
+ *     without a valid entitlement (single-build-gated model).
  */
 export const codecManifest: ToolManifest = {
   version: 1,
@@ -30,7 +34,7 @@ export const codecManifest: ToolManifest = {
     'codec.export.text',
     'codec.export.summary.json',
     'codec.export.summary.markdown',
-    // Pro — declared as advertising, NOT registered in the free build.
+    // Pro — registered as gated `proExporters` (single-build, entitlement-gated).
     'codec.export.batch.report',
     'codec.export.recipe.bundle',
   ],

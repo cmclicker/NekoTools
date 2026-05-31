@@ -3,13 +3,14 @@ import { FIXED_CLOCK, type Clock } from '@nekotools/lens-kit';
 
 import { createYamlFromJsonParser } from './parser-from-json.js';
 import { createYamlTextParser } from './parser-text.js';
-import { freeExporters } from './exporters.js';
+import { freeExporters, proExporters } from './exporters.js';
 import { yamlManifest } from './manifest.js';
 
 export * from './kinds.js';
 export * from './diagnostics.js';
 export * from './parser-text.js';
 export * from './parser-from-json.js';
+export * from './codegen.js';
 export * from './exporters.js';
 export * from './manifest.js';
 export { FIXED_CLOCK } from '@nekotools/lens-kit';
@@ -22,9 +23,14 @@ export interface BuildYamlRegistrationOptions {
 }
 
 /**
- * Build a NekoYAML registration for the runtime. The free build passes
- * only the free parsers and exporters; Pro ids declared in the manifest
- * (schema report, roundtrip diff, anchor graph) are not registered here.
+ * Build a NekoYAML registration for the runtime. Free exporters run for
+ * everyone. The two engine-only Pro exporters (`yaml.export.schema.report`
+ * — a structure report; `yaml.export.roundtrip.diff` — a round-trip
+ * fidelity report) are registered as `proExporters` and gated by
+ * `runExporter` behind a valid entitlement (single-build-gated model, same
+ * as NekoTOML / NekoJSON). The remaining Pro features (policy packs,
+ * redaction presets, batch validate, saved recipes, workspace snapshots,
+ * anchor graph) depend on future premium engines and are not registered.
  */
 export function buildYamlRegistration(
   clock: Clock = FIXED_CLOCK('1970-01-01T00:00:00.000Z'),
@@ -38,5 +44,6 @@ export function buildYamlRegistration(
     manifest: yamlManifest,
     parsers: [createYamlTextParser(textDeps), createYamlFromJsonParser({ clock })],
     exporters: freeExporters,
+    proExporters,
   };
 }

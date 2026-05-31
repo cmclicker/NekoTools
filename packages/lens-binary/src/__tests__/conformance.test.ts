@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
-import type { Workspace } from '@nekotools/contracts';
+import type { Entitlement, Workspace } from '@nekotools/contracts';
 import {
+  EntitlementError,
   ToolRegistry,
   jsonWorkspaceSerializer,
   runExporter,
@@ -13,6 +14,17 @@ import { FIXED_CLOCK, binaryManifest, buildBinaryRegistration } from '../index.j
 
 const clock = FIXED_CLOCK('2026-05-19T00:00:00.000Z');
 const PRO_EXPORTER_IDS = ['binary.export.batch.report', 'binary.export.byte-map'];
+
+const PRO: Entitlement = {
+  version: 1,
+  licenseId: 'TEST',
+  licensee: 'Test User',
+  tier: 'pro',
+  features: ['*'],
+  issuedAt: '2026-01-01T00:00:00.000Z',
+  expiresAt: null,
+  signature: 'test',
+};
 
 function registry(): ToolRegistry {
   const r = new ToolRegistry();
@@ -36,14 +48,58 @@ describe('NekoBinary: manifest', () => {
   it('declares an explicit outOfScope', () => {
     expect(binaryManifest.outOfScope.length).toBeGreaterThan(0);
   });
+});
 
-  it('keeps Pro exporters advertised but unregistered in the free build', () => {
-    const registration = buildBinaryRegistration(clock);
-    const registered = new Set(registration.exporters.map((exporter) => exporter.id));
+describe('NekoBinary: monetization gating (single-build, entitlement-gated)', () => {
+  const registration = buildBinaryRegistration(clock);
+
+  it('Pro exporters are declared AND registered as proExporters, not free', () => {
+    const proIds = new Set((registration.proExporters ?? []).map((e) => e.id));
+    const free = new Set(registration.exporters.map((e) => e.id));
     for (const id of PRO_EXPORTER_IDS) {
       expect(binaryManifest.exporters).toContain(id);
-      expect(registered.has(id)).toBe(false);
+      expect(proIds.has(id)).toBe(true);
+      expect(free.has(id)).toBe(false);
     }
+  });
+
+  it('a free caller (default entitlement) is refused with EntitlementError', () => {
+    const r = registry();
+    const parsed = runParser(r, 'binary', 'binary.hex', {
+      raw: '0xCAFEBABE',
+      source: { kind: 'paste', bytes: 10 },
+    });
+    for (const id of PRO_EXPORTER_IDS) {
+      expect(() => runExporter(r, 'binary', id, parsed)).toThrow(EntitlementError);
+    }
+  });
+
+  it('a Pro entitlement unlocks the byte-map + batch-report exporters', () => {
+    const r = registry();
+    const parsed = runParser(r, 'binary', 'binary.hex', {
+      raw: '0xCAFEBABE',
+      source: { kind: 'paste', bytes: 10 },
+    });
+
+    const byteMap = String(runExporter(r, 'binary', 'binary.export.byte-map', parsed, PRO).body);
+    expect(byteMap).toContain('# NekoBinary byte map');
+    expect(byteMap).toContain('| offset | hex | decimal | binary | ascii |');
+    expect(byteMap).toContain('representation: bytes');
+    expect(byteMap).toContain('| 0x0000 | ca | 202 | 11001010 | . |');
+
+    const report = String(
+      runExporter(r, 'binary', 'binary.export.batch.report', parsed, PRO).body,
+    );
+    expect(report).toContain('# NekoBinary batch report');
+    expect(report).toContain('artifacts: 1');
+    expect(report).toContain('representation: bytes');
+    expect(report).toContain('hex: cafebabe');
+  });
+
+  it('a truly unknown exporter id still throws "unknown exporter"', () => {
+    expect(() =>
+      runExporter(registry(), 'binary', 'binary.export.nope', { artifacts: [], diagnostics: [] }, PRO),
+    ).toThrow(/unknown exporter/);
   });
 });
 
