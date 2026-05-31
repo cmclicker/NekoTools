@@ -3,6 +3,20 @@ import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 
 import { XmlApp } from '../XmlApp.js';
 
+const PRO = {
+  version: 1 as const,
+  licenseId: 'X',
+  licensee: 'Buyer',
+  tier: 'pro' as const,
+  features: ['*'],
+  issuedAt: '2026-01-01T00:00:00.000Z',
+  expiresAt: null,
+  signature: 's',
+};
+
+const NESTED_XML =
+  '<catalog><item id="1"><name>A</name></item><item id="2"><name>B</name></item></catalog>';
+
 describe('XmlApp', () => {
   it('decodes XML and renders the JSON view + document stats', () => {
     render(<XmlApp initialInput={'<root a="1"><child>hi</child></root>'} />);
@@ -57,5 +71,30 @@ describe('XmlApp', () => {
     fireEvent.click(screen.getByTestId('xml-copy-output'));
     await waitFor(() => expect(writes).toHaveLength(1));
     expect(writes[0]).toBe('<a>x</a>');
+  });
+
+  it('locks the XPath + XSD Pro views when free', () => {
+    render(<XmlApp initialInput={NESTED_XML} initialUiState={{ viewMode: 'xpath' }} />);
+    expect(screen.getByTestId('xml-locked')).toBeInTheDocument();
+    expect(screen.queryByTestId('xml-output')).not.toBeInTheDocument();
+  });
+
+  it('unlocks the XPath path inventory via an injected Pro entitlement', () => {
+    render(
+      <XmlApp initialInput={NESTED_XML} initialUiState={{ viewMode: 'xpath' }} entitlement={PRO} />,
+    );
+    expect(screen.queryByTestId('xml-locked')).not.toBeInTheDocument();
+    const out = screen.getByTestId('xml-output').textContent ?? '';
+    expect(out).toContain('# NekoXML path inventory');
+    expect(out).toContain('/catalog/item');
+  });
+
+  it('unlocks the inferred XSD via an injected Pro entitlement', () => {
+    render(
+      <XmlApp initialInput={NESTED_XML} initialUiState={{ viewMode: 'xsd' }} entitlement={PRO} />,
+    );
+    const out = screen.getByTestId('xml-output').textContent ?? '';
+    expect(out).toContain('<xs:schema xmlns:xs="http://www.w3.org/2001/XMLSchema">');
+    expect(out).toContain('<xs:element name=');
   });
 });

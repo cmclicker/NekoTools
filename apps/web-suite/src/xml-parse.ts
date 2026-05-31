@@ -1,4 +1,4 @@
-import { ToolRegistry, runExporter, runParser } from '@nekotools/tool-runtime';
+import { FREE_ENTITLEMENT, ToolRegistry, runExporter, runParser } from '@nekotools/tool-runtime';
 import {
   buildXmlRegistration,
   FIXED_CLOCK,
@@ -7,7 +7,7 @@ import {
   type XmlElement,
   type XmlParsedArtifact,
 } from '@nekotools/lens-xml';
-import type { Diagnostic } from '@nekotools/contracts';
+import type { Diagnostic, Entitlement } from '@nekotools/contracts';
 
 /**
  * NekoXML UI parse helper, extracted out of XmlApp for testability — the
@@ -16,6 +16,10 @@ import type { Diagnostic } from '@nekotools/contracts';
  * Output strings come from the real engine exporters (JSON / pretty /
  * markdown), so the tab can't drift from the engine. The registry is a
  * module singleton so parser identity is stable across re-renders.
+ *
+ * The Pro XPath-inventory + inferred-XSD exports are gated: `runExporter`
+ * throws EntitlementError for a free caller, surfaced here as null so the
+ * UI shows the Pro-lock (same pattern as hex-parse.ts / toml-parse.ts).
  */
 
 const SHARED_UTF8_ENCODER = new TextEncoder();
@@ -40,11 +44,19 @@ export interface ParsedXmlView {
   readonly pretty: string;
   /** Markdown summary of the parse (shape + diagnostics). */
   readonly markdown: string;
+  /** Pro: markdown structural path inventory, or null when not entitled. */
+  readonly xpathReport: string | null;
+  /** Pro: an inferred W3C XSD for the tree, or null when not entitled. */
+  readonly xsd: string | null;
+  readonly proUnlocked: boolean;
   readonly diagnostics: readonly Diagnostic[];
   readonly inputBytes: number;
 }
 
-export function parseXmlInput(raw: string): ParsedXmlView {
+export function parseXmlInput(
+  raw: string,
+  entitlement: Entitlement = FREE_ENTITLEMENT,
+): ParsedXmlView {
   const bytes = utf8ByteLength(raw);
   const result = runParser(registry, 'xml', 'xml.text', {
     raw,
@@ -56,6 +68,14 @@ export function parseXmlInput(raw: string): ParsedXmlView {
   );
   const value: ParsedXml | undefined = artifact?.value;
   const exportInput = { artifacts: artifact ? [artifact] : [], diagnostics: result.diagnostics };
+  const runPro = (id: string): string | null => {
+    if (artifact === undefined) return null;
+    try {
+      return String(runExporter(registry, 'xml', id, exportInput, entitlement).body);
+    } catch {
+      return null;
+    }
+  };
 
   const json = artifact
     ? String(runExporter(registry, 'xml', 'xml.export.json', exportInput).body)
@@ -74,6 +94,9 @@ export function parseXmlInput(raw: string): ParsedXmlView {
     json,
     pretty,
     markdown,
+    xpathReport: runPro('xml.export.xpath.report'),
+    xsd: runPro('xml.export.xsd'),
+    proUnlocked: entitlement.tier !== 'free',
     diagnostics: result.diagnostics,
     inputBytes: bytes,
   };

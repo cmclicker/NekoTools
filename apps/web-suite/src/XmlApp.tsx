@@ -1,7 +1,10 @@
 import { useCallback, useMemo, useState, type ChangeEvent } from 'react';
 
+import type { Entitlement } from '@nekotools/contracts';
+
 import { Diagnostics } from './Diagnostics.js';
 import { copyToClipboard, type ClipboardDeps } from './clipboard.js';
+import { useLicenseContext } from './license-store.js';
 import { parseXmlInput } from './xml-parse.js';
 
 /**
@@ -10,11 +13,12 @@ import { parseXmlInput } from './xml-parse.js';
  * tree as JSON, pretty-print it, read well-formedness diagnostics
  * (mismatched/unclosed tags with line numbers, multiple roots, duplicate
  * attributes, skipped DOCTYPEs), and copy the JSON / pretty XML / markdown
- * summary. Everything runs locally — NekoXML never resolves a DTD,
- * expands an external entity, or fetches anything (XXE-safe).
+ * summary. Pro (gated by the suite license): a structural XPath path
+ * inventory or an inferred W3C XSD. Everything runs locally — NekoXML never
+ * resolves a DTD, expands an external entity, or fetches anything (XXE-safe).
  */
 
-export type XmlViewMode = 'json' | 'pretty' | 'markdown';
+export type XmlViewMode = 'json' | 'pretty' | 'markdown' | 'xpath' | 'xsd';
 
 export interface NekoXmlUiState {
   readonly viewMode: XmlViewMode;
@@ -24,12 +28,31 @@ export interface XmlAppProps {
   readonly initialInput?: string;
   readonly initialUiState?: Partial<NekoXmlUiState>;
   readonly clipboardDeps?: ClipboardDeps;
+  /** Injected entitlement; defaults to the suite license context. */
+  readonly entitlement?: Entitlement;
 }
 
 interface CopyStatus {
   readonly ok: boolean;
   readonly method: 'clipboard-api' | 'execCommand' | 'none';
 }
+
+const PRO_VIEWS = new Set<XmlViewMode>(['xpath', 'xsd']);
+const VIEW_MODES: readonly XmlViewMode[] = ['json', 'pretty', 'markdown', 'xpath', 'xsd'];
+const VIEW_LABELS: Record<XmlViewMode, string> = {
+  json: 'JSON',
+  pretty: 'Pretty XML',
+  markdown: 'Markdown',
+  xpath: 'XPath inventory ⭐',
+  xsd: 'XSD ⭐',
+};
+const COPY_LABELS: Record<XmlViewMode, string> = {
+  json: 'Copy JSON',
+  pretty: 'Copy pretty XML',
+  markdown: 'Copy markdown summary',
+  xpath: 'Copy XPath inventory',
+  xsd: 'Copy XSD',
+};
 
 const SAMPLE_INPUT = [
   '<?xml version="1.0" encoding="UTF-8"?>',
@@ -44,30 +67,45 @@ const SAMPLE_INPUT = [
   '</catalog>',
 ].join('\n');
 
-function copyLabel(mode: XmlViewMode): string {
-  if (mode === 'json') return 'Copy JSON';
-  if (mode === 'pretty') return 'Copy pretty XML';
-  return 'Copy markdown summary';
-}
-
-export function XmlApp({ initialInput, initialUiState, clipboardDeps }: XmlAppProps = {}): JSX.Element {
+export function XmlApp({
+  initialInput,
+  initialUiState,
+  clipboardDeps,
+  entitlement,
+}: XmlAppProps = {}): JSX.Element {
   const [input, setInput] = useState<string>(initialInput ?? SAMPLE_INPUT);
   const [viewMode, setViewMode] = useState<XmlViewMode>(initialUiState?.viewMode ?? 'json');
   const [copyStatus, setCopyStatus] = useState<CopyStatus | null>(null);
 
-  const parsed = useMemo(() => parseXmlInput(input), [input]);
+  const license = useLicenseContext();
+  const effectiveEntitlement = entitlement ?? license.entitlement;
+  const parsed = useMemo(
+    () => parseXmlInput(input, effectiveEntitlement),
+    [input, effectiveEntitlement],
+  );
+  const proUnlocked = parsed.proUnlocked;
+  const isProView = PRO_VIEWS.has(viewMode);
 
   const output =
-    viewMode === 'json' ? parsed.json : viewMode === 'pretty' ? parsed.pretty : parsed.markdown;
+    viewMode === 'json'
+      ? parsed.json
+      : viewMode === 'pretty'
+        ? parsed.pretty
+        : viewMode === 'markdown'
+          ? parsed.markdown
+          : viewMode === 'xpath'
+            ? parsed.xpathReport
+            : parsed.xsd;
+  const copyText = output ?? '';
 
   const handleCopy = useCallback(async () => {
-    if (output === '') {
+    if (copyText === '') {
       setCopyStatus({ ok: false, method: 'none' });
       return;
     }
-    const result = await copyToClipboard(output, clipboardDeps);
+    const result = await copyToClipboard(copyText, clipboardDeps);
     setCopyStatus({ ok: result.ok, method: result.method });
-  }, [output, clipboardDeps]);
+  }, [copyText, clipboardDeps]);
 
   return (
     <section className="tool tool--xml" aria-label="NekoXML workbench">
@@ -94,36 +132,18 @@ export function XmlApp({ initialInput, initialUiState, clipboardDeps }: XmlAppPr
         <div className="results__toolbar">
           <fieldset className="viewmode" aria-label="XML output mode">
             <legend className="visually-hidden">XML output mode</legend>
-            <label className={viewMode === 'json' ? 'viewmode--active' : ''}>
-              <input
-                type="radio"
-                name="xmlViewMode"
-                value="json"
-                checked={viewMode === 'json'}
-                onChange={() => setViewMode('json')}
-              />
-              JSON
-            </label>
-            <label className={viewMode === 'pretty' ? 'viewmode--active' : ''}>
-              <input
-                type="radio"
-                name="xmlViewMode"
-                value="pretty"
-                checked={viewMode === 'pretty'}
-                onChange={() => setViewMode('pretty')}
-              />
-              Pretty XML
-            </label>
-            <label className={viewMode === 'markdown' ? 'viewmode--active' : ''}>
-              <input
-                type="radio"
-                name="xmlViewMode"
-                value="markdown"
-                checked={viewMode === 'markdown'}
-                onChange={() => setViewMode('markdown')}
-              />
-              Markdown
-            </label>
+            {VIEW_MODES.map((m) => (
+              <label key={m} className={viewMode === m ? 'viewmode--active' : ''}>
+                <input
+                  type="radio"
+                  name="xmlViewMode"
+                  value={m}
+                  checked={viewMode === m}
+                  onChange={() => setViewMode(m)}
+                />
+                {VIEW_LABELS[m]}
+              </label>
+            ))}
           </fieldset>
 
           <div className="copy" role="group" aria-label="Copy affordances">
@@ -131,10 +151,10 @@ export function XmlApp({ initialInput, initialUiState, clipboardDeps }: XmlAppPr
               type="button"
               className="copy__btn"
               onClick={handleCopy}
-              disabled={output === ''}
+              disabled={copyText === ''}
               data-testid="xml-copy-output"
             >
-              {copyLabel(viewMode)}
+              {COPY_LABELS[viewMode]}
             </button>
           </div>
 
@@ -165,9 +185,22 @@ export function XmlApp({ initialInput, initialUiState, clipboardDeps }: XmlAppPr
         </ul>
 
         {parsed.root !== null ? (
-          <pre className="toml-output" data-testid="xml-output" aria-label={`${viewMode} output`}>
-            {output}
-          </pre>
+          isProView && !proUnlocked ? (
+            <div className="pro-lock" role="status" data-testid="xml-locked">
+              <strong>
+                {viewMode === 'xpath' ? 'XPath path inventory' : 'Inferred XSD'} is a Pro feature.
+              </strong>
+              <p>
+                Generate a structural inventory of every element path, or an inferred W3C XSD from
+                the sample document. Unlock with a license key (verified locally, works offline
+                forever).
+              </p>
+            </div>
+          ) : (
+            <pre className="toml-output" data-testid="xml-output" aria-label={`${viewMode} output`}>
+              {output}
+            </pre>
+          )
         ) : (
           <div role="status" className="empty-state" data-testid="xml-no-document">
             No XML decoded yet. Paste a document above (or check the diagnostics below).

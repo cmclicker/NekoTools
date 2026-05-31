@@ -4,6 +4,17 @@ import { fireEvent, render, screen, waitFor, within } from '@testing-library/rea
 import { App } from '../App.js';
 import { RegexApp } from '../RegexApp.js';
 
+const PRO = {
+  version: 1 as const,
+  licenseId: 'X',
+  licensee: 'Buyer',
+  tier: 'pro' as const,
+  features: ['*'],
+  issuedAt: '2026-01-01T00:00:00.000Z',
+  expiresAt: null,
+  signature: 's',
+};
+
 describe('RegexApp', () => {
   it('renders every global match with its offsets', () => {
     render(<RegexApp initialPattern="a" initialFlags="g" initialSample="banana" />);
@@ -62,6 +73,51 @@ describe('RegexApp', () => {
       expect(writes).toHaveLength(1);
     });
     expect(JSON.parse(writes[0]!).matchCount).toBe(3);
+  });
+
+  it('locks the explain + redaction Pro views when free', () => {
+    render(
+      <RegexApp
+        initialPattern={'(?<year>\\d{4})'}
+        initialFlags="g"
+        initialSample="2026 and 1999"
+        initialUiState={{ viewMode: 'explain' }}
+      />,
+    );
+    expect(screen.getByTestId('regex-locked')).toBeInTheDocument();
+    expect(screen.queryByTestId('regex-output')).not.toBeInTheDocument();
+    // The free matches list is hidden while a Pro view is selected.
+    expect(screen.queryByTestId('regex-matches')).not.toBeInTheDocument();
+  });
+
+  it('unlocks the structural explanation via an injected Pro entitlement', () => {
+    render(
+      <RegexApp
+        initialPattern={'(?<year>\\d{4})'}
+        initialFlags="g"
+        initialSample="2026 and 1999"
+        initialUiState={{ viewMode: 'explain' }}
+        entitlement={PRO}
+      />,
+    );
+    const out = screen.getByTestId('regex-output').textContent ?? '';
+    expect(out).toContain('# NekoRegex pattern explanation');
+    expect(out).toContain('named capture group "year"');
+  });
+
+  it('renders the JSON redaction recipe in the redaction view when Pro', () => {
+    render(
+      <RegexApp
+        initialPattern={'(?<year>\\d{4})'}
+        initialFlags="g"
+        initialSample="2026 and 1999"
+        initialUiState={{ viewMode: 'redaction' }}
+        entitlement={PRO}
+      />,
+    );
+    const out = screen.getByTestId('regex-output').textContent ?? '';
+    expect(out).toContain('"tool": "regex"');
+    expect(out).toContain('[REDACTED]');
   });
 });
 
