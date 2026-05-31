@@ -7,6 +7,7 @@ import {
   type CronParsedArtifact,
   type ParsedCron,
 } from './kinds.js';
+import { toICalendar, toTimezoneReport } from './codegen.js';
 
 const TOOL_ID = 'cron';
 
@@ -86,4 +87,57 @@ export const freeExporters: readonly Exporter<CronArtifact>[] = [
   jsonExporter,
   nextRunsExporter,
   markdownSummaryExporter,
+];
+
+// --- Pro exporters (registered in the binary, gated by entitlement) --------
+//
+// These back the manifest's declared Pro exporter ids (`export.ical` /
+// `export.timezone.report`). Each derives purely from the already-parsed
+// `cron.parsed` value — specifically its `nextRuns`, which the parser computed
+// as UTC instants — with no network, no clock, and no premium-engine
+// dependency. Generation lives in `codegen.ts`. Honest about scope: the iCal
+// export is a finite snapshot of the computed next runs (one VEVENT each, no
+// RRULE), and the timezone report only renders those UTC instants in other
+// zones (it does not re-schedule).
+
+/**
+ * `cron.export.ical` (Pro) — a minimal iCalendar (VCALENDAR) with one VEVENT
+ * per already-computed next-run instant (DTSTART in UTC). Not an RRULE.
+ */
+export const icalExporter: Exporter<CronArtifact> = {
+  version: 1,
+  id: 'cron.export.ical',
+  toolId: TOOL_ID,
+  target: 'plaintext',
+  accepts: CRON_PARSED_EXPORT_KINDS,
+  producesMimeType: 'text/calendar',
+  producesExtension: 'ics',
+  export({ artifacts }) {
+    const value = pickParsed(artifacts)?.value ?? null;
+    return { mimeType: 'text/calendar', extension: 'ics', body: toICalendar(value) };
+  },
+};
+
+/**
+ * `cron.export.timezone.report` (Pro) — a Markdown table rendering each
+ * already-computed UTC next-run instant across a fixed set of major IANA
+ * zones via `Intl.DateTimeFormat`. Display only — not re-scheduled.
+ */
+export const timezoneReportExporter: Exporter<CronArtifact> = {
+  version: 1,
+  id: 'cron.export.timezone.report',
+  toolId: TOOL_ID,
+  target: 'markdown',
+  accepts: CRON_PARSED_EXPORT_KINDS,
+  producesMimeType: 'text/markdown',
+  producesExtension: 'md',
+  export({ artifacts }) {
+    const value = pickParsed(artifacts)?.value ?? null;
+    return { mimeType: 'text/markdown', extension: 'md', body: toTimezoneReport(value) };
+  },
+};
+
+export const proExporters: readonly Exporter<CronArtifact>[] = [
+  icalExporter,
+  timezoneReportExporter,
 ];

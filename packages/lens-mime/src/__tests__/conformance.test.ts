@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
-import type { Artifact, Workspace } from '@nekotools/contracts';
+import type { Artifact, Entitlement, Workspace } from '@nekotools/contracts';
 import {
+  EntitlementError,
   ToolRegistry,
   jsonWorkspaceSerializer,
   runExporter,
@@ -13,6 +14,17 @@ import { FIXED_CLOCK, buildMimeRegistration, mimeManifest } from '../index.js';
 import type { MimeParsedArtifact } from '../kinds.js';
 
 const clock = FIXED_CLOCK('2026-05-28T00:00:00.000Z');
+
+const PRO: Entitlement = {
+  version: 1,
+  licenseId: 'TEST',
+  licensee: 'Test User',
+  tier: 'pro',
+  features: ['*'],
+  issuedAt: '2026-01-01T00:00:00.000Z',
+  expiresAt: null,
+  signature: 'test',
+};
 
 function registry(): ToolRegistry {
   const r = new ToolRegistry();
@@ -55,19 +67,47 @@ describe('NekoMIME: manifest', () => {
   });
 });
 
-describe('NekoMIME: monetization safety', () => {
+describe('NekoMIME: monetization gating (single-build, entitlement-gated)', () => {
   const registration = buildMimeRegistration(clock);
   const proExporterIds = ['mime.export.iana-lookup', 'mime.export.csv'];
-  it('no Pro exporter is registered, and each throws "unknown exporter"', () => {
-    const registered = new Set(registration.exporters.map((e) => e.id));
-    const r = registry();
+
+  it('Pro exporters are declared AND registered as proExporters, not free', () => {
+    const proIds = new Set((registration.proExporters ?? []).map((e) => e.id));
+    const free = new Set(registration.exporters.map((e) => e.id));
     for (const id of proExporterIds) {
-      expect(registered.has(id)).toBe(false);
       expect(mimeManifest.exporters).toContain(id);
-      expect(() => runExporter(r, 'mime', id, { artifacts: [], diagnostics: [] })).toThrow(
-        /unknown exporter/,
-      );
+      expect(proIds.has(id)).toBe(true);
+      expect(free.has(id)).toBe(false);
     }
+  });
+
+  it('a free caller (default entitlement) is refused with EntitlementError', () => {
+    const r = registry();
+    const parsed = parse('text/html; charset=utf-8\nimage/png');
+    for (const id of proExporterIds) {
+      expect(() => runExporter(r, 'mime', id, parsed)).toThrow(EntitlementError);
+    }
+  });
+
+  it('a Pro entitlement unlocks the IANA-lookup + CSV exporters', () => {
+    const r = registry();
+    const parsed = parse('text/html; charset=utf-8\nimage/png');
+
+    const md = String(runExporter(r, 'mime', 'mime.export.iana-lookup', parsed, PRO).body);
+    expect(md).toContain('# NekoMIME IANA lookup');
+    expect(md).toContain('text/html');
+    expect(md).toContain('image/png');
+
+    const csv = String(runExporter(r, 'mime', 'mime.export.csv', parsed, PRO).body);
+    expect(csv).toContain('input,valid,type');
+    expect(csv).toContain('charset=utf-8');
+    expect(csv).toContain('image,png');
+  });
+
+  it('a truly unknown exporter id still throws "unknown exporter"', () => {
+    expect(() =>
+      runExporter(registry(), 'mime', 'mime.export.nope', { artifacts: [], diagnostics: [] }, PRO),
+    ).toThrow(/unknown exporter/);
   });
 });
 

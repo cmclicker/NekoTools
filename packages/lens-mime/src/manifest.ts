@@ -5,10 +5,15 @@ import { MIME_KIND_PARSED } from './kinds.js';
 
 /**
  * The NekoMIME manifest. Reading model matches the other lenses:
- * `entitlements.free` ships (engine + UI); `entitlements.pro` advertises a
- * future package, and the two Pro exporter ids are declared but NOT
- * registered (monetization-safety tests assert they throw "unknown
- * exporter"). Offline policy is `network-forbidden`.
+ * `entitlements.free` ships (engine + UI); `entitlements.pro` advertises the
+ * Pro surface. The two Pro exporter ids (`mime.export.iana-lookup`,
+ * `mime.export.csv`) are declared here AND registered as `proExporters` in the
+ * single build — `runExporter` gates them behind a valid entitlement
+ * (entitlement-gated tests assert a free caller is refused with
+ * `EntitlementError` while a Pro caller gets real output). They derive purely
+ * from the parsed report plus a bundled IANA common-subset table; the
+ * remaining Pro entitlements (sniff/charset/Accept-header/snapshots) stay
+ * advertising-only. Offline policy is `network-forbidden`.
  */
 export const mimeManifest: ToolManifest = {
   version: 1,
@@ -23,7 +28,7 @@ export const mimeManifest: ToolManifest = {
     'mime.export.json',
     'mime.export.normalized',
     'mime.export.markdown.summary',
-    // Pro — declared as advertising, NOT registered in the free build.
+    // Pro — declared here AND registered as proExporters; entitlement-gated.
     'mime.export.iana-lookup',
     'mime.export.csv',
   ],

@@ -3,8 +3,9 @@ import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 import { describe, expect, it } from 'vitest';
-import type { Workspace } from '@nekotools/contracts';
+import type { Entitlement, Workspace } from '@nekotools/contracts';
 import {
+  EntitlementError,
   ToolRegistry,
   jsonWorkspaceSerializer,
   runExporter,
@@ -25,6 +26,17 @@ import type { TimeInstant, TimeInstantArtifact } from '../kinds.js';
 const NOW = '2026-05-27T00:00:00.000Z';
 const NOW_MS = Date.parse(NOW);
 const clock = FIXED_CLOCK(NOW);
+
+const PRO: Entitlement = {
+  version: 1,
+  licenseId: 'TEST',
+  licensee: 'Test User',
+  tier: 'pro',
+  features: ['*'],
+  issuedAt: '2026-01-01T00:00:00.000Z',
+  expiresAt: null,
+  signature: 'test',
+};
 
 function registry(): ToolRegistry {
   const r = new ToolRegistry();
@@ -74,34 +86,70 @@ describe('NekoTime: manifest', () => {
   });
 });
 
-describe('NekoTime: monetization safety', () => {
+describe('NekoTime: monetization gating (single-build, entitlement-gated)', () => {
   const registration = buildTimeRegistration(clock);
   const proExporterIds = ['time.export.batch.csv', 'time.export.timezone.board'];
+  // A fixed instant keeps the Pro-unlock assertions deterministic: 1700000000s
+  // → 2023-11-14T22:13:20.000Z. ICU localizes wall-clock strings differently
+  // across versions, so the unlock tests assert structure + zone labels + the
+  // self-normalized offsets + ISO-derived UTC values, never localized strings.
+  const FIXED_RAW = '1700000000';
+  const FIXED_ISO = '2023-11-14T22:13:20.000Z';
+  const FIXED_EPOCH_S = '1700000000';
 
-  it('no Pro exporter is registered in the free build', () => {
-    const registered = new Set(registration.exporters.map((e) => e.id));
-    for (const id of proExporterIds) expect(registered.has(id)).toBe(false);
-  });
-
-  it('no graph projector is registered in the free build', () => {
-    expect(registration.graphProjectors ?? []).toHaveLength(0);
-  });
-
-  it('runExporter throws "unknown exporter" for every Pro exporter id', () => {
-    const r = registry();
-    for (const id of proExporterIds) {
-      expect(() => runExporter(r, 'time', id, { artifacts: [], diagnostics: [] })).toThrow(
-        /unknown exporter/,
-      );
-    }
-  });
-
-  it('the manifest declares Pro exporters that are NOT in the registered set', () => {
-    const registered = new Set(registration.exporters.map((e) => e.id));
+  it('Pro exporters are declared AND registered as proExporters, not free', () => {
+    const proIds = new Set((registration.proExporters ?? []).map((e) => e.id));
+    const free = new Set(registration.exporters.map((e) => e.id));
     for (const id of proExporterIds) {
       expect(timeManifest.exporters).toContain(id);
-      expect(registered.has(id)).toBe(false);
+      expect(proIds.has(id)).toBe(true);
+      expect(free.has(id)).toBe(false);
     }
+  });
+
+  it('a free caller (default entitlement) is refused with EntitlementError', () => {
+    const r = registry();
+    const parsed = parse(FIXED_RAW);
+    for (const id of proExporterIds) {
+      expect(() => runExporter(r, 'time', id, parsed)).toThrow(EntitlementError);
+    }
+  });
+
+  it('a Pro entitlement unlocks the batch CSV exporter (real output)', () => {
+    const r = registry();
+    const parsed = parse(FIXED_RAW);
+    const csv = String(runExporter(r, 'time', 'time.export.batch.csv', parsed, PRO).body);
+    // Header row + the resolved instant's stable fields. No localized strings.
+    expect(csv).toContain('interpretation,iso,epochSeconds,epochMillis,utc,localFormatted,offsetLabel,relative');
+    expect(csv).toContain(FIXED_ISO);
+    expect(csv).toContain(FIXED_EPOCH_S);
+    // One header + one data row for the single-instant artifact.
+    expect(csv.split('\r\n')).toHaveLength(2);
+  });
+
+  it('a Pro entitlement unlocks the timezone board exporter (real output)', () => {
+    const r = registry();
+    const parsed = parse(FIXED_RAW);
+    const board = String(runExporter(r, 'time', 'time.export.timezone.board', parsed, PRO).body);
+    // Table structure + a fixed leading and far zone. Assert the zone labels +
+    // header, not localized wall-clock strings (ICU-version-stable).
+    expect(board).toContain('| Zone | Local time | Offset |');
+    expect(board).toContain('| UTC |');
+    expect(board).toContain('| Asia/Tokyo |');
+    // The instant header is ISO-derived (deterministic regardless of ICU).
+    expect(board).toContain(FIXED_ISO);
+    // UTC's normalized offset is always +00:00 for any instant.
+    expect(board).toMatch(/\| UTC \|[^|]*\| \+00:00 \|/);
+  });
+
+  it('a truly unknown exporter id still throws "unknown exporter"', () => {
+    expect(() =>
+      runExporter(registry(), 'time', 'time.export.nope', { artifacts: [], diagnostics: [] }, PRO),
+    ).toThrow(/unknown exporter/);
+  });
+
+  it('no graph projector is registered in the build', () => {
+    expect(registration.graphProjectors ?? []).toHaveLength(0);
   });
 
   it('free entitlements match exactly the implemented vertical-slice set', () => {

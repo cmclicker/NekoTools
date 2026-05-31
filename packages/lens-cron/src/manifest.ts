@@ -6,14 +6,20 @@ import { CRON_KIND_PARSED } from './kinds.js';
 /**
  * The NekoCron manifest.
  *
- * Reading model matches the other lenses: `entitlements.free` is what ships
- * (engine + UI); `entitlements.pro` advertises a future `@nekotools-pro/*`
- * package, and the two Pro exporter ids are declared but NOT registered
- * (monetization-safety tests assert they throw "unknown exporter").
+ * Reading model matches the other lenses: `entitlements.free` is what every
+ * build ships unconditionally; `entitlements.pro` advertises the gated
+ * surface. The two Pro exporter ids (`cron.export.ical`,
+ * `cron.export.timezone.report`) are declared here AND registered as
+ * `proExporters`, gated by `runExporter` behind a valid entitlement
+ * (single-build-gated model — see `buildCronRegistration`). Both derive purely
+ * from the already-computed UTC next runs. The remaining Pro entitlements
+ * (calendar scheduling, schedule compare/overlap, workspace snapshots) remain
+ * advertising-only — they depend on future premium engines and ship no impl.
  *
  * Offline policy is `network-forbidden`. Next-run times are computed in
  * UTC from the local clock — no timezone database is fetched, which is
- * also why timezone-aware scheduling is explicitly Pro/out-of-scope.
+ * also why timezone-aware *scheduling* is out-of-scope; the Pro timezone
+ * report only RENDERS those UTC instants in other zones via `Intl`.
  */
 export const cronManifest: ToolManifest = {
   version: 1,
@@ -28,7 +34,7 @@ export const cronManifest: ToolManifest = {
     'cron.export.json',
     'cron.export.next-runs',
     'cron.export.markdown.summary',
-    // Pro — declared as advertising, NOT registered in the free build.
+    // Pro — declared here and registered as proExporters (entitlement-gated).
     'cron.export.ical',
     'cron.export.timezone.report',
   ],
