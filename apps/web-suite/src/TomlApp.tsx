@@ -1,7 +1,10 @@
 import { useCallback, useMemo, useState, type ChangeEvent } from 'react';
 
+import type { Entitlement } from '@nekotools/contracts';
+
 import { Diagnostics } from './Diagnostics.js';
 import { copyToClipboard, type ClipboardDeps } from './clipboard.js';
+import { useLicenseContext } from './license-store.js';
 import { parseTomlInput } from './toml-parse.js';
 
 /**
@@ -10,12 +13,14 @@ import { parseTomlInput } from './toml-parse.js';
  * decoded value tree as JSON, convert/normalize it, read structural
  * diagnostics (duplicate keys, parse errors with line numbers, unsupported
  * multi-line constructs), and copy the JSON / normalized TOML / markdown
- * summary. The shared `ProSurface` (Free/Pro) renders via the tool
- * registry; this component is the panel only. Everything runs locally —
- * NekoTOML never fetches or resolves anything referenced in the document.
+ * summary. Pro (gated by the suite license): export the decoded tree as a
+ * TypeScript type or an inferred JSON Schema. The shared `ProSurface`
+ * (Free/Pro) renders via the tool registry; this component is the panel
+ * only. Everything runs locally — NekoTOML never fetches or resolves
+ * anything referenced in the document.
  */
 
-export type TomlViewMode = 'json' | 'normalized' | 'markdown';
+export type TomlViewMode = 'json' | 'normalized' | 'markdown' | 'types' | 'schema';
 
 export interface NekoTomlUiState {
   readonly viewMode: TomlViewMode;
@@ -25,12 +30,31 @@ export interface TomlAppProps {
   readonly initialInput?: string;
   readonly initialUiState?: Partial<NekoTomlUiState>;
   readonly clipboardDeps?: ClipboardDeps;
+  /** Injected entitlement; defaults to the suite license context. */
+  readonly entitlement?: Entitlement;
 }
 
 interface CopyStatus {
   readonly ok: boolean;
   readonly method: 'clipboard-api' | 'execCommand' | 'none';
 }
+
+const PRO_VIEWS = new Set<TomlViewMode>(['types', 'schema']);
+const VIEW_MODES: readonly TomlViewMode[] = ['json', 'normalized', 'markdown', 'types', 'schema'];
+const VIEW_LABELS: Record<TomlViewMode, string> = {
+  json: 'JSON',
+  normalized: 'Normalized TOML',
+  markdown: 'Markdown',
+  types: 'TypeScript ⭐',
+  schema: 'JSON Schema ⭐',
+};
+const COPY_LABELS: Record<TomlViewMode, string> = {
+  json: 'Copy JSON',
+  normalized: 'Copy normalized TOML',
+  markdown: 'Copy markdown summary',
+  types: 'Copy TypeScript',
+  schema: 'Copy JSON Schema',
+};
 
 const SAMPLE_INPUT = [
   '# NekoTOML — paste a TOML document',
@@ -49,29 +73,36 @@ const SAMPLE_INPUT = [
   'name = "nail"',
 ].join('\n');
 
-function copyLabel(mode: TomlViewMode): string {
-  if (mode === 'json') return 'Copy JSON';
-  if (mode === 'normalized') return 'Copy normalized TOML';
-  return 'Copy markdown summary';
-}
-
 export function TomlApp({
   initialInput,
   initialUiState,
   clipboardDeps,
+  entitlement,
 }: TomlAppProps = {}): JSX.Element {
   const [input, setInput] = useState<string>(initialInput ?? SAMPLE_INPUT);
   const [viewMode, setViewMode] = useState<TomlViewMode>(initialUiState?.viewMode ?? 'json');
   const [copyStatus, setCopyStatus] = useState<CopyStatus | null>(null);
 
-  const parsed = useMemo(() => parseTomlInput(input), [input]);
+  const license = useLicenseContext();
+  const effectiveEntitlement = entitlement ?? license.entitlement;
+  const parsed = useMemo(
+    () => parseTomlInput(input, effectiveEntitlement),
+    [input, effectiveEntitlement],
+  );
+  const proUnlocked = parsed.proUnlocked;
+  const isProView = PRO_VIEWS.has(viewMode);
 
-  const copyText =
+  const output =
     viewMode === 'json'
       ? parsed.json
       : viewMode === 'normalized'
         ? parsed.normalized
-        : parsed.markdown;
+        : viewMode === 'markdown'
+          ? parsed.markdown
+          : viewMode === 'types'
+            ? parsed.types
+            : parsed.schemaJson;
+  const copyText = output ?? '';
 
   const handleCopy = useCallback(async () => {
     if (copyText === '') {
@@ -81,9 +112,6 @@ export function TomlApp({
     const result = await copyToClipboard(copyText, clipboardDeps);
     setCopyStatus({ ok: result.ok, method: result.method });
   }, [copyText, clipboardDeps]);
-
-  const output =
-    viewMode === 'json' ? parsed.json : viewMode === 'normalized' ? parsed.normalized : parsed.markdown;
 
   return (
     <section className="tool tool--toml" aria-label="NekoTOML workbench">
@@ -110,36 +138,18 @@ export function TomlApp({
         <div className="results__toolbar">
           <fieldset className="viewmode" aria-label="TOML output mode">
             <legend className="visually-hidden">TOML output mode</legend>
-            <label className={viewMode === 'json' ? 'viewmode--active' : ''}>
-              <input
-                type="radio"
-                name="tomlViewMode"
-                value="json"
-                checked={viewMode === 'json'}
-                onChange={() => setViewMode('json')}
-              />
-              JSON
-            </label>
-            <label className={viewMode === 'normalized' ? 'viewmode--active' : ''}>
-              <input
-                type="radio"
-                name="tomlViewMode"
-                value="normalized"
-                checked={viewMode === 'normalized'}
-                onChange={() => setViewMode('normalized')}
-              />
-              Normalized TOML
-            </label>
-            <label className={viewMode === 'markdown' ? 'viewmode--active' : ''}>
-              <input
-                type="radio"
-                name="tomlViewMode"
-                value="markdown"
-                checked={viewMode === 'markdown'}
-                onChange={() => setViewMode('markdown')}
-              />
-              Markdown
-            </label>
+            {VIEW_MODES.map((m) => (
+              <label key={m} className={viewMode === m ? 'viewmode--active' : ''}>
+                <input
+                  type="radio"
+                  name="tomlViewMode"
+                  value={m}
+                  checked={viewMode === m}
+                  onChange={() => setViewMode(m)}
+                />
+                {VIEW_LABELS[m]}
+              </label>
+            ))}
           </fieldset>
 
           <div className="copy" role="group" aria-label="Copy affordances">
@@ -150,7 +160,7 @@ export function TomlApp({
               disabled={copyText === ''}
               data-testid="toml-copy-output"
             >
-              {copyLabel(viewMode)}
+              {COPY_LABELS[viewMode]}
             </button>
           </div>
 
@@ -181,9 +191,22 @@ export function TomlApp({
         </ul>
 
         {parsed.data !== null ? (
-          <pre className="toml-output" data-testid="toml-output" aria-label={`${viewMode} output`}>
-            {output}
-          </pre>
+          isProView && !proUnlocked ? (
+            <div className="pro-lock" role="status" data-testid="toml-locked">
+              <strong>
+                {viewMode === 'types' ? 'TypeScript types export' : 'JSON Schema export'} is a Pro
+                feature.
+              </strong>
+              <p>
+                Generate a TypeScript type or an inferred JSON Schema from the decoded document.
+                Unlock with a license key (verified locally, works offline forever).
+              </p>
+            </div>
+          ) : (
+            <pre className="toml-output" data-testid="toml-output" aria-label={`${viewMode} output`}>
+              {output}
+            </pre>
+          )
         ) : (
           <div role="status" className="empty-state" data-testid="toml-no-document">
             No TOML decoded yet. Paste a document above (or check the diagnostics below).

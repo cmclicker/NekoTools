@@ -1,4 +1,4 @@
-import { ToolRegistry, runParser } from '@nekotools/tool-runtime';
+import { FREE_ENTITLEMENT, ToolRegistry, runExporter, runParser } from '@nekotools/tool-runtime';
 import {
   buildEnvRegistration,
   FIXED_CLOCK,
@@ -7,7 +7,7 @@ import {
   type EnvDocument,
   type EnvDocumentArtifact,
 } from '@nekotools/lens-env';
-import type { Diagnostic } from '@nekotools/contracts';
+import type { Diagnostic, Entitlement } from '@nekotools/contracts';
 
 /**
  * NekoEnv UI parse helpers, extracted out of EnvApp for testability.
@@ -42,21 +42,48 @@ export interface ParsedEnv {
   readonly diagnostics: readonly Diagnostic[];
   /** UTF-8 byte length of the raw input (recorded into source.bytes). */
   readonly inputBytes: number;
+  /** Pro: a typed `ProcessEnv` interface, or null when not entitled. */
+  readonly typescript: string | null;
+  /** Pro: a Zod schema validating a loaded env, or null when not entitled. */
+  readonly zod: string | null;
+  /** Pro: cross-document markdown data dictionary, or null when not entitled. */
+  readonly dataDictionary: string | null;
+  /** Pro: Compose / ConfigMap composite, or null when not entitled. */
+  readonly composeStack: string | null;
+  readonly proUnlocked: boolean;
 }
 
-export function parseEnvText(raw: string): ParsedEnv {
+export function parseEnvText(
+  raw: string,
+  entitlement: Entitlement = FREE_ENTITLEMENT,
+): ParsedEnv {
   const bytes = utf8ByteLength(raw);
   const result = runParser(registry, 'env', 'env.text', {
     raw,
     source: { kind: 'paste', bytes },
   });
   const artifact = (result.artifacts[0] as EnvDocumentArtifact | undefined) ?? null;
+  const exportInput = { artifacts: artifact ? [artifact] : [], diagnostics: result.diagnostics };
+  const runPro = (id: string): string | null => {
+    if (artifact === null) return null;
+    try {
+      return String(runExporter(registry, 'env', id, exportInput, entitlement).body);
+    } catch {
+      return null;
+    }
+  };
+
   return {
     hasDocument: artifact !== null,
     artifact,
     document: artifact?.value ?? null,
     diagnostics: result.diagnostics,
     inputBytes: bytes,
+    typescript: runPro('env.export.types.typescript'),
+    zod: runPro('env.export.types.zod'),
+    dataDictionary: runPro('env.export.docs.data-dictionary'),
+    composeStack: runPro('env.export.compose.dotenv-stack'),
+    proUnlocked: entitlement.tier !== 'free',
   };
 }
 

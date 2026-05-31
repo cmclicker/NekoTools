@@ -5,6 +5,21 @@ import { EnvApp } from '../EnvApp.js';
 
 const SIMPLE_INPUT = 'A=1\nB=two\nDEBUG=true\n';
 
+// Real newlines (single-quoted, not a JSX attribute literal) so the parser
+// sees two entries — mirrors the engine conformance test's input shape.
+const PRO_INPUT = 'PORT=8080\nDEBUG=true\n';
+
+const PRO = {
+  version: 1 as const,
+  licenseId: 'X',
+  licensee: 'Buyer',
+  tier: 'pro' as const,
+  features: ['*'],
+  issuedAt: '2026-01-01T00:00:00.000Z',
+  expiresAt: null,
+  signature: 's',
+};
+
 describe('EnvApp integration', () => {
   it('parses the initial input and shows the table view by default', () => {
     render(<EnvApp initialInput={SIMPLE_INPUT} />);
@@ -158,5 +173,66 @@ describe('EnvApp integration', () => {
     );
     expect(screen.getByRole('region', { name: /NekoEnv diff view/i })).toBeInTheDocument();
     expect(screen.getByTestId('env-compare-input')).toBeInTheDocument();
+  });
+
+  it('locks the Pro codegen views when free', () => {
+    render(
+      <EnvApp initialInput={SIMPLE_INPUT} initialUiState={{ viewMode: 'types-ts' }} />,
+    );
+    expect(screen.getByTestId('env-locked')).toBeInTheDocument();
+    expect(screen.queryByTestId('env-output')).not.toBeInTheDocument();
+  });
+
+  it('unlocks the TypeScript ProcessEnv view via an injected Pro entitlement', () => {
+    render(
+      <EnvApp
+        initialInput={PRO_INPUT}
+        initialUiState={{ viewMode: 'types-ts' }}
+        entitlement={PRO}
+      />,
+    );
+    expect(screen.queryByTestId('env-locked')).not.toBeInTheDocument();
+    const out = screen.getByTestId('env-output').textContent ?? '';
+    expect(out).toContain('namespace NodeJS');
+    expect(out).toContain('interface ProcessEnv');
+  });
+
+  it('unlocks the Zod schema view via an injected Pro entitlement', () => {
+    render(
+      <EnvApp
+        initialInput={PRO_INPUT}
+        initialUiState={{ viewMode: 'types-zod' }}
+        entitlement={PRO}
+      />,
+    );
+    expect(screen.getByTestId('env-output').textContent ?? '').toContain(
+      "import { z } from 'zod';",
+    );
+  });
+
+  it('unlocks the data-dictionary view via an injected Pro entitlement', () => {
+    render(
+      <EnvApp
+        initialInput={PRO_INPUT}
+        initialUiState={{ viewMode: 'data-dictionary' }}
+        entitlement={PRO}
+      />,
+    );
+    expect(screen.getByTestId('env-output').textContent ?? '').toContain(
+      '# NekoEnv data dictionary',
+    );
+  });
+
+  it('unlocks the Compose / ConfigMap view via an injected Pro entitlement', () => {
+    render(
+      <EnvApp
+        initialInput={PRO_INPUT}
+        initialUiState={{ viewMode: 'compose' }}
+        entitlement={PRO}
+      />,
+    );
+    const out = screen.getByTestId('env-output').textContent ?? '';
+    expect(out).toContain('services:');
+    expect(out).toContain('kind: ConfigMap');
   });
 });

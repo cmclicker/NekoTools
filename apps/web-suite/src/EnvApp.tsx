@@ -1,10 +1,13 @@
 import { useCallback, useMemo, useState, type ChangeEvent } from 'react';
 
+import type { Entitlement } from '@nekotools/contracts';
+
 import { Diagnostics } from './Diagnostics.js';
 import { EnvDiffView } from './EnvDiffView.js';
 import { EnvTableView, mask } from './EnvTableView.js';
 import { EnvTextView } from './EnvTextView.js';
 import { copyToClipboard, type ClipboardDeps } from './clipboard.js';
+import { useLicenseContext } from './license-store.js';
 import { computeEnvDiff, parseEnvText } from './env-parse.js';
 
 /**
@@ -17,7 +20,14 @@ import { computeEnvDiff, parseEnvText } from './env-parse.js';
  * diff panel shows an empty-state hint.
  */
 
-export type EnvViewMode = 'table' | 'text' | 'diff';
+export type EnvViewMode =
+  | 'table'
+  | 'text'
+  | 'diff'
+  | 'types-ts'
+  | 'types-zod'
+  | 'data-dictionary'
+  | 'compose';
 
 export interface NekoEnvUiState {
   readonly viewMode: EnvViewMode;
@@ -31,7 +41,28 @@ export interface EnvAppProps {
   readonly initialCompareInput?: string;
   readonly initialUiState?: Partial<NekoEnvUiState>;
   readonly clipboardDeps?: ClipboardDeps;
+  /** Injected entitlement; defaults to the suite license context. */
+  readonly entitlement?: Entitlement;
 }
+
+const PRO_VIEWS = new Set<EnvViewMode>([
+  'types-ts',
+  'types-zod',
+  'data-dictionary',
+  'compose',
+]);
+const PRO_VIEW_MODES: readonly EnvViewMode[] = [
+  'types-ts',
+  'types-zod',
+  'data-dictionary',
+  'compose',
+];
+const PRO_VIEW_LABELS: Record<string, string> = {
+  'types-ts': 'TypeScript ⭐',
+  'types-zod': 'Zod ⭐',
+  'data-dictionary': 'Data dictionary ⭐',
+  compose: 'Compose ⭐',
+};
 
 interface CopyStatus {
   readonly kind: 'key' | 'value';
@@ -67,6 +98,7 @@ export function EnvApp({
   initialCompareInput,
   initialUiState,
   clipboardDeps,
+  entitlement,
 }: EnvAppProps = {}): JSX.Element {
   const [input, setInput] = useState<string>(initialInput ?? SAMPLE_INPUT);
   const [compareInput, setCompareInput] = useState<string>(
@@ -86,12 +118,29 @@ export function EnvApp({
   );
   const [copyStatus, setCopyStatus] = useState<CopyStatus | null>(null);
 
-  const parsed = useMemo(() => parseEnvText(input), [input]);
+  const license = useLicenseContext();
+  const effectiveEntitlement = entitlement ?? license.entitlement;
+  const parsed = useMemo(
+    () => parseEnvText(input, effectiveEntitlement),
+    [input, effectiveEntitlement],
+  );
   const parsedCompare = useMemo(() => parseEnvText(compareInput), [compareInput]);
   const diff = useMemo(
     () => computeEnvDiff(parsed.artifact, parsedCompare.artifact),
     [parsed.artifact, parsedCompare.artifact],
   );
+  const proUnlocked = parsed.proUnlocked;
+  const isProView = PRO_VIEWS.has(viewMode);
+  const proOutput =
+    viewMode === 'types-ts'
+      ? parsed.typescript
+      : viewMode === 'types-zod'
+        ? parsed.zod
+        : viewMode === 'data-dictionary'
+          ? parsed.dataDictionary
+          : viewMode === 'compose'
+            ? parsed.composeStack
+            : null;
 
   const activeEntry = useMemo(() => {
     if (!parsed.document || activeKey === null) return null;
@@ -212,6 +261,18 @@ export function EnvApp({
               />
               Diff
             </label>
+            {PRO_VIEW_MODES.map((m) => (
+              <label key={m} className={viewMode === m ? 'viewmode--active' : ''}>
+                <input
+                  type="radio"
+                  name="envViewMode"
+                  value={m}
+                  checked={viewMode === m}
+                  onChange={() => setViewMode(m)}
+                />
+                {PRO_VIEW_LABELS[m]}
+              </label>
+            ))}
           </fieldset>
 
           <label className="search">
@@ -290,7 +351,28 @@ export function EnvApp({
           ) : null}
         </div>
 
-        {viewMode === 'table' ? (
+        {isProView ? (
+          !proUnlocked ? (
+            <div className="pro-lock" role="status" data-testid="env-locked">
+              <strong>Codegen exports are a Pro feature.</strong>
+              <p>
+                Generate a typed <code>ProcessEnv</code> interface or a Zod schema from these
+                variables, a cross-document data dictionary, and a Docker Compose / Kubernetes
+                ConfigMap stack to drop into your deployment. Unlock with a license key (verified
+                locally, works offline forever).
+              </p>
+            </div>
+          ) : parsed.document !== null ? (
+            <pre className="yaml-output" data-testid="env-output" aria-label={`${viewMode} output`}>
+              {proOutput}
+            </pre>
+          ) : (
+            <div role="status" className="empty-state" data-testid="env-no-document">
+              No dotenv document yet. Fix the diagnostics below or switch
+              to the Text view to inspect the raw input.
+            </div>
+          )
+        ) : viewMode === 'table' ? (
           parsed.document !== null ? (
             <EnvTableView
               document={parsed.document}

@@ -1,4 +1,4 @@
-import { ToolRegistry, runExporter, runParser } from '@nekotools/tool-runtime';
+import { FREE_ENTITLEMENT, ToolRegistry, runExporter, runParser } from '@nekotools/tool-runtime';
 import {
   buildNdjsonRegistration,
   FIXED_CLOCK,
@@ -7,12 +7,15 @@ import {
   type NdjsonParsedArtifact,
   type NdjsonRecord,
 } from '@nekotools/lens-ndjson';
-import type { Diagnostic } from '@nekotools/contracts';
+import type { Diagnostic, Entitlement } from '@nekotools/contracts';
 
 /**
  * NekoNDJSON UI parse helper, extracted out of NdjsonApp for testability —
  * the same engine-adapter seam the other tools' `*-parse.ts` modules
- * provide. Output strings come from the real engine exporters.
+ * provide. Output strings come from the real engine exporters. The Pro
+ * JSON Schema + CSV exports are gated: `runExporter` throws EntitlementError
+ * for a free caller, surfaced here as null so the UI shows the Pro-lock
+ * (same pattern as hex-parse.ts).
  */
 
 const registry = (() => {
@@ -30,10 +33,18 @@ export interface ParsedNdjsonView {
   readonly json: string;
   readonly ndjson: string;
   readonly markdown: string;
+  /** Pro: inferred JSON Schema for one record, or null when not entitled. */
+  readonly schemaJson: string | null;
+  /** Pro: valid object records flattened to a CSV grid, or null when not entitled. */
+  readonly csv: string | null;
+  readonly proUnlocked: boolean;
   readonly diagnostics: readonly Diagnostic[];
 }
 
-export function parseNdjsonInput(raw: string): ParsedNdjsonView {
+export function parseNdjsonInput(
+  raw: string,
+  entitlement: Entitlement = FREE_ENTITLEMENT,
+): ParsedNdjsonView {
   const result = runParser(registry, 'ndjson', 'ndjson.text', {
     raw,
     source: { kind: 'paste', bytes: raw.length },
@@ -46,6 +57,14 @@ export function parseNdjsonInput(raw: string): ParsedNdjsonView {
   const exportInput = { artifacts: artifact ? [artifact] : [], diagnostics: result.diagnostics };
   const run = (id: string, fallback: string): string =>
     artifact ? String(runExporter(registry, 'ndjson', id, exportInput).body) : fallback;
+  const runPro = (id: string): string | null => {
+    if (artifact === undefined) return null;
+    try {
+      return String(runExporter(registry, 'ndjson', id, exportInput, entitlement).body);
+    } catch {
+      return null;
+    }
+  };
 
   return {
     count: value?.count ?? 0,
@@ -56,6 +75,9 @@ export function parseNdjsonInput(raw: string): ParsedNdjsonView {
     json: run('ndjson.export.json', '[]'),
     ndjson: run('ndjson.export.ndjson', ''),
     markdown: run('ndjson.export.markdown.summary', ''),
+    schemaJson: runPro('ndjson.export.schema.json'),
+    csv: runPro('ndjson.export.csv'),
+    proUnlocked: entitlement.tier !== 'free',
     diagnostics: result.diagnostics,
   };
 }

@@ -3,6 +3,17 @@ import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 
 import { TomlApp } from '../TomlApp.js';
 
+const PRO = {
+  version: 1 as const,
+  licenseId: 'X',
+  licensee: 'Buyer',
+  tier: 'pro' as const,
+  features: ['*'],
+  issuedAt: '2026-01-01T00:00:00.000Z',
+  expiresAt: null,
+  signature: 's',
+};
+
 describe('TomlApp', () => {
   it('decodes TOML and renders the JSON view + document stats', () => {
     render(<TomlApp initialInput={'title = "x"\n[server]\nport = 8080'} />);
@@ -56,5 +67,37 @@ describe('TomlApp', () => {
     fireEvent.click(screen.getByTestId('toml-copy-output'));
     await waitFor(() => expect(writes).toHaveLength(1));
     expect(writes[0]).toBe('port = 8080');
+  });
+
+  it('locks the TypeScript + JSON Schema Pro views when free', () => {
+    render(
+      <TomlApp initialInput={'title = "x"'} initialUiState={{ viewMode: 'types' }} />,
+    );
+    expect(screen.getByTestId('toml-locked')).toBeInTheDocument();
+    expect(screen.queryByTestId('toml-output')).not.toBeInTheDocument();
+  });
+
+  it('unlocks the TypeScript type via an injected Pro entitlement', () => {
+    render(
+      <TomlApp
+        initialInput={'title = "x"\n[server]\nport = 8080'}
+        initialUiState={{ viewMode: 'types' }}
+        entitlement={PRO}
+      />,
+    );
+    expect(screen.getByTestId('toml-output').textContent ?? '').toContain(
+      'export type Config = {',
+    );
+  });
+
+  it('renders the inferred JSON Schema in the schema view when Pro', () => {
+    render(
+      <TomlApp
+        initialInput={'title = "x"\n[server]\nport = 8080'}
+        initialUiState={{ viewMode: 'schema' }}
+        entitlement={PRO}
+      />,
+    );
+    expect(screen.getByTestId('toml-output').textContent ?? '').toContain('"type": "object"');
   });
 });

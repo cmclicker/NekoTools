@@ -3,6 +3,17 @@ import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 
 import { CsvApp } from '../CsvApp.js';
 
+const PRO = {
+  version: 1 as const,
+  licenseId: 'X',
+  licensee: 'Buyer',
+  tier: 'pro' as const,
+  features: ['*'],
+  issuedAt: '2026-01-01T00:00:00.000Z',
+  expiresAt: null,
+  signature: 's',
+};
+
 describe('CsvApp', () => {
   it('renders CSV counts and table cells', () => {
     render(<CsvApp initialInput={'name,age\nAda,37\nLinus,55'} />);
@@ -57,5 +68,51 @@ describe('CsvApp', () => {
       expect(writes).toHaveLength(1);
     });
     expect(writes[0]).toBe('name,note\nAda,"hello, world"');
+  });
+
+  it('locks the Pro views (profile / schema / cleaning) when free', () => {
+    render(
+      <CsvApp initialInput={'name,age\nAda,37'} initialUiState={{ viewMode: 'profile' }} />,
+    );
+    expect(screen.getByTestId('csv-locked')).toBeInTheDocument();
+    expect(screen.queryByTestId('csv-output')).not.toBeInTheDocument();
+  });
+
+  it('renders the column profile in the profile view when Pro', () => {
+    render(
+      <CsvApp
+        initialInput={'name,age\nAda,37'}
+        initialUiState={{ viewMode: 'profile' }}
+        entitlement={PRO}
+      />,
+    );
+    expect(screen.queryByTestId('csv-locked')).not.toBeInTheDocument();
+    expect(screen.getByTestId('csv-output').textContent ?? '').toContain(
+      '# NekoCSV column profile',
+    );
+  });
+
+  it('renders the inferred JSON Schema in the schema view when Pro', () => {
+    render(
+      <CsvApp
+        initialInput={'name,age\nAda,37'}
+        initialUiState={{ viewMode: 'schema' }}
+        entitlement={PRO}
+      />,
+    );
+    expect(screen.getByTestId('csv-output').textContent ?? '').toContain('"type": "object"');
+  });
+
+  it('renders the cleaning recipe in the cleaning view when Pro', () => {
+    render(
+      <CsvApp
+        initialInput={'name,age\nAda,\nLinus,55'}
+        initialUiState={{ viewMode: 'cleaning' }}
+        entitlement={PRO}
+      />,
+    );
+    const out = screen.getByTestId('csv-output').textContent ?? '';
+    expect(out).toContain('"tool": "csv"');
+    expect(out).toContain('"steps"');
   });
 });

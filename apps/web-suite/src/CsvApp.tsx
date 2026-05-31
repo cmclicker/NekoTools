@@ -1,21 +1,46 @@
 import { useCallback, useMemo, useState, type ChangeEvent } from 'react';
 
+import type { Entitlement } from '@nekotools/contracts';
+
 import { Diagnostics } from './Diagnostics.js';
 import { copyToClipboard, type ClipboardDeps } from './clipboard.js';
+import { useLicenseContext } from './license-store.js';
 import { runCsv, type CsvDelimiter } from './csv-parse.js';
+
+/**
+ * NekoCSV sub-app. Wires `@nekotools/lens-csv` into the shared web-suite
+ * shell. Free: paste CSV/TSV, see counts + the parsed table, copy the JSON /
+ * Markdown / normalized-CSV exports. Pro (gated by the suite license): a
+ * structural column profile, an inferred JSON Schema, and a JSON cleaning
+ * recipe. All local — nothing is uploaded.
+ */
+
+export type CsvViewMode = 'table' | 'profile' | 'schema' | 'cleaning';
 
 export interface NekoCsvUiState {
   readonly delimiter: CsvDelimiter;
   readonly hasHeader: boolean;
+  readonly viewMode: CsvViewMode;
 }
 
 export interface CsvAppProps {
   readonly initialInput?: string;
   readonly initialUiState?: Partial<NekoCsvUiState>;
   readonly clipboardDeps?: ClipboardDeps;
+  /** Injected entitlement; defaults to the suite license context. */
+  readonly entitlement?: Entitlement;
 }
 
 type CopyTarget = 'json' | 'markdown' | 'csv';
+
+const PRO_VIEWS = new Set<CsvViewMode>(['profile', 'schema', 'cleaning']);
+const VIEW_MODES: readonly CsvViewMode[] = ['table', 'profile', 'schema', 'cleaning'];
+const VIEW_LABELS: Record<CsvViewMode, string> = {
+  table: 'Table',
+  profile: 'Column profile ⭐',
+  schema: 'JSON Schema ⭐',
+  cleaning: 'Cleaning recipe ⭐',
+};
 
 interface CopyStatus {
   readonly ok: boolean;
@@ -37,14 +62,31 @@ export function CsvApp({
   initialInput,
   initialUiState,
   clipboardDeps,
+  entitlement,
 }: CsvAppProps = {}): JSX.Element {
   const [input, setInput] = useState<string>(initialInput ?? SAMPLE_INPUT);
   const [delimiter, setDelimiter] = useState<CsvDelimiter>(initialUiState?.delimiter ?? 'comma');
   const [hasHeader, setHasHeader] = useState<boolean>(initialUiState?.hasHeader ?? true);
+  const [viewMode, setViewMode] = useState<CsvViewMode>(initialUiState?.viewMode ?? 'table');
   const [copyStatus, setCopyStatus] = useState<CopyStatus | null>(null);
 
-  const run = useMemo(() => runCsv(input, delimiter, hasHeader), [input, delimiter, hasHeader]);
+  const license = useLicenseContext();
+  const effectiveEntitlement = entitlement ?? license.entitlement;
+  const run = useMemo(
+    () => runCsv(input, delimiter, hasHeader, effectiveEntitlement),
+    [input, delimiter, hasHeader, effectiveEntitlement],
+  );
   const table = run.table;
+  const proUnlocked = run.proUnlocked;
+  const isProView = PRO_VIEWS.has(viewMode);
+  const proOutput =
+    viewMode === 'profile'
+      ? run.profileReport
+      : viewMode === 'schema'
+        ? run.schemaJson
+        : viewMode === 'cleaning'
+          ? run.cleaningRecipe
+          : null;
 
   const handleCopy = useCallback(
     async (target: CopyTarget) => {
@@ -113,6 +155,23 @@ export function CsvApp({
             Header row
           </label>
 
+          <fieldset className="viewmode" aria-label="CSV view mode">
+            <legend className="visually-hidden">CSV view mode</legend>
+            {VIEW_MODES.map((mode) => (
+              <label key={mode} className={viewMode === mode ? 'viewmode--active' : ''}>
+                <input
+                  type="radio"
+                  name="csvViewMode"
+                  value={mode}
+                  checked={viewMode === mode}
+                  onChange={() => setViewMode(mode)}
+                  data-testid={`csv-view-${mode}`}
+                />
+                {VIEW_LABELS[mode]}
+              </label>
+            ))}
+          </fieldset>
+
           <div className="copy" role="group" aria-label="Copy affordances">
             <button
               type="button"
@@ -162,6 +221,28 @@ export function CsvApp({
           <div role="status" className="empty-state" data-testid="csv-no-table">
             No table parsed. Check diagnostics below.
           </div>
+        ) : isProView ? (
+          !proUnlocked ? (
+            <div className="pro-lock" role="status" data-testid="csv-locked">
+              <strong>
+                {viewMode === 'profile'
+                  ? 'Column profile'
+                  : viewMode === 'schema'
+                    ? 'JSON Schema inference'
+                    : 'Cleaning recipe'}{' '}
+                is a Pro feature.
+              </strong>
+              <p>
+                Generate a structural per-column profile, infer a JSON Schema for one row, and get a
+                declarative JSON cleaning recipe straight from this table. Unlock with a license key
+                (verified locally, works offline forever).
+              </p>
+            </div>
+          ) : (
+            <pre className="toml-output csv-output" data-testid="csv-output" aria-label={`${viewMode} output`}>
+              {proOutput}
+            </pre>
+          )
         ) : (
           <>
             <dl className="csv-counts" data-testid="csv-counts">
