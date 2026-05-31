@@ -45,6 +45,7 @@
     { "path": "./packages/lens-hex" },
     { "path": "./packages/lens-csp" },
     { "path": "./packages/lens-license" },
-    { "path": "./apps/web-suite" }
+    { "path": "./apps/web-suite" },
+    { "path": "./tools/vendor-keys" }
   ]
 }

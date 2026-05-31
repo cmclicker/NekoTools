@@ -1,3 +1,6 @@
 packages:
   - "apps/*"
   - "packages/*"
+  # Owner-only tooling (NOT shipped/bundled — e.g. license minting). Kept out
+  # of packages/* so the private-key-using code is separated by location.
+  - "tools/*"

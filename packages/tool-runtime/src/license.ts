@@ -30,7 +30,7 @@ export class EntitlementError extends Error {
 
 /**
  * Production signing public key (Ed25519, raw, base64). Replace this with
- * the real key from `pnpm --filter @nekotools/tool-runtime keygen` before
+ * the real key from `pnpm --filter @nekotools/vendor-keys keygen` before
  * shipping a paid build; the matching private key never enters the repo.
  */
 export const EMBEDDED_PUBLIC_KEY = 'REPLACE_WITH_PRODUCTION_ED25519_PUBLIC_KEY_BASE64';
@@ -103,8 +103,8 @@ export async function verifyLicense(
 
 /**
  * Sign a license body with an Ed25519 private key, producing a license key
- * string. Used by the vendor keygen tool and by tests; never shipped to the
- * client (the client only ever verifies).
+ * string. Used by the owner-only `@nekotools/vendor-keys` mint tooling and by
+ * tests; never shipped to the client (the client only ever verifies).
  */
 export async function signLicense(body: LicenseBody, privateKey: CryptoKey): Promise<string> {
   const bodyBytes = UTF8.encode(JSON.stringify(body));

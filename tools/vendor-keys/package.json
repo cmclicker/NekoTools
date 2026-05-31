@@ -1,5 +1,5 @@
 {
-  "name": "@nekotools/tool-runtime",
+  "name": "@nekotools/vendor-keys",
   "version": "0.0.0",
   "private": true,
   "type": "module",
@@ -12,15 +12,18 @@
     "build": "tsc -b",
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
-    "lint": "eslint src"
+    "lint": "eslint src",
+    "keygen": "tsx src/keygen.ts",
+    "mint": "tsx src/mint.ts"
   },
   "dependencies": {
     "@nekotools/contracts": "workspace:*",
-    "@nekotools/schemas": "workspace:*"
+    "@nekotools/tool-runtime": "workspace:*"
   },
   "devDependencies": {
     "typescript": "^6.0.3",
     "vitest": "^1.4.0",
-    "eslint": "^8.57.0"
+    "eslint": "^8.57.0",
+    "tsx": "^4.7.0"
   }
 }
