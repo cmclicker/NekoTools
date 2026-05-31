@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
-import type { Artifact, Workspace } from '@nekotools/contracts';
+import type { Artifact, Entitlement, Workspace } from '@nekotools/contracts';
 import {
+  EntitlementError,
   ToolRegistry,
   jsonWorkspaceSerializer,
   runExporter,
@@ -13,6 +14,17 @@ import { FIXED_CLOCK, buildUnicodeRegistration, describeCodepoint, scanUnicode, 
 import type { UnicodeParsedArtifact } from '../kinds.js';
 
 const clock = FIXED_CLOCK('2026-05-28T00:00:00.000Z');
+
+const PRO: Entitlement = {
+  version: 1,
+  licenseId: 'TEST',
+  licensee: 'Test User',
+  tier: 'pro',
+  features: ['*'],
+  issuedAt: '2026-01-01T00:00:00.000Z',
+  expiresAt: null,
+  signature: 'test',
+};
 
 function registry(): ToolRegistry {
   const r = new ToolRegistry();
@@ -56,19 +68,63 @@ describe('NekoUnicode: manifest', () => {
   });
 });
 
-describe('NekoUnicode: monetization safety', () => {
+describe('NekoUnicode: monetization gating (single-build, entitlement-gated)', () => {
   const registration = buildUnicodeRegistration(clock);
   const proExporterIds = ['unicode.export.names', 'unicode.export.csv'];
-  it('no Pro exporter is registered, and each throws "unknown exporter"', () => {
-    const registered = new Set(registration.exporters.map((e) => e.id));
-    const r = registry();
+
+  it('Pro exporters are declared AND registered as proExporters, not free', () => {
+    const proIds = new Set((registration.proExporters ?? []).map((e) => e.id));
+    const free = new Set(registration.exporters.map((e) => e.id));
     for (const id of proExporterIds) {
-      expect(registered.has(id)).toBe(false);
       expect(unicodeManifest.exporters).toContain(id);
-      expect(() => runExporter(r, 'unicode', id, { artifacts: [], diagnostics: [] })).toThrow(
-        /unknown exporter/,
-      );
+      expect(proIds.has(id)).toBe(true);
+      expect(free.has(id)).toBe(false);
     }
+  });
+
+  it('a free caller (default entitlement) is refused with EntitlementError', () => {
+    const r = registry();
+    const parsed = parse('A😀');
+    for (const id of proExporterIds) {
+      expect(() =>
+        runExporter(r, 'unicode', id, { artifacts: parsed.artifacts, diagnostics: [] }),
+      ).toThrow(EntitlementError);
+    }
+  });
+
+  it('a Pro entitlement unlocks the names + CSV exporters with real output', () => {
+    const r = registry();
+    // 'A' (letter) + TAB (C0 control) + NO-BREAK SPACE (curated) + 中 (fallback).
+    const parsed = parse('A\t 中');
+
+    const names = String(
+      runExporter(r, 'unicode', 'unicode.export.names', {
+        artifacts: parsed.artifacts,
+        diagnostics: [],
+      }, PRO).body,
+    );
+    expect(names).toContain('# NekoUnicode names');
+    expect(names).toContain('| codepoint | char | name |');
+    expect(names).toContain('CHARACTER TABULATION'); // algorithmic C0 control name
+    expect(names).toContain('NO-BREAK SPACE'); // curated map
+    expect(names).toContain('U+4E2D (letter)'); // principled fallback, never a wrong name
+
+    const csv = String(
+      runExporter(r, 'unicode', 'unicode.export.csv', {
+        artifacts: parsed.artifacts,
+        diagnostics: [],
+      }, PRO).body,
+    );
+    expect(csv.split('\r\n')[0]).toBe('index,codepoint,char,name,decimal,category,utf8,utf16,jsEscape,htmlEntity,urlEncoded');
+    expect(csv).toContain('0,U+0041,A,');
+    expect(csv).toContain('U+00A0');
+    expect(csv).toContain('NO-BREAK SPACE');
+  });
+
+  it('a truly unknown exporter id still throws "unknown exporter"', () => {
+    expect(() =>
+      runExporter(registry(), 'unicode', 'unicode.export.nope', { artifacts: [], diagnostics: [] }, PRO),
+    ).toThrow(/unknown exporter/);
   });
 });
 

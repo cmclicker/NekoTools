@@ -7,6 +7,7 @@ import {
   type UnicodeParsedArtifact,
   type UnicodeReport,
 } from './kinds.js';
+import { toCodepointCsv, toNamesMarkdown } from './codegen.js';
 
 const TOOL_ID = 'unicode';
 
@@ -82,3 +83,44 @@ export const freeExporters: readonly Exporter<UnicodeArtifact>[] = [
   normalizedExporter,
   markdownSummaryExporter,
 ];
+
+// --- Pro exporters (registered in the binary, gated by entitlement) --------
+//
+// These back the manifest's declared Pro exporter ids (`export.names` /
+// `lookup.names`, and `export.csv`). Each derives purely from the parsed
+// `unicode.parsed` report's code points — no network, no premium-engine
+// dependency. Names come from a small curated table + algorithmic controls
+// with a principled `U+XXXX (<category>)` fallback (NOT the full UCD); a
+// wrong name is never emitted. Generators live in `codegen.ts`.
+
+/** `unicode.export.names` (Pro) — a `U+XXXX | char | name` markdown table. */
+export const namesExporter: Exporter<UnicodeArtifact> = {
+  version: 1,
+  id: 'unicode.export.names',
+  toolId: TOOL_ID,
+  target: 'markdown',
+  accepts: UNICODE_PARSED_EXPORT_KINDS,
+  producesMimeType: 'text/markdown',
+  producesExtension: 'md',
+  export({ artifacts }) {
+    const cps = pickParsed(artifacts)?.value.codepoints ?? [];
+    return { mimeType: 'text/markdown', extension: 'md', body: toNamesMarkdown(cps) };
+  },
+};
+
+/** `unicode.export.csv` (Pro) — an RFC-4180 per-codepoint CSV grid. */
+export const csvExporter: Exporter<UnicodeArtifact> = {
+  version: 1,
+  id: 'unicode.export.csv',
+  toolId: TOOL_ID,
+  target: 'csv',
+  accepts: UNICODE_PARSED_EXPORT_KINDS,
+  producesMimeType: 'text/csv',
+  producesExtension: 'csv',
+  export({ artifacts }) {
+    const cps = pickParsed(artifacts)?.value.codepoints ?? [];
+    return { mimeType: 'text/csv', extension: 'csv', body: toCodepointCsv(cps) };
+  },
+};
+
+export const proExporters: readonly Exporter<UnicodeArtifact>[] = [namesExporter, csvExporter];

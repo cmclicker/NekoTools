@@ -14,12 +14,15 @@ import { TIME_KIND_INSTANT } from './kinds.js';
  *     implementation-backed in `apps/web-suite` in the same commit, per
  *     the open-core rule that a free entitlement must ship with its
  *     implementation.
- *   - `entitlements.pro` is honest intent advertising for a future
- *     `@nekotools-pro/*` package; nothing Pro is bundled or registered in
- *     this build. The monetization-safety tests enforce that.
- *   - `exporters` may list Pro ids that are declared but NOT registered in
- *     the free build (the registry validates only the forward direction:
- *     every registered impl must be declared).
+ *   - `entitlements.pro` lists the gated capabilities. The two declared
+ *     Pro exporters (`batch.convert` -> `time.export.batch.csv`,
+ *     `timezone.board` -> `time.export.timezone.board`) ARE bundled in this
+ *     build and registered as `proExporters`; `runExporter` enforces the
+ *     entitlement at call time (single-build-gated model). The remaining Pro
+ *     entitlements stay advertising-only -- they depend on future engines.
+ *   - `exporters` lists every exporter id, free and Pro alike (the registry
+ *     validates only the forward direction: every registered impl must be
+ *     declared).
  *
  * NekoTime is dependency-free: it uses only the built-in `Date` and `Intl`
  * APIs, so there is no date/time library in `package.json`.

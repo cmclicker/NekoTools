@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
-import type { Artifact, Workspace } from '@nekotools/contracts';
+import type { Artifact, Entitlement, Workspace } from '@nekotools/contracts';
 import {
+  EntitlementError,
   ToolRegistry,
   jsonWorkspaceSerializer,
   runExporter,
@@ -14,6 +15,17 @@ import type { CronParsedArtifact } from '../kinds.js';
 
 // A Thursday, 00:00:00 UTC — fixed so next-run times are deterministic.
 const clock = FIXED_CLOCK('2026-05-28T00:00:00.000Z');
+
+const PRO: Entitlement = {
+  version: 1,
+  licenseId: 'TEST',
+  licensee: 'Test User',
+  tier: 'pro',
+  features: ['*'],
+  issuedAt: '2026-01-01T00:00:00.000Z',
+  expiresAt: null,
+  signature: 'test',
+};
 
 function registry(): ToolRegistry {
   const r = new ToolRegistry();
@@ -64,20 +76,62 @@ describe('NekoCron: manifest', () => {
   });
 });
 
-describe('NekoCron: monetization safety', () => {
+describe('NekoCron: monetization gating (single-build, entitlement-gated)', () => {
   const registration = buildCronRegistration(clock);
   const proExporterIds = ['cron.export.ical', 'cron.export.timezone.report'];
 
-  it('no Pro exporter is registered, and each throws "unknown exporter"', () => {
-    const registered = new Set(registration.exporters.map((e) => e.id));
-    const r = registry();
+  it('Pro exporters are declared AND registered as proExporters, not free', () => {
+    const proIds = new Set((registration.proExporters ?? []).map((e) => e.id));
+    const free = new Set(registration.exporters.map((e) => e.id));
     for (const id of proExporterIds) {
-      expect(registered.has(id)).toBe(false);
       expect(cronManifest.exporters).toContain(id);
-      expect(() => runExporter(r, 'cron', id, { artifacts: [], diagnostics: [] })).toThrow(
-        /unknown exporter/,
-      );
+      expect(proIds.has(id)).toBe(true);
+      expect(free.has(id)).toBe(false);
     }
+  });
+
+  it('a free caller (default entitlement) is refused with EntitlementError', () => {
+    const r = registry();
+    const parsed = parse('*/15 * * * *');
+    for (const id of proExporterIds) {
+      expect(() =>
+        runExporter(r, 'cron', id, { artifacts: parsed.artifacts, diagnostics: [] }),
+      ).toThrow(EntitlementError);
+    }
+  });
+
+  it('a Pro entitlement unlocks the iCal + timezone-report exporters', () => {
+    const r = registry();
+    const parsed = parse('*/15 * * * *');
+    const ctx = { artifacts: parsed.artifacts, diagnostics: [] };
+
+    // iCal: a valid VCALENDAR with one VEVENT per already-computed next run.
+    // The first computed run is 2026-05-28T00:15:00.000Z (see next-run tests),
+    // which becomes the iCal UTC date-time 20260528T001500Z.
+    const ical = String(runExporter(r, 'cron', 'cron.export.ical', ctx, PRO).body);
+    expect(ical).toContain('BEGIN:VCALENDAR');
+    expect(ical).toContain('VERSION:2.0');
+    expect(ical).toContain('BEGIN:VEVENT');
+    expect(ical).toContain('DTSTART:20260528T001500Z');
+    // Honest about scope: a finite snapshot of computed runs, never an actual
+    // RRULE recurrence property. (The X-NEKOCRON-NOTE prose mentions the word
+    // "RRULE" to be explicit, so assert no real `RRULE:`/`RRULE;` property line
+    // rather than the bare substring.)
+    expect(ical).not.toMatch(/^RRULE[:;]/m);
+
+    // Timezone report: renders the same UTC instants across fixed zones. Assert
+    // the structural zone labels (our literal column headers) + the verbatim
+    // UTC instant — never localized date strings, which vary by ICU version.
+    const report = String(runExporter(r, 'cron', 'cron.export.timezone.report', ctx, PRO).body);
+    expect(report).toContain('UTC');
+    expect(report).toContain('Asia/Tokyo');
+    expect(report).toContain('2026-05-28T00:15:00.000Z');
+  });
+
+  it('a truly unknown exporter id still throws "unknown exporter"', () => {
+    expect(() =>
+      runExporter(registry(), 'cron', 'cron.export.nope', { artifacts: [], diagnostics: [] }, PRO),
+    ).toThrow(/unknown exporter/);
   });
 });
 
