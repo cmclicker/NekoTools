@@ -1,7 +1,7 @@
 import type { ToolManifest } from '@nekotools/contracts';
 import { DEFAULT_OFFLINE_POLICY } from '@nekotools/contracts';
 
-import { REGEX_KIND_MATCHSET } from './kinds.js';
+import { REGEX_KIND_MATCHSET, REGEX_KIND_SUITE } from './kinds.js';
 
 /**
  * The NekoRegex manifest (Free vertical slice).
@@ -11,11 +11,12 @@ import { REGEX_KIND_MATCHSET } from './kinds.js';
  *     implementation. Because this slice ships the engine AND the UI in one
  *     PR, the UI affordances (test / match.* / export.*) are included here
  *     honestly — they are all live in this build.
- *   - `entitlements.pro` is advertising for a future `@nekotools-pro/*`
- *     package; nothing Pro is bundled, gated, or verified here.
- *   - `exporters` lists Pro exporter ids that are declared but NOT
- *     registered in the free build (monetization-safety tests enforce
- *     that they stay unregistered).
+ *   - `entitlements.pro` lists the Pro feature flags. In the single-build
+ *     model the Pro exporters ship in the binary but `runExporter` gates
+ *     them behind a valid entitlement (a free caller gets EntitlementError).
+ *   - `exporters` lists every exporter id — free plus the four gated Pro
+ *     ids (explain, redaction.recipe, suite, snapshot). Each registered
+ *     exporter MUST be declared here; the runtime fails closed otherwise.
  */
 export const regexManifest: ToolManifest = {
   version: 1,
@@ -24,13 +25,13 @@ export const regexManifest: ToolManifest = {
   toolVersion: 1,
   summary:
     'Test regular expressions locally — matches, capture groups, named groups, and safety diagnostics. Native RegExp only; no eval, no network, no LLM.',
-  artifactKinds: [REGEX_KIND_MATCHSET],
-  parsers: ['regex.match'],
+  artifactKinds: [REGEX_KIND_MATCHSET, REGEX_KIND_SUITE],
+  parsers: ['regex.match', 'regex.suite'],
   exporters: [
     'regex.export.json',
     'regex.export.markdown.summary',
     'regex.export.pattern',
-    // Pro — declared as advertising, NOT registered in the free build.
+    // Pro — registered in the binary, gated by entitlement (single-build).
     'regex.export.explain',
     'regex.export.redaction.recipe',
     'regex.export.suite',

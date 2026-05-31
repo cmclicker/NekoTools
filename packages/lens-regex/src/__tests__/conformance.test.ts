@@ -12,10 +12,16 @@ import { validate } from '@nekotools/schemas';
 import {
   FIXED_CLOCK,
   REGEX_KIND_MATCHSET,
+  REGEX_KIND_SUITE,
   buildRegexRegistration,
   regexManifest,
 } from '../index.js';
-import type { RegexMatchSet, RegexMatchSetArtifact } from '../kinds.js';
+import type {
+  RegexMatchSet,
+  RegexMatchSetArtifact,
+  RegexSuite,
+  RegexSuiteArtifact,
+} from '../kinds.js';
 
 const clock = FIXED_CLOCK('2026-05-27T00:00:00.000Z');
 
@@ -51,6 +57,27 @@ function matchSetOf(pattern: string, flags: string, sample: string): RegexMatchS
   return artifact.value;
 }
 
+/** Deterministic multi-case suite fixture shared by the suite tests. */
+const SUITE_CASES = [
+  { name: 'digits', pattern: '\\d+', flags: 'g', sample: 'a1b22c', expectedMatchCount: 2 },
+  { name: 'word', pattern: '\\w+', flags: '', sample: 'hi there' },
+];
+
+function runSuite(cases: readonly unknown[]) {
+  return runParser(registry(), 'regex', 'regex.suite', {
+    raw: '',
+    source: { kind: 'paste', bytes: 0 },
+    hints: { cases },
+  });
+}
+
+function suiteOf(cases: readonly unknown[]): RegexSuite {
+  const artifact = runSuite(cases).artifacts.find(
+    (a) => a.kind === REGEX_KIND_SUITE,
+  ) as RegexSuiteArtifact;
+  return artifact.value;
+}
+
 describe('NekoRegex: manifest', () => {
   it('passes schema + cross-field validation', () => {
     const result = validateManifest(regexManifest);
@@ -81,11 +108,15 @@ describe('NekoRegex: manifest', () => {
 
 describe('NekoRegex: monetization gating (single-build, entitlement-gated)', () => {
   const registration = buildRegexRegistration(clock);
-  // Two declared Pro ids are built + gated in this PR; two remain
-  // advertising-only (saved suites / regression snapshots need the
-  // not-yet-built saved-workspace engine — canSaveWorkspace is false).
-  const builtProIds = ['regex.export.explain', 'regex.export.redaction.recipe'];
-  const advertisingOnlyIds = ['regex.export.suite', 'regex.export.snapshot'];
+  // All four declared Pro ids are built + gated in this PR: explain +
+  // redaction.recipe render a single-run matchset; suite + snapshot render a
+  // pasted multi-case regex.suite (nothing persisted — canSaveWorkspace false).
+  const builtProIds = [
+    'regex.export.explain',
+    'regex.export.redaction.recipe',
+    'regex.export.suite',
+    'regex.export.snapshot',
+  ];
 
   it('built Pro exporters are declared AND registered as proExporters, not free', () => {
     const free = new Set(registration.exporters.map((e) => e.id));
@@ -97,28 +128,32 @@ describe('NekoRegex: monetization gating (single-build, entitlement-gated)', () 
     }
   });
 
-  it('advertising-only Pro ids are declared but registered nowhere (still "unknown exporter")', () => {
-    const free = new Set(registration.exporters.map((e) => e.id));
-    const pro = new Set((registration.proExporters ?? []).map((e) => e.id));
-    const r = registry();
-    for (const id of advertisingOnlyIds) {
-      expect(regexManifest.exporters).toContain(id);
-      expect(free.has(id)).toBe(false);
-      expect(pro.has(id)).toBe(false);
-      expect(() => runExporter(r, 'regex', id, { artifacts: [], diagnostics: [] }, PRO)).toThrow(
-        /unknown exporter/,
-      );
-    }
+  it('a truly unknown exporter id still throws "unknown exporter"', () => {
+    expect(() =>
+      runExporter(registry(), 'regex', 'regex.export.nope', { artifacts: [], diagnostics: [] }, PRO),
+    ).toThrow(/unknown exporter/);
   });
 
   it('no graph projector is registered in the free build', () => {
     expect(registration.graphProjectors ?? []).toHaveLength(0);
   });
 
-  it('a free caller (default entitlement) is refused the built Pro exporters with EntitlementError', () => {
+  it('a free caller (default entitlement) is refused the matchset-backed Pro exporters with EntitlementError', () => {
     const r = registry();
     const parsed = run('(?<year>\\d{4})-\\d{2}', 'g', '2026-05 and 1999-12');
-    for (const id of builtProIds) {
+    for (const id of ['regex.export.explain', 'regex.export.redaction.recipe']) {
+      expect(() => runExporter(r, 'regex', id, parsed)).toThrow(EntitlementError);
+    }
+  });
+
+  it('a free caller is refused the suite-backed Pro exporters with EntitlementError', () => {
+    const r = registry();
+    const parsed = runParser(r, 'regex', 'regex.suite', {
+      raw: '',
+      source: { kind: 'paste', bytes: 0 },
+      hints: { cases: SUITE_CASES },
+    });
+    for (const id of ['regex.export.suite', 'regex.export.snapshot']) {
       expect(() => runExporter(r, 'regex', id, parsed)).toThrow(EntitlementError);
     }
   });
@@ -139,6 +174,44 @@ describe('NekoRegex: monetization gating (single-build, entitlement-gated)', () 
     expect(recipe.match?.flags).toContain('g'); // forced global for a redaction pass
     expect(recipe.replacement).toBe('[REDACTED]');
     expect(recipe.preserveGroups).toContain('year');
+  });
+
+  it('a Pro entitlement unlocks the suite report exporter', () => {
+    const r = registry();
+    const parsed = runParser(r, 'regex', 'regex.suite', {
+      raw: '',
+      source: { kind: 'paste', bytes: 0 },
+      hints: { cases: SUITE_CASES },
+    });
+
+    const report = String(runExporter(r, 'regex', 'regex.export.suite', parsed, PRO).body);
+    expect(report).toContain('# NekoRegex test suite');
+    expect(report).toContain('1 passed'); // the asserted "digits" case (2 === 2)
+    expect(report).toContain('\\d+'); // a case's pattern appears
+    expect(report).toContain('passed'); // verdict token for the asserted case
+  });
+
+  it('a Pro entitlement unlocks the regression snapshot exporter', () => {
+    const r = registry();
+    const parsed = runParser(r, 'regex', 'regex.suite', {
+      raw: '',
+      source: { kind: 'paste', bytes: 0 },
+      hints: { cases: SUITE_CASES },
+    });
+
+    const snapshot = JSON.parse(
+      String(runExporter(r, 'regex', 'regex.export.snapshot', parsed, PRO).body),
+    ) as {
+      kind?: string;
+      caseCount?: number;
+      cases?: Array<{ name?: string; pattern?: string; matchCount?: number; matched?: string[] }>;
+    };
+    expect(snapshot.kind).toBe('suite-snapshot');
+    expect(snapshot.caseCount).toBe(2);
+    const digits = snapshot.cases?.find((c) => c.name === 'digits');
+    expect(digits?.pattern).toBe('\\d+');
+    expect(digits?.matchCount).toBe(2); // the baseline match count
+    expect(digits?.matched).toEqual(['1', '22']); // matched substrings baseline
   });
 
   it('free entitlements match exactly the implemented Free-slice set', () => {
@@ -256,6 +329,67 @@ describe('NekoRegex: regex.match parser', () => {
 
   it('produces a regex.matchset artifact that validates against the artifact schema', () => {
     const artifact = run('a', 'g', 'banana').artifacts[0]!;
+    const validation = validate('artifact', artifact);
+    expect(validation.ok, validation.errors.join('; ')).toBe(true);
+  });
+});
+
+describe('NekoRegex: regex.suite parser', () => {
+  it('runs every pasted case and counts cases + pass/fail verdicts', () => {
+    const suite = suiteOf(SUITE_CASES);
+    expect(suite.caseCount).toBe(2);
+    // "digits" asserts 2 and matches 2 → passed; "word" has no expectation.
+    expect(suite.passedCount).toBe(1);
+    expect(suite.failedCount).toBe(0);
+
+    const [digits, word] = suite.cases;
+    expect(digits!.name).toBe('digits');
+    expect(digits!.matchCount).toBe(2);
+    expect(digits!.passed).toBe(true);
+    // No expectedMatchCount → informational only → passed is null. Without the
+    // `g` flag, `\w+` returns a single (greedy) match: "hi".
+    expect(word!.expectedMatchCount).toBeUndefined();
+    expect(word!.matchCount).toBe(1);
+    expect(word!.passed).toBeNull();
+  });
+
+  it('marks an asserted case that misses its expected count as failed (+ regex.suite_failed)', () => {
+    const result = runSuite([{ name: 'too-many', pattern: '\\d', flags: 'g', sample: '123', expectedMatchCount: 1 }]);
+    const suite = (result.artifacts[0] as RegexSuiteArtifact).value;
+    expect(suite.failedCount).toBe(1);
+    expect(suite.cases[0]!.passed).toBe(false);
+    expect(result.diagnostics.find((d) => d.code === 'regex.suite_failed')?.severity).toBe('warning');
+  });
+
+  it('captures an invalid case without throwing (valid:false, error set)', () => {
+    const suite = suiteOf([{ name: 'bad', pattern: '(', sample: 'abc' }]);
+    expect(suite.cases[0]!.valid).toBe(false);
+    expect(suite.cases[0]!.error).not.toBeNull();
+    expect(suite.cases[0]!.matchCount).toBe(0);
+  });
+
+  it('emits regex.suite_invalid (error) when the cases hint is missing or not an array', () => {
+    const call = () =>
+      runParser(registry(), 'regex', 'regex.suite', {
+        raw: '',
+        source: { kind: 'paste', bytes: 0 },
+      });
+    expect(call).not.toThrow();
+    const result = call();
+    expect(result.artifacts).toHaveLength(1);
+    const suite = (result.artifacts[0] as RegexSuiteArtifact).value;
+    expect(suite.caseCount).toBe(0);
+    expect(result.diagnostics.find((d) => d.code === 'regex.suite_invalid')?.severity).toBe('error');
+  });
+
+  it('emits regex.suite_empty (info) for an empty cases array', () => {
+    const result = runSuite([]);
+    expect(result.diagnostics.find((d) => d.code === 'regex.suite_empty')?.severity).toBe('info');
+    expect((result.artifacts[0] as RegexSuiteArtifact).value.caseCount).toBe(0);
+  });
+
+  it('produces a regex.suite artifact that validates against the artifact schema', () => {
+    const artifact = runSuite(SUITE_CASES).artifacts[0]!;
     const validation = validate('artifact', artifact);
     expect(validation.ok, validation.errors.join('; ')).toBe(true);
   });

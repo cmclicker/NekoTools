@@ -13,12 +13,13 @@ import { DIFF_KIND_RESULT } from './kinds.js';
  *     count summary, the unified view, the three exports, the copy
  *     affordance, and workspace save — every one of which is implemented
  *     here. The monetization-safety tests assert this set exactly.
- *   - `entitlements.pro` is advertising for a future `@nekotools-pro/*`
- *     package; nothing Pro is bundled in this local build.
- *   - `exporters` may list Pro ids that are declared but NOT registered in
- *     the free build. The registry validates only the forward direction
- *     (every registered impl must be declared), so declaring-without-
- *     registering is the advertising surface.
+ *   - `entitlements.pro` lists Pro features. The two Pro exporters
+ *     (`diff.export.semantic`, `diff.export.bundle.signed`) are registered
+ *     as gated `proExporters` and unlocked by a valid entitlement (single-
+ *     build runtime-gated model). The remaining pro entitlements
+ *     (diff.ignore-order, recipe.saved, workspace.snapshots, batch.diff,
+ *     policy.drift) stay advertising-only — they need engines/state not in
+ *     this build.
  */
 export const diffManifest: ToolManifest = {
   version: 1,
@@ -33,7 +34,7 @@ export const diffManifest: ToolManifest = {
     'diff.export.unified',
     'diff.export.json',
     'diff.export.markdown.summary',
-    // Pro — declared as advertising, NOT registered in the free build.
+    // Pro — registered as gated proExporters, unlocked by a valid entitlement.
     'diff.export.semantic',
     'diff.export.bundle.signed',
   ],
@@ -71,7 +72,7 @@ export const diffManifest: ToolManifest = {
     'three-way / merge-conflict resolution',
     'binary or image diffing',
     'fetching either side from a URL, git ref, or file path',
-    'syntax-aware semantic diff (declared Pro, not bundled in this build)',
+    'full AST / language-grammar semantic diff (the Pro semantic export is token- and JSON-key-level, not a parser per language)',
     'live file watching or durable storage',
   ],
 };
