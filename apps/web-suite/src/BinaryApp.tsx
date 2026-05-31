@@ -2,16 +2,26 @@ import { useCallback, useMemo, useState, type ChangeEvent } from 'react';
 
 import { Diagnostics } from './Diagnostics.js';
 import { copyToClipboard, type ClipboardDeps } from './clipboard.js';
+import { useLicenseContext } from './license-store.js';
 import { runBinary, type BinaryInputMode, type BinarySummary } from './binary-parse.js';
+import type { Entitlement } from '@nekotools/contracts';
+
+/** Free: the decoded-artifact summary view (the original primary output, the
+ * default). Pro: a byte map + a batch report, both projected from the parsed
+ * artifacts the engine already produced — no re-parse. */
+export type BinaryViewMode = 'summary' | 'byte-map' | 'batch-report';
 
 export interface NekoBinaryUiState {
   readonly mode: BinaryInputMode;
+  readonly viewMode: BinaryViewMode;
 }
 
 export interface BinaryAppProps {
   readonly initialInput?: string;
   readonly initialUiState?: Partial<NekoBinaryUiState>;
   readonly clipboardDeps?: ClipboardDeps;
+  /** Injected entitlement; defaults to the suite license context. */
+  readonly entitlement?: Entitlement;
 }
 
 type CopyTarget = 'json' | 'markdown' | 'plaintext';
@@ -32,16 +42,34 @@ const MODES: ReadonlyArray<{ readonly id: BinaryInputMode; readonly label: strin
   { id: 'utf8', label: 'UTF-8' },
 ];
 
+const PRO_VIEWS = new Set<BinaryViewMode>(['byte-map', 'batch-report']);
+const VIEW_MODES: readonly BinaryViewMode[] = ['summary', 'byte-map', 'batch-report'];
+const VIEW_LABELS: Record<BinaryViewMode, string> = {
+  summary: 'Summary',
+  'byte-map': 'Byte map ⭐',
+  'batch-report': 'Batch report ⭐',
+};
+
 export function BinaryApp({
   initialInput,
   initialUiState,
   clipboardDeps,
+  entitlement,
 }: BinaryAppProps = {}): JSX.Element {
   const [input, setInput] = useState<string>(initialInput ?? SAMPLE_INPUT);
   const [mode, setMode] = useState<BinaryInputMode>(initialUiState?.mode ?? 'decimal');
+  const [viewMode, setViewMode] = useState<BinaryViewMode>(
+    initialUiState?.viewMode ?? 'summary',
+  );
   const [copyStatus, setCopyStatus] = useState<CopyStatus | null>(null);
 
-  const run = useMemo(() => runBinary(input, mode), [input, mode]);
+  const license = useLicenseContext();
+  const effectiveEntitlement = entitlement ?? license.entitlement;
+
+  const run = useMemo(
+    () => runBinary(input, mode, effectiveEntitlement),
+    [input, mode, effectiveEntitlement],
+  );
 
   const handleCopy = useCallback(
     async (target: CopyTarget) => {
@@ -56,6 +84,10 @@ export function BinaryApp({
     },
     [clipboardDeps, run.jsonExport, run.markdownExport, run.plaintextExport],
   );
+
+  const proUnlocked = run.proUnlocked;
+  const isProView = PRO_VIEWS.has(viewMode);
+  const proOutput = viewMode === 'byte-map' ? run.byteMap : run.batchReport;
 
   return (
     <section className="tool tool--binary" aria-label="NekoBinary workbench">
@@ -92,6 +124,23 @@ export function BinaryApp({
                   data-testid={`binary-mode-${item.id}`}
                 />
                 {item.label}
+              </label>
+            ))}
+          </fieldset>
+
+          <fieldset className="viewmode" aria-label="Binary view mode">
+            <legend className="visually-hidden">Binary view mode</legend>
+            {VIEW_MODES.map((m) => (
+              <label key={m} className={viewMode === m ? 'viewmode--active' : ''}>
+                <input
+                  type="radio"
+                  name="binaryViewMode"
+                  value={m}
+                  checked={viewMode === m}
+                  onChange={() => setViewMode(m)}
+                  data-testid={`binary-view-${m}`}
+                />
+                {VIEW_LABELS[m]}
               </label>
             ))}
           </fieldset>
@@ -138,7 +187,28 @@ export function BinaryApp({
           ) : null}
         </div>
 
-        {run.summary === null ? (
+        {isProView ? (
+          !proUnlocked ? (
+            <div className="pro-lock" role="status" data-testid="binary-locked">
+              <strong>
+                {viewMode === 'byte-map' ? 'Byte map' : 'Batch report'} is a Pro feature.
+              </strong>
+              <p>
+                Export a byte map (offset / hex / decimal / binary / ascii per byte), or a batch
+                report over every parsed artifact (representation, byte length, and the value in
+                each base). Unlock with a license key (verified locally, works offline forever).
+              </p>
+            </div>
+          ) : (
+            <pre
+              className="toml-output binary-pro-output"
+              data-testid="binary-pro-output"
+              aria-label={`${viewMode} output`}
+            >
+              {proOutput}
+            </pre>
+          )
+        ) : run.summary === null ? (
           <div role="status" className="empty-state" data-testid="binary-no-output">
             No artifact produced. Check diagnostics below.
           </div>

@@ -3,6 +3,17 @@ import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 
 import { CodecApp } from '../CodecApp.js';
 
+const PRO = {
+  version: 1 as const,
+  licenseId: 'X',
+  licensee: 'Buyer',
+  tier: 'pro' as const,
+  features: ['*'],
+  issuedAt: '2026-01-01T00:00:00.000Z',
+  expiresAt: null,
+  signature: 's',
+};
+
 describe('CodecApp', () => {
   it('encodes Base64 by default and renders the output', () => {
     render(<CodecApp initialInput="hello" />);
@@ -75,5 +86,43 @@ describe('CodecApp', () => {
       expect(writes).toHaveLength(1);
     });
     expect(writes[0]).toBe('aGVsbG8=');
+  });
+
+  it('locks the batch-report + recipe-bundle Pro views when free', () => {
+    render(<CodecApp initialInput="hello" initialUiState={{ viewMode: 'batch-report' }} />);
+    expect(screen.getByTestId('codec-locked')).toBeInTheDocument();
+    expect(screen.queryByTestId('codec-output')).not.toBeInTheDocument();
+    expect(screen.queryByText(/# NekoCodec batch report/)).not.toBeInTheDocument();
+    // Switching to the other Pro view stays locked.
+    fireEvent.click(screen.getByTestId('codec-view-recipe-bundle'));
+    expect(screen.getByTestId('codec-locked')).toBeInTheDocument();
+  });
+
+  it('unlocks the batch report via an injected Pro entitlement', () => {
+    render(
+      <CodecApp
+        initialInput="hello"
+        initialUiState={{ viewMode: 'batch-report' }}
+        entitlement={PRO}
+      />,
+    );
+    const out = screen.getByTestId('codec-output').textContent ?? '';
+    expect(out).toContain('# NekoCodec batch report');
+    expect(out).toContain('| 1 | encode | base64 |');
+    expect(screen.queryByTestId('codec-locked')).not.toBeInTheDocument();
+  });
+
+  it('unlocks the recipe bundle via an injected Pro entitlement', () => {
+    render(
+      <CodecApp
+        initialInput="hello"
+        initialUiState={{ viewMode: 'recipe-bundle' }}
+        entitlement={PRO}
+      />,
+    );
+    const out = screen.getByTestId('codec-output').textContent ?? '';
+    expect(out).toContain('"tool": "codec"');
+    expect(out).toContain('"operation": "encode"');
+    expect(screen.queryByTestId('codec-locked')).not.toBeInTheDocument();
   });
 });

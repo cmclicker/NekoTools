@@ -1,8 +1,10 @@
 import { useCallback, useMemo, useState, type ChangeEvent } from 'react';
 import type { CodecName, CodecOperation } from '@nekotools/lens-codec';
+import type { Entitlement } from '@nekotools/contracts';
 
 import { Diagnostics } from './Diagnostics.js';
 import { copyToClipboard, type ClipboardDeps } from './clipboard.js';
+import { useLicenseContext } from './license-store.js';
 import { runCodec } from './codec-parse.js';
 
 /**
@@ -10,19 +12,26 @@ import { runCodec } from './codec-parse.js';
  * the shared web-suite shell as a tool tab. Free surface: pick an operation
  * (encode / decode) and a codec (Base64 / Base64URL / URL / Hex), see the
  * transformed output and any validation diagnostics, and copy the output or
- * a JSON / Markdown summary. The shared `ProSurface` (Free/Pro) renders
- * automatically via the tool registry; this component is the panel only.
+ * a JSON / Markdown summary. Pro (gated by the suite license): a Markdown
+ * batch report over the parsed transform(s) and a declarative, reusable JSON
+ * recipe bundle. The shared `ProSurface` (Free/Pro) renders automatically via
+ * the tool registry; this component is the panel only.
  */
+
+export type CodecViewMode = 'output' | 'batch-report' | 'recipe-bundle';
 
 export interface NekoCodecUiState {
   readonly operation: CodecOperation;
   readonly codec: CodecName;
+  readonly viewMode: CodecViewMode;
 }
 
 export interface CodecAppProps {
   readonly initialInput?: string;
   readonly initialUiState?: Partial<NekoCodecUiState>;
   readonly clipboardDeps?: ClipboardDeps;
+  /** Injected entitlement; defaults to the suite license context. */
+  readonly entitlement?: Entitlement;
 }
 
 interface CopyStatus {
@@ -45,18 +54,36 @@ const CODECS: ReadonlyArray<{ readonly id: CodecName; readonly label: string }> 
   { id: 'hex', label: 'Hex' },
 ];
 
+const PRO_VIEWS = new Set<CodecViewMode>(['batch-report', 'recipe-bundle']);
+const VIEW_MODES: readonly CodecViewMode[] = ['output', 'batch-report', 'recipe-bundle'];
+const VIEW_LABELS: Record<CodecViewMode, string> = {
+  output: 'Output',
+  'batch-report': 'Batch report ⭐',
+  'recipe-bundle': 'Recipe bundle ⭐',
+};
+
 export function CodecApp({
   initialInput,
   initialUiState,
   clipboardDeps,
+  entitlement,
 }: CodecAppProps = {}): JSX.Element {
   const [input, setInput] = useState<string>(initialInput ?? SAMPLE_INPUT);
   const [operation, setOperation] = useState<CodecOperation>(initialUiState?.operation ?? 'encode');
   const [codec, setCodec] = useState<CodecName>(initialUiState?.codec ?? 'base64');
+  const [viewMode, setViewMode] = useState<CodecViewMode>(initialUiState?.viewMode ?? 'output');
   const [copyStatus, setCopyStatus] = useState<CopyStatus | null>(null);
 
-  const run = useMemo(() => runCodec(input, operation, codec), [input, operation, codec]);
+  const license = useLicenseContext();
+  const effectiveEntitlement = entitlement ?? license.entitlement;
+  const run = useMemo(
+    () => runCodec(input, operation, codec, effectiveEntitlement),
+    [input, operation, codec, effectiveEntitlement],
+  );
   const hasOutput = run.output !== null;
+  const proUnlocked = run.proUnlocked;
+  const isProView = PRO_VIEWS.has(viewMode);
+  const proOutput = viewMode === 'batch-report' ? run.batchReport : run.recipeBundle;
 
   const handleCopy = useCallback(
     async (text: string | null, label: string) => {
@@ -126,6 +153,23 @@ export function CodecApp({
               </label>
             ))}
           </fieldset>
+
+          <fieldset className="viewmode" aria-label="Codec view mode">
+            <legend className="visually-hidden">Codec view mode</legend>
+            {VIEW_MODES.map((mode) => (
+              <label key={mode} className={viewMode === mode ? 'viewmode--active' : ''}>
+                <input
+                  type="radio"
+                  name="codecViewMode"
+                  value={mode}
+                  checked={viewMode === mode}
+                  onChange={() => setViewMode(mode)}
+                  data-testid={`codec-view-${mode}`}
+                />
+                {VIEW_LABELS[mode]}
+              </label>
+            ))}
+          </fieldset>
         </div>
 
         <div className="copy" role="group" aria-label="Copy affordances">
@@ -171,7 +215,28 @@ export function CodecApp({
           </p>
         ) : null}
 
-        {hasOutput ? (
+        {isProView ? (
+          !proUnlocked ? (
+            <div className="pro-lock" role="status" data-testid="codec-locked">
+              <strong>
+                {viewMode === 'batch-report' ? 'Batch report' : 'Recipe bundle'} is a Pro feature.
+              </strong>
+              <p>
+                Generate a Markdown batch report over the parsed transform(s), or export a
+                declarative, reusable JSON recipe bundle capturing each operation + codec. Unlock
+                with a license key (verified locally, works offline forever).
+              </p>
+            </div>
+          ) : (
+            <pre
+              className="codec-output"
+              data-testid="codec-output"
+              aria-label={`${viewMode} output`}
+            >
+              {proOutput}
+            </pre>
+          )
+        ) : hasOutput ? (
           <pre
             className="codec-output"
             data-testid="codec-output"

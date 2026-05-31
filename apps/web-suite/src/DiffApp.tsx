@@ -1,24 +1,31 @@
 import { useCallback, useMemo, useState, type ChangeEvent } from 'react';
 import type { DiffMode } from '@nekotools/lens-diff';
+import type { Entitlement } from '@nekotools/contracts';
 
 import { Diagnostics } from './Diagnostics.js';
 import { computeDiff } from './diff-parse.js';
 import { copyToClipboard, type ClipboardDeps } from './clipboard.js';
+import { useLicenseContext } from './license-store.js';
 
 /**
  * NekoDiff sub-app — the NekoDiff vertical-slice UI. Wires
  * `@nekotools/lens-diff` into the shared web-suite shell as a tool tab:
  * two input panes (Left / Right), a compare-mode selector (Text / JSON /
- * YAML), a changed-line summary, a unified hunk view, copy of the unified
- * diff, and engine diagnostics (empty side, parse failure, large input,
- * binary-looking input). The shared `ProSurface` (Free/Pro) renders
- * automatically via the tool registry; this component is the panel only.
+ * YAML), a view selector (Unified / JSON summary / Markdown, plus the Pro
+ * Semantic and Signed-bundle views), a changed-line summary, a unified hunk
+ * view, copy of the unified diff, and engine diagnostics (empty side, parse
+ * failure, large input, binary-looking input). Pro (gated by the suite
+ * license): a token/key-level semantic diff and a canonical signable bundle.
+ * The UI never signs — the bundle view renders the unsigned signable JSON.
  */
 
 export type { DiffMode } from '@nekotools/lens-diff';
 
+export type DiffViewMode = 'unified' | 'json' | 'markdown' | 'semantic' | 'signed-bundle';
+
 export interface NekoDiffUiState {
   readonly mode: DiffMode;
+  readonly viewMode: DiffViewMode;
 }
 
 export interface DiffAppProps {
@@ -26,6 +33,8 @@ export interface DiffAppProps {
   readonly initialRight?: string;
   readonly initialUiState?: Partial<NekoDiffUiState>;
   readonly clipboardDeps?: ClipboardDeps;
+  /** Injected entitlement; defaults to the suite license context. */
+  readonly entitlement?: Entitlement;
 }
 
 interface CopyStatus {
@@ -38,6 +47,22 @@ const MODES: readonly { readonly id: DiffMode; readonly label: string }[] = [
   { id: 'json', label: 'JSON' },
   { id: 'yaml', label: 'YAML' },
 ];
+
+const PRO_VIEWS = new Set<DiffViewMode>(['semantic', 'signed-bundle']);
+const VIEW_MODES: readonly DiffViewMode[] = [
+  'unified',
+  'json',
+  'markdown',
+  'semantic',
+  'signed-bundle',
+];
+const VIEW_LABELS: Record<DiffViewMode, string> = {
+  unified: 'Unified',
+  json: 'JSON summary',
+  markdown: 'Markdown',
+  semantic: 'Semantic ⭐',
+  'signed-bundle': 'Signed bundle ⭐',
+};
 
 const SAMPLE_LEFT = `name: nekotools
 version: 1
@@ -57,14 +82,24 @@ export function DiffApp({
   initialRight,
   initialUiState,
   clipboardDeps,
+  entitlement,
 }: DiffAppProps = {}): JSX.Element {
   const [left, setLeft] = useState<string>(initialLeft ?? SAMPLE_LEFT);
   const [right, setRight] = useState<string>(initialRight ?? SAMPLE_RIGHT);
   const [mode, setMode] = useState<DiffMode>(initialUiState?.mode ?? 'text');
+  const [viewMode, setViewMode] = useState<DiffViewMode>(initialUiState?.viewMode ?? 'unified');
   const [copyStatus, setCopyStatus] = useState<CopyStatus | null>(null);
 
-  const out = useMemo(() => computeDiff(left, right, mode), [left, right, mode]);
+  const license = useLicenseContext();
+  const effectiveEntitlement = entitlement ?? license.entitlement;
+  const out = useMemo(
+    () => computeDiff(left, right, mode, effectiveEntitlement),
+    [left, right, mode, effectiveEntitlement],
+  );
   const result = out.result;
+  const proUnlocked = out.proUnlocked;
+  const isProView = PRO_VIEWS.has(viewMode);
+  const proOutput = viewMode === 'semantic' ? out.semantic : out.signedBundle;
 
   const handleCopy = useCallback(async () => {
     if (out.unified === null) {
@@ -133,6 +168,23 @@ export function DiffApp({
             ))}
           </fieldset>
 
+          <fieldset className="viewmode" aria-label="Diff view mode">
+            <legend className="visually-hidden">Diff view mode</legend>
+            {VIEW_MODES.map((v) => (
+              <label key={v} className={viewMode === v ? 'viewmode--active' : ''}>
+                <input
+                  type="radio"
+                  name="diffViewMode"
+                  value={v}
+                  checked={viewMode === v}
+                  onChange={() => setViewMode(v)}
+                  data-testid={`diff-view-${v}`}
+                />
+                {VIEW_LABELS[v]}
+              </label>
+            ))}
+          </fieldset>
+
           <div className="copy" role="group" aria-label="Copy affordances">
             <button
               type="button"
@@ -169,7 +221,42 @@ export function DiffApp({
           </p>
         ) : null}
 
-        {showHunks ? (
+        {isProView ? (
+          !proUnlocked ? (
+            <div className="pro-lock" role="status" data-testid="diff-locked">
+              <strong>
+                {viewMode === 'semantic' ? 'Semantic diff' : 'Signed bundle'} is a Pro feature.
+              </strong>
+              <p>
+                Render a token/key-level semantic diff (intra-line word changes and changed JSON/YAML
+                key paths), or export a canonical signable bundle of the result. Unlock with a license
+                key (verified locally, works offline forever).
+              </p>
+            </div>
+          ) : (
+            <pre
+              className="toml-output diff-pro-output"
+              data-testid="diff-output"
+              aria-label={`${viewMode} output`}
+            >
+              {proOutput}
+            </pre>
+          )
+        ) : viewMode === 'json' || viewMode === 'markdown' ? (
+          result !== null ? (
+            <pre
+              className="toml-output diff-pro-output"
+              data-testid="diff-output"
+              aria-label={`${viewMode} output`}
+            >
+              {viewMode === 'json' ? out.jsonSummary : out.markdown}
+            </pre>
+          ) : (
+            <div role="status" className="empty-state" data-testid="diff-no-output">
+              No diff to show yet. Paste content into Left and Right (or check the diagnostics below).
+            </div>
+          )
+        ) : showHunks ? (
           <div
             className="diff-output"
             role="region"
