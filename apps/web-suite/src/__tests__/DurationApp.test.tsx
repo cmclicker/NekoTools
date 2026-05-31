@@ -3,6 +3,17 @@ import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 
 import { DurationApp } from '../DurationApp.js';
 
+const PRO = {
+  version: 1 as const,
+  licenseId: 'X',
+  licensee: 'Buyer',
+  tier: 'pro' as const,
+  features: ['*'],
+  issuedAt: '2026-01-01T00:00:00.000Z',
+  expiresAt: null,
+  signature: 's',
+};
+
 describe('DurationApp', () => {
   it('renders the per-entry table with seconds + ISO', () => {
     render(<DurationApp initialInput={'PT1H30M'} />);
@@ -37,6 +48,25 @@ describe('DurationApp', () => {
   it('converts to an ISO list', () => {
     render(<DurationApp initialInput={'90m\n3600'} initialUiState={{ viewMode: 'normalized' }} />);
     expect(screen.getByTestId('duration-output').textContent).toBe('PT1H30M\nPT1H');
+  });
+
+  it('locks the breakdown CSV Pro view when free', () => {
+    render(<DurationApp initialInput={'PT1H30M'} initialUiState={{ viewMode: 'breakdown' }} />);
+    expect(screen.getByTestId('duration-locked')).toBeInTheDocument();
+    expect(screen.queryByTestId('duration-output')).not.toBeInTheDocument();
+  });
+
+  it('unlocks the breakdown CSV via an injected Pro entitlement', () => {
+    render(
+      <DurationApp
+        initialInput={'PT1H30M'}
+        initialUiState={{ viewMode: 'breakdown' }}
+        entitlement={PRO}
+      />,
+    );
+    const out = screen.getByTestId('duration-output').textContent ?? '';
+    expect(out.split('\n')[0]).toBe('input,totalSeconds,days,hours,minutes,seconds,iso,approximate');
+    expect(out).toContain('PT1H30M,5400,0,1,30,0,');
   });
 
   it('copies the JSON view via the injected clipboard', async () => {

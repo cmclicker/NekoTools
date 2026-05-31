@@ -1,19 +1,22 @@
 import { useCallback, useMemo, useState, type ChangeEvent } from 'react';
 
+import type { Entitlement } from '@nekotools/contracts';
 import type { SortOptions, SortOrder } from '@nekotools/lens-sort';
 
 import { Diagnostics } from './Diagnostics.js';
 import { copyToClipboard, type ClipboardDeps } from './clipboard.js';
+import { useLicenseContext } from './license-store.js';
 import { parseSortInput } from './sort-parse.js';
 
 /**
  * NekoSort sub-app. Wires `@nekotools/lens-sort` into the shared web-suite
  * shell as a Text tool tab. Free surface: paste lines, toggle the options
  * (order, unique, case-insensitive, numeric, trim, remove-blank), see the
- * transformed result + counts, and copy. All local.
+ * transformed result + counts, and copy. Pro (gated by the suite license):
+ * export a CSV of line frequencies. All local.
  */
 
-export type SortViewMode = 'result' | 'json' | 'markdown';
+export type SortViewMode = 'result' | 'json' | 'markdown' | 'frequency';
 
 export interface NekoSortUiState {
   readonly options: Partial<SortOptions>;
@@ -24,12 +27,29 @@ export interface SortAppProps {
   readonly initialInput?: string;
   readonly initialUiState?: Partial<NekoSortUiState>;
   readonly clipboardDeps?: ClipboardDeps;
+  /** Injected entitlement; defaults to the suite license context. */
+  readonly entitlement?: Entitlement;
 }
 
 interface CopyStatus {
   readonly ok: boolean;
   readonly method: 'clipboard-api' | 'execCommand' | 'none';
 }
+
+const PRO_VIEWS = new Set<SortViewMode>(['frequency']);
+const VIEW_MODES: readonly SortViewMode[] = ['result', 'json', 'markdown', 'frequency'];
+const VIEW_LABELS: Record<SortViewMode, string> = {
+  result: 'Result',
+  json: 'JSON',
+  markdown: 'Markdown',
+  frequency: 'Frequency ⭐',
+};
+const COPY_LABELS: Record<SortViewMode, string> = {
+  result: 'Copy result',
+  json: 'Copy JSON',
+  markdown: 'Copy markdown summary',
+  frequency: 'Copy frequency CSV',
+};
 
 const SAMPLE_INPUT = ['banana', 'apple', 'cherry', 'apple', 'Banana'].join('\n');
 
@@ -42,15 +62,35 @@ const DEFAULTS: SortOptions = {
   removeBlank: false,
 };
 
-export function SortApp({ initialInput, initialUiState, clipboardDeps }: SortAppProps = {}): JSX.Element {
+export function SortApp({
+  initialInput,
+  initialUiState,
+  clipboardDeps,
+  entitlement,
+}: SortAppProps = {}): JSX.Element {
   const [input, setInput] = useState<string>(initialInput ?? SAMPLE_INPUT);
   const [options, setOptions] = useState<SortOptions>({ ...DEFAULTS, ...initialUiState?.options });
   const [viewMode, setViewMode] = useState<SortViewMode>(initialUiState?.viewMode ?? 'result');
   const [copyStatus, setCopyStatus] = useState<CopyStatus | null>(null);
 
-  const parsed = useMemo(() => parseSortInput(input, options), [input, options]);
+  const license = useLicenseContext();
+  const effectiveEntitlement = entitlement ?? license.entitlement;
+  const parsed = useMemo(
+    () => parseSortInput(input, options, effectiveEntitlement),
+    [input, options, effectiveEntitlement],
+  );
+  const proUnlocked = parsed.proUnlocked;
+  const isProView = PRO_VIEWS.has(viewMode);
 
-  const copyText = viewMode === 'json' ? parsed.json : viewMode === 'markdown' ? parsed.markdown : parsed.result;
+  const outputText =
+    viewMode === 'json'
+      ? parsed.json
+      : viewMode === 'markdown'
+        ? parsed.markdown
+        : viewMode === 'frequency'
+          ? parsed.frequency
+          : parsed.result;
+  const copyText = outputText ?? '';
 
   const handleCopy = useCallback(async () => {
     if (copyText === '') {
@@ -123,7 +163,7 @@ export function SortApp({ initialInput, initialUiState, clipboardDeps }: SortApp
         <div className="results__toolbar">
           <fieldset className="viewmode" aria-label="Sort output mode">
             <legend className="visually-hidden">Sort output mode</legend>
-            {(['result', 'json', 'markdown'] as const).map((m) => (
+            {VIEW_MODES.map((m) => (
               <label key={m} className={viewMode === m ? 'viewmode--active' : ''}>
                 <input
                   type="radio"
@@ -132,7 +172,7 @@ export function SortApp({ initialInput, initialUiState, clipboardDeps }: SortApp
                   checked={viewMode === m}
                   onChange={() => setViewMode(m)}
                 />
-                {m === 'result' ? 'Result' : m === 'json' ? 'JSON' : 'Markdown'}
+                {VIEW_LABELS[m]}
               </label>
             ))}
           </fieldset>
@@ -145,7 +185,7 @@ export function SortApp({ initialInput, initialUiState, clipboardDeps }: SortApp
               disabled={copyText === ''}
               data-testid="sort-copy-output"
             >
-              {viewMode === 'json' ? 'Copy JSON' : viewMode === 'markdown' ? 'Copy markdown summary' : 'Copy result'}
+              {COPY_LABELS[viewMode]}
             </button>
           </div>
 
@@ -174,9 +214,20 @@ export function SortApp({ initialInput, initialUiState, clipboardDeps }: SortApp
         </ul>
 
         {parsed.inputCount > 0 ? (
-          <pre className="toml-output" data-testid="sort-output" aria-label={`${viewMode} output`}>
-            {viewMode === 'json' ? parsed.json : viewMode === 'markdown' ? parsed.markdown : parsed.result}
-          </pre>
+          isProView && !proUnlocked ? (
+            <div className="pro-lock" role="status" data-testid="sort-locked">
+              <strong>Frequency export is a Pro feature.</strong>
+              <p>
+                Export a CSV of how often each line occurs (<code>count,line</code>, most frequent
+                first) — handy for log triage and tally counts. Unlock with a license key (verified
+                locally, works offline forever).
+              </p>
+            </div>
+          ) : (
+            <pre className="toml-output" data-testid="sort-output" aria-label={`${viewMode} output`}>
+              {outputText}
+            </pre>
+          )
         ) : (
           <div role="status" className="empty-state" data-testid="sort-no-document">
             No lines yet. Paste some above (or check the diagnostics below).
