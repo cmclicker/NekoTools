@@ -12,34 +12,40 @@ A **blocker** must be `PASS` before the named release stage.
 
 | Stage | Status | Gate |
 | ----- | ------ | ---- |
-| `INTERNAL_DOGFOOD` | **READY** | sections 1–6 below all PASS |
-| `LIMITED_PUBLIC_PREVIEW` | **BLOCKERS RESOLVED — pending confirming re-audit** | section 8 blockers all RESOLVED; a fresh release-readiness re-audit + owner disposition of the section-7 non-blocking risks is the remaining step |
+| `INTERNAL_DOGFOOD` | **READY** | sections 1–6 below all PASS for the full 35-tool surface |
+| `LIMITED_PUBLIC_PREVIEW` | **PENDING** | the product surface grew from 3 tools to 35 + a 23-tool Pro tier since the last gate; needs a fresh re-audit of the new surface, the section-8 blockers below, and owner disposition of section-7 risks |
+| `FOUNDERS_ALPHA` (paid) | **NOT READY** | additionally needs: a production Ed25519 keypair minted (public key embedded; private key off-repo), an owner key-mint path, and a purchase/delivery channel — see `monetization-model.md` + the founders-alpha plan |
 
 Do not advertise `LIMITED_PUBLIC_PREVIEW` until a re-audit confirms this gate
-and the owner has dispositioned the non-blocking risks in section 7.
+and the owner has dispositioned the non-blocking risks in section 7. Do not
+advertise/sell `FOUNDERS_ALPHA` until the production signing key + mint path
+exist (the build currently verifies against a dev key; `EMBEDDED_PUBLIC_KEY` is
+still the placeholder).
 
 ## Current release-readiness gate (Phase 2 product surface)
 
-Last reviewed: 2026-05-26 against `main` @ `11718bd` (release-readiness audit
-+ the B1 / B2-D3 / B3 / B4-D4 follow-up PRs #56 / #57 / this PR).
+Last reviewed: 2026-05-30 against `main` @ `022b1ca` (Pro-exporter build-out
+#104–#118 + Pro-UI surfacing #119–#122). Supersedes the 2026-05-26 review,
+which described the 3-tool Phase 2 surface.
 
 ### 1. Product surface / shipped tools
 
-| Tool | Status | Evidence |
-| ---- | ------ | -------- |
-| NekoJSON | PASS — engine + UI free tier | `@nekotools/lens-json` + `apps/web-suite`; roadmap Phase 1 complete (PR #11) |
-| NekoEnv | PASS — engine + UI free tier | `@nekotools/lens-env` + `apps/web-suite`; roadmap row 12 (PR #14) |
-| NekoLogs | PASS — engine + UI free tier | `@nekotools/lens-logs` + `apps/web-suite`; roadmap row 15 (PR #54) |
+| Surface | Status | Evidence |
+| ------- | ------ | -------- |
+| **35 tools**, each engine + UI free tier | PASS | one `@nekotools/lens-*` package + one `apps/web-suite/src/*App.tsx` tab per tool; each free tier implementation-backed + conformance-pinned |
+| **23 tools** with real gated Pro exporters | PASS | `proExporters` registered + `runExporter` entitlement gate; per-tool monetization-gating conformance tests (#104–#118) |
+| Pro features reachable in the UI | PASS | every Pro exporter surfaced as a tab view behind a `pro-lock` that unlocks on a valid license (#119–#122) |
 
-Three tools are exposed as mounted tool tabs in `apps/web-suite`; each free
-tier is implementation-backed and conformance-pinned.
+All 35 tools are mounted tool tabs in `apps/web-suite` (`lens-kit` is a shared
+util, not a tool). The free tier is genuinely useful standalone; Pro is
+leverage layered on top per `monetization-model.md`.
 
 ### 2. Source-of-truth & docs accuracy
 
 | Item | Status | Evidence |
 | ---- | ------ | -------- |
 | `docs/roadmap.md` canonical + current (rows 1–15 Done; queue empty) | PASS | roadmap + governance Rule 6 (PR #51) |
-| `README.md` front door matches shipped product (3 tools, engine + UI) | PASS | PR #56 |
+| `README.md` front door matches shipped product (35 tools, engine + UI; 23 with Pro) | REVIEW | README predates the full tool build-out + Pro tier; re-confirm it reflects 35 tools before public preview |
 | Tool charters marked IMPLEMENTED + match code | PASS | `docs/tools/*.md` |
 | No internal/phase copy in user-facing UI | PASS | PR #56 (`Now viewing …`) |
 | No doc contradicts the canonical roadmap | PASS | drift sweep (PR #53) |
@@ -48,8 +54,8 @@ tier is implementation-backed and conformance-pinned.
 
 | Gate | Status | Evidence |
 | ---- | ------ | -------- |
-| `pnpm typecheck` / `lint` / `test` / `build` (`ci.yml`) | PASS | **557 tests** green on `main` |
-| `pnpm offline-guard` (`offline-guard.yml`) | PASS | **0 violations** / 117 source files / 11 package.json |
+| `pnpm typecheck` / `lint` / `test` / `build` (`ci.yml`) | PASS | **~1,718 tests** green on `main` (summed across packages; web-suite 507) |
+| `pnpm offline-guard` (`offline-guard.yml`) | PASS | **0 violations** / 487 source files / 42 package.json |
 | CI green on `main` HEAD | PASS | `ci` + `offline-guard` success |
 
 Recommended **before** public preview (non-blocking, see section 7): e2e
@@ -69,8 +75,9 @@ SHA.
 | Item | Status | Evidence |
 | ---- | ------ | -------- |
 | Free entitlements implementation-backed + conformance-pinned | PASS | per-tool `conformance.test.ts` |
-| Pro declared-but-not-registered (no Pro code in free build) | PASS | monetization-safety tests |
-| `monetization-model.md` free/Pro boundary matches manifests | PASS | D3 (PR #57) — workspace save/load Free; advanced leverage Pro |
+| Pro exporters registered + runtime-gated (single-build model) | PASS | `proExporters` + `runExporter` `EntitlementError`; per-tool monetization-gating tests assert free→refused, Pro→unlocked. (Earlier "declared-but-not-registered / no Pro code in free build" claim no longer applies — Pro is in the single build, gated at runtime.) |
+| `monetization-model.md` describes the runtime-gated model accurately | PASS | "What stops casual bypass" rewritten to single-build runtime gating (this PR); free/Pro boundary still matches manifests |
+| Signed-license unlock works end-to-end | PASS | Ed25519 verify in `tool-runtime/license.ts`; `LicenseIntegration.test.tsx` + per-tool unlock tests; verified live in a dev build |
 
 ### 6. Claims / README copy safety
 
@@ -85,22 +92,23 @@ SHA.
 | ---- | ---- |
 | **F3** — `.github/dependabot.yml` present (weekly GitHub-Actions + npm/pnpm version checks); Dependabot **alerts** still require owner GitHub-UI enablement | config landed; offline-first + frozen lockfile + clean permissive licenses mitigate the residual |
 | Branch protection unavailable (current plan) | no mechanical merge gate; relies on the PR + review discipline in `governance.md` |
-| No e2e / a11y / bundle-size CI gate | strong component/integration coverage (557 tests) mitigates for dogfood |
+| No e2e / a11y / bundle-size CI gate | strong component/integration coverage (~1,718 tests) mitigates for dogfood |
 | GitHub Actions pinned by tag, not SHA | supply-chain hardening; tracked below |
 
 ### 8. Public-preview blockers
 
 | Blocker | Status |
 | ------- | ------ |
-| B1 — README understated shipped tools | RESOLVED (PR #56) |
+| B1 — README understated shipped tools (was 3) | REOPENED — README must now match **35 tools + Pro tier**; see §2 |
 | B2 / D3 — monetization free/Pro workspace boundary | RESOLVED (PR #57) |
 | B3 — release-unsafe internal UI copy | RESOLVED (PR #56) |
-| B4 / D4 — no current release-checklist gate | RESOLVED (this PR) |
-| Confirming release-readiness re-audit | PENDING (run after this PR) |
+| B4 / D4 — no current release-checklist gate | RESOLVED |
+| B5 — `monetization-model.md` described build-time separation, not the shipped runtime gating | RESOLVED (this PR) |
+| Confirming release-readiness re-audit over the 35-tool + Pro surface | PENDING |
 
-All four substantive blockers (B1–B4) are resolved. `LIMITED_PUBLIC_PREVIEW`
-remains gated on a confirming re-audit and the owner's disposition of the
-section-7 non-blocking risks — it is **not** claimed here.
+`LIMITED_PUBLIC_PREVIEW` remains gated on the README truth-up (B1, reopened by
+the tool build-out), a confirming re-audit of the full surface, and owner
+disposition of the section-7 non-blocking risks — it is **not** claimed here.
 
 ---
 
@@ -179,8 +187,8 @@ Phase 0 review.
 | Criterion                            | Status | Notes |
 | ------------------------------------ | ------ | ----- |
 | `pnpm install` succeeds              | PASS   | Lockfile committed; `--frozen-lockfile` works in CI. |
-| `pnpm typecheck` / `lint` / `test` / `offline-guard` succeed | PASS | Phase 0 snapshot: 110 tests (contracts 6, schemas 58, runtime 20, offline-guard 6, lens-binary 20). **Current `main`: 557 tests — see the gate above.** |
-| `README.md` explains scope           | PASS   | (kept current — see PR #56) |
+| `pnpm typecheck` / `lint` / `test` / `offline-guard` succeed | PASS | Phase 0 snapshot: 110 tests (contracts 6, schemas 58, runtime 20, offline-guard 6, lens-binary 20). **Current `main`: ~1,718 tests — see the gate above.** |
+| `README.md` explains scope           | REVIEW | predates the 35-tool + Pro build-out; see §2 (B1 reopened) |
 | `LICENSE` clarifies trademark + commercial-use clause | PASS | source-available, not OSI — see `open-core-strategy.md` |
 
 ### Remaining hardening items (tracked)
@@ -202,7 +210,7 @@ pnpm test            110 tests passed
 pnpm offline-guard   34 source files, 7 package.json, 0 violations
 ```
 
-This is the Phase 0 snapshot. Current `main` verification (557 tests, 117
+This is the Phase 0 snapshot. Current `main` verification (~1,718 tests, 487
 source files, 0 violations) is summarized in the gate above and runs green in
 CI on every push/PR.
 

@@ -66,21 +66,36 @@ with what users are actually paying for.
 
 ## What stops casual bypass
 
-Not entitlement flags in source. Build-time separation:
+**The shipped model is single-build, runtime-gated by a signed license** —
+not build-time separation. Being precise about this matters, because an
+honest description is the whole brand:
 
-- The Pro implementation is not present in the public free build.
-- Flipping `hasPro = true` does nothing because the Pro modules are not
-  bundled.
-- The Ed25519-signed license verifies on launch with a public key
-  bundled in the paid binary.
+- There is **one** build. Each Pro feature's implementation (the gated
+  exporters in `packages/lens-*/src/exporters.ts`, registered as
+  `proExporters`) ships in that single build alongside the free features.
+- The gate is at **runtime**: `runExporter` (in
+  `packages/tool-runtime/src/runners.ts`) checks the active entitlement and
+  throws `EntitlementError` for a Pro exporter unless the entitlement grants
+  it. The free build runs under `FREE_ENTITLEMENT`, which grants nothing Pro.
+- A purchased license is an **Ed25519-signed** offline key. The app verifies
+  it locally on each launch against a bundled public key
+  (`EMBEDDED_PUBLIC_KEY`) — see `packages/tool-runtime/src/license.ts`. No
+  server is contacted, ever. One verified key lights up the whole suite,
+  offline, forever.
 
-This stops casual tampering. It does not stop determined cracking, and
-the business model does not depend on perfect DRM. It depends on:
+Because the Pro code is present in the (source-available) build, a determined
+user can patch the gate. **That is fine and expected** — the business model
+has never depended on perfect DRM. The signed `licensee` is surfaced in the UI
+("Licensed to …") as social friction against casual key-sharing. What the
+model actually depends on:
 
 - Real Pro value users want to pay for.
-- Signed, trusted distribution.
+- Signed, trusted distribution (and, later, polished signed desktop builds).
 - Trademark protection on the NekoTools name and marks.
 - Commercial licensing for businesses that need legitimate use.
 
-See [open-core-strategy.md](open-core-strategy.md) for the repo and
-build-time architecture.
+A future paid-binary variant **could** additionally strip the Pro
+implementation out of a closed build (true build-time separation) for stronger
+tamper-resistance; that is an option, not the current shipped architecture.
+
+See [open-core-strategy.md](open-core-strategy.md) for the repo architecture.
